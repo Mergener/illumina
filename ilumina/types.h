@@ -102,13 +102,13 @@ inline ui8 pop_msb(ui64 n) {
  * iterates through every set bit on the bitboard, storing them on the specified bit
  * variable.
  */
-#define BB_FOREACH(bb, bit, code) {			\
-	Bitboard _bb_copy = bb;					\
-	while (_bb_copy) {						\
-		ui8 bit = pop_lsb(_bb_copy);	    \
-		code								\
-		_bb_copy &= _bb_copy - 1;		    \
-	}										\
+#define BB_FOREACH(bb, bit, code) {     \
+	Bitboard _bb_copy = bb;             \
+	while (_bb_copy) {                  \
+		ui8 bit = pop_lsb(_bb_copy);    \
+		code                            \
+		_bb_copy &= _bb_copy - 1;       \
+	}                                   \
 }
 
 //
