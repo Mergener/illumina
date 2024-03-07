@@ -2,11 +2,13 @@
 #define ILUMINA_TYPES_H
 
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 #include "debug.h"
 
 //
-// Some useful bit manipulation macros
+// Some useful bit manipulation macros.
 //
 
 #define BIT(n) ((1ULL) << (n))
@@ -132,6 +134,14 @@ inline constexpr Color COLORS[] = { CL_WHITE, CL_BLACK };
 inline constexpr Color opposite_color(Color c) { return c ^ 1; }
 
 //
+// Board sides
+//
+
+enum class BoardSide {
+    King, Queen
+};
+
+//
 // Directions
 //
 
@@ -165,8 +175,30 @@ inline constexpr Direction pawn_push_direction(Color color) {
 }
 
 //
-// Squares
+// Board coordinates (squares -- ranks and files)
 //
+
+/**
+ * Represents the index of a rank on the board.
+ * Named by RNK_* constants.
+ */
+using BoardRank = ui8;
+
+enum {
+    RNK_1, RNK_2, RNK_3, RNK_4,
+    RNK_5, RNK_6, RNK_7, RNK_8,
+};
+
+/**
+ * Represents the index of a rank on the board.
+ * Named by FL_* constants.
+ */
+using BoardFile = ui8;
+
+enum {
+    FL_1, FL_2, FL_3, FL_4,
+    FL_5, FL_6, FL_7, FL_8,
+};
 
 /**
  * Represents the index of a square on the board.
@@ -188,6 +220,17 @@ enum {
     SQ_COUNT = 64
 };
 
+inline constexpr BoardFile square_file(Square s) {
+    return (s % 8);
+}
+
+inline constexpr BoardRank square_rank(Square s) {
+    return (s / 8);
+}
+
+inline constexpr Square make_square(BoardFile file, BoardRank rank) {
+    return rank * 8 + file;
+}
 
 inline constexpr Square mirror_horizontal(Square s) {
     constexpr Square MIRRORS[] {
@@ -220,22 +263,29 @@ inline constexpr Square mirror_vertical(Square s) {
 }
 
 inline int chebyshev_distance(Square a, Square b) {
-    extern int g_ChebyshevDistances[SQ_COUNT][SQ_COUNT];
-    return g_ChebyshevDistances[a][b];
+    extern int g_chebyshev[SQ_COUNT][SQ_COUNT];
+    return g_chebyshev[a][b];
 }
 
 inline int manhattan_distance(Square a, Square b) {
-    extern int g_ManhattanDistances[SQ_COUNT][SQ_COUNT];
-    return g_ManhattanDistances[a][b];
+    extern int g_manhattan[SQ_COUNT][SQ_COUNT];
+    return g_manhattan[a][b];
 }
 
-inline static constexpr Square pawn_push_destination(Square src, Color color) {
+inline constexpr Square pawn_push_destination(Square src, Color color) {
     return src + pawn_push_direction(color);
 }
 
-inline static constexpr Square double_push_destination(Square src, Color color) {
+inline constexpr Square double_push_destination(Square src, Color color) {
     return src + pawn_push_direction(color) * 2;
 }
+
+inline constexpr Square castled_king_square(Color c, BoardSide side) {
+    constexpr Square SQUARES[] { SQ_G1, SQ_G8, SQ_C1, SQ_C8 };
+    return SQUARES[int(side) * 2 + c];
+}
+
+Square parse_square(std::string_view square_str);
 
 //
 // Pieces
@@ -245,12 +295,8 @@ using PieceType = ui8;
 
 enum {
     PT_NULL,
-    PT_PAWN,
-    PT_KNIGHT,
-    PT_BISHOP,
-    PT_ROOK,
-    PT_QUEEN,
-    PT_KING,
+    PT_PAWN, PT_KNIGHT, PT_BISHOP,
+    PT_ROOK, PT_QUEEN, PT_KING,
     PT_COUNT
 };
 
@@ -262,6 +308,8 @@ inline constexpr PieceType PIECE_TYPES[] = {
 
 class Piece {
 public:
+    Piece() = default;
+
     inline constexpr Piece(Color color, PieceType type)
         : m_data((color & BITMASK(1)) | ((type & BITMASK(3)) << 1)) {}
 
@@ -273,9 +321,14 @@ public:
 
     inline constexpr ui8 raw() const { return m_data; }
 
+    char to_char() const;
+    static Piece from_char(char c);
+
 private:
-    ui8 m_data;
+    ui8 m_data = 0;
 };
+
+inline constexpr Piece PIECE_NULL(CL_WHITE, PT_NULL);
 
 inline constexpr Piece WHITE_PAWN(CL_WHITE, PT_PAWN);
 inline constexpr Piece WHITE_KNIGHT(CL_WHITE, PT_KNIGHT);
@@ -306,6 +359,8 @@ enum {
     MT_SIMPLE_PROMOTION,
 };
 
+class Board; // Forward declaration of Board for some Move static methods.
+
 class Move {
 
     //
@@ -321,6 +376,8 @@ class Move {
     //
 
 public:
+    Move(const Board& board, Square src, Square dst);
+
     inline explicit constexpr Move(ui32 data)
         : m_data(data) {}
 
@@ -336,6 +393,8 @@ public:
         constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_EN_PASSANT) | BIT(MT_PROMOTION_CAPTURE);
         return (BIT(type()) & MASK) != 0;
     }
+
+    std::string to_uci() const; // TODO
 
 private:
     ui32 m_data;
@@ -405,6 +464,8 @@ public:
         move.m_data |= (prom_piece.raw() & BITMASK(4)) << 23;
         return move;
     }
+
+    static Move parse_uci(const Board& board, std::string_view move_str);
 };
 
 inline constexpr Move MOVE_NULL(0);
