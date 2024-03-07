@@ -1,11 +1,11 @@
-#include "ilumina.h"
+#include "illumina.h"
 
 #include "types.h"
 
-namespace ilumina {
+namespace illumina {
 
 void init() {
     init_types();
 }
 
-} // ilumina
+} // illumina

@@ -2,10 +2,10 @@
 
 #include <string>
 
-namespace ilumina {
+namespace illumina {
 
 Square parse_square(std::string_view square_str) {
-    ILUMINA_ASSERT(square_str.size() >= 2);
+    ILLUMINA_ASSERT(square_str.size() >= 2);
 
     BoardFile file = std::tolower(square_str[0]) - 'a';
     BoardRank rank = square_str[1] - '0';
@@ -65,4 +65,4 @@ void init_types() {
 }
 
 
-} // ilumina
+} // illumina

@@ -1,5 +1,5 @@
-#ifndef ILUMINA_BOARD_H
-#define ILUMINA_BOARD_H
+#ifndef ILLUMINA_BOARD_H
+#define ILLUMINA_BOARD_H
 
 #include <array>
 #include <string_view>
@@ -7,7 +7,7 @@
 
 #include "types.h"
 
-namespace ilumina {
+namespace illumina {
 
 struct BoardState {
     Move last_move   = MOVE_NULL;
@@ -62,6 +62,6 @@ private:
     bool m_frc = false;
 };
 
-} // ilumina
+} // illumina
 
-#endif // ILUMINA_BOARD_H
+#endif // ILLUMINA_BOARD_H
