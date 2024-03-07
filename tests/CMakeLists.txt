@@ -1,0 +1,4 @@
+add_executable(ilumina_tests testsuite.cpp testsuite.h main.cpp)
+set_target_properties(ilumina_tests PROPERTIES OUTPUT_NAME ilumina)
+target_link_libraries(ilumina_tests PRIVATE ilumina_lib)
+target_include_directories(ilumina_tests PRIVATE ${ILUMINA_LIBRARY_SOURCE_DIR})
