@@ -376,7 +376,7 @@ class Move {
     //
 
 public:
-    Move(const Board& board, Square src, Square dst);
+    Move(const Board& board, Square src, Square dst) {}
 
     inline explicit constexpr Move(ui32 data)
         : m_data(data) {}
