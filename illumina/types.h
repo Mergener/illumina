@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <iostream>
 
 #include "debug.h"
 
@@ -321,12 +322,20 @@ public:
 
     inline constexpr ui8 raw() const { return m_data; }
 
+    inline bool operator==(Piece other) const { return m_data == other.m_data; }
+    inline bool operator!=(Piece other) const { return m_data != other.m_data; }
+
     char to_char() const;
     static Piece from_char(char c);
 
 private:
     ui8 m_data = 0;
 };
+
+inline std::ostream& operator<<(std::ostream& stream, Piece p) {
+    stream << p.to_char();
+    return stream;
+}
 
 inline constexpr Piece PIECE_NULL(CL_WHITE, PT_NULL);
 
@@ -430,10 +439,10 @@ public:
                                                        Square dst,
                                                        Color pawn_color,
                                                        Piece capt_piece,
-                                                       Piece prom_piece) {
+                                                       PieceType prom_piece_type) {
         Move move = Move::base(src, dst, Piece(pawn_color, PT_PAWN), MT_PROMOTION_CAPTURE);
         move.m_data |= (capt_piece.raw() & BITMASK(4)) << 16;
-        move.m_data |= (prom_piece.raw() & BITMASK(4)) << 23;
+        move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
         return move;
     }
 
@@ -446,12 +455,12 @@ public:
     }
 
     inline static constexpr Move new_double_push(Square src, Color pawn_color) {
-        Move move = Move::base(src, pawn_push_destination(src, pawn_color), Piece(pawn_color, PT_PAWN), MT_DOUBLE_PUSH);
+        Move move = Move::base(src, double_push_destination(src, pawn_color), Piece(pawn_color, PT_PAWN), MT_DOUBLE_PUSH);
         return move;
     }
 
     inline static constexpr Move new_castles(Square src, Square dst, Color king_color, Square rook_square) {
-        Move move = Move::base(src, dst, Piece(king_color, PT_KING), rook_square);
+        Move move = Move::base(src, dst, Piece(king_color, PT_KING), MT_CASTLES);
         move.m_data |= (rook_square & BITMASK(6)) << 26;
         return move;
     }
@@ -459,9 +468,9 @@ public:
     inline static constexpr Move new_simple_promotion(Square src,
                                                       Square dst,
                                                       Color pawn_color,
-                                                      Piece prom_piece) {
+                                                      PieceType prom_piece_type) {
         Move move = Move::base(src, dst, Piece(pawn_color, PT_PAWN), MT_SIMPLE_PROMOTION);
-        move.m_data |= (prom_piece.raw() & BITMASK(4)) << 23;
+        move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
         return move;
     }
 

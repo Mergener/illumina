@@ -1,8 +1,3 @@
-#include <iostream>
-#include <vector>
-#include <functional>
-#include <string>
-
 #include "litetest.h"
 
 using namespace litetest;
