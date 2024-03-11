@@ -1,5 +1,5 @@
-#ifndef ILUMINA_TYPES_H
-#define ILUMINA_TYPES_H
+#ifndef ILLUMINA_TYPES_H
+#define ILLUMINA_TYPES_H
 
 #include <cstdint>
 #include <string>
@@ -27,7 +27,7 @@
 #pragma intrinsic(_BitScanReverse64)
 #endif
 
-namespace ilumina {
+namespace illumina {
 
 /**
  * Initializes the types module.
@@ -64,7 +64,7 @@ using Bitboard = ui64;
  * so this function would return 3 (zero-indexed).
  */
 inline ui8 pop_lsb(ui64 n) {
-    ILUMINA_ASSERT(n != 0);
+    ILLUMINA_ASSERT(n != 0);
 #if defined(_MSC_VER)
     unsigned long idx;
 	_BitScanForward64(&idx, n);
@@ -87,7 +87,7 @@ inline ui8 pop_lsb(ui64 n) {
  * so this function would return 11 (zero-indexed).
  */
 inline ui8 pop_msb(ui64 n) {
-    ILUMINA_ASSERT(n != 0);
+    ILLUMINA_ASSERT(n != 0);
 #if defined(_MSC_VER)
     unsigned long idx;
 	_BitScanReverse64(&idx, n);
@@ -376,7 +376,7 @@ class Move {
     //
 
 public:
-    Move(const Board& board, Square src, Square dst);
+    Move(const Board& board, Square src, Square dst) {}
 
     inline explicit constexpr Move(ui32 data)
         : m_data(data) {}
@@ -470,6 +470,6 @@ public:
 
 inline constexpr Move MOVE_NULL(0);
 
-} // ilumina
+} // illumina
 
-#endif // ILUMINA_TYPES_H
+#endif // ILLUMINA_TYPES_H

@@ -1,4 +1,4 @@
-add_executable(ilumina_cli main.cpp)
-set_target_properties(ilumina_cli PROPERTIES OUTPUT_NAME ilumina)
-target_link_libraries(ilumina_cli PRIVATE ilumina_lib)
-target_include_directories(ilumina_cli PRIVATE ${ILUMINA_LIBRARY_SOURCE_DIR})
+add_executable(illumina_cli main.cpp)
+set_target_properties(illumina_cli PROPERTIES OUTPUT_NAME illumina)
+target_link_libraries(illumina_cli PRIVATE illumina_lib)
+target_include_directories(illumina_cli PRIVATE ${ILLUMINA_LIBRARY_SOURCE_DIR})

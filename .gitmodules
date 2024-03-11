@@ -1,0 +1,4 @@
+[submodule "ext/litetest"]
+	path = ext/litetest
+	url = https://github.com/mergener/litetest
+	branch = main
