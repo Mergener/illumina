@@ -69,6 +69,8 @@ private:
     BoardState m_state;
 
     bool m_frc = false;
+
+    inline Bitboard& piece_bb(Piece piece) { return m_bbs[piece.color()][piece.type()]; }
 };
 
 } // illumina

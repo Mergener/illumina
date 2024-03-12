@@ -53,6 +53,14 @@ inline constexpr ui8 lrot(ui8 val, ui8 rot) {
 
 using Bitboard = ui64;
 
+inline constexpr ui64 pop_bit(ui64 val, ui8 bit) {
+    return val & ~BIT(bit);
+}
+
+inline constexpr ui64 set_bit(ui64 val, ui8 bit) {
+    return val | BIT(bit);
+}
+
 /**
  * Returns the position of the least significant bit from a given non-zero 64 bit integer.
  *
@@ -230,7 +238,7 @@ inline char file_to_char(BoardFile f) {
 }
 
 inline char rank_to_char(BoardRank r) {
-    ILLUMINA_ASSERT_VALID_RANK(f);
+    ILLUMINA_ASSERT_VALID_RANK(r);
 
     return '1' + r;
 }
@@ -304,14 +312,16 @@ inline constexpr Square mirror_vertical(Square s) {
 }
 
 inline int chebyshev_distance(Square a, Square b) {
-    ILLUMINA_ASSERT_VALID_SQUARE(s);
+    ILLUMINA_ASSERT_VALID_SQUARE(a);
+    ILLUMINA_ASSERT_VALID_SQUARE(b);
 
     extern int g_chebyshev[SQ_COUNT][SQ_COUNT];
     return g_chebyshev[a][b];
 }
 
 inline int manhattan_distance(Square a, Square b) {
-    ILLUMINA_ASSERT_VALID_SQUARE(s);
+    ILLUMINA_ASSERT_VALID_SQUARE(a);
+    ILLUMINA_ASSERT_VALID_SQUARE(b);
 
     extern int g_manhattan[SQ_COUNT][SQ_COUNT];
     return g_manhattan[a][b];
