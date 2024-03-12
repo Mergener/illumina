@@ -8,6 +8,10 @@
 
 #include "debug.h"
 
+//
+// The following headers contain required intrinsics to manipulate bits on a bitboard.
+// We conditionally include them based on the compiler we're using.
+//
 #ifdef __GNUC__
 #include <cpuid.h>
 #elif defined(_MSC_VER)
@@ -42,11 +46,6 @@ using ui64 = std::uint64_t;
 inline constexpr ui8 lrot(ui8 val, ui8 rot) {
     return (val << rot) | (val >> ((sizeof(val) * 8) - rot));
 }
-
-//
-// The following headers contain required intrinsics to manipulate bits on a bitboard.
-// We conditionally include them based on the compiler we're using.
-//
 
 //
 // Bitboards
