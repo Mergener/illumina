@@ -53,6 +53,14 @@ inline constexpr ui8 lrot(ui8 val, ui8 rot) {
 
 using Bitboard = ui64;
 
+inline constexpr ui64 pop_bit(ui64 val, ui8 bit) {
+    return val & ~BIT(bit);
+}
+
+inline constexpr ui64 set_bit(ui64 val, ui8 bit) {
+    return val | BIT(bit);
+}
+
 /**
  * Returns the position of the least significant bit from a given non-zero 64 bit integer.
  *
