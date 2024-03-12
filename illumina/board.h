@@ -16,7 +16,7 @@ struct BoardState {
     ui16 rule_50     = 0;
     ui8 n_checkers   = 0;
     std::array<std::array<Bitboard, PT_COUNT>, CL_COUNT> attacks;
-    std::array<Bitboard, CL_COUNT> castle_rights;
+    CastlingRights castle_rights;
 };
 
 class Board {
@@ -28,6 +28,10 @@ public:
     inline bool     frc() const                 { return m_frc; }
     inline bool     in_check() const            { return m_state.n_checkers > 0; }
     inline bool     in_double_check() const     { return m_state.n_checkers == 2; }
+
+    inline Square get_castle_rook_square(Color color, BoardSide side) const {
+        return m_castle_rook_squares[color][int(side)];
+    }
 
     void set_piece_at(Square s, Piece p); // TODO
 
@@ -55,6 +59,11 @@ private:
     Color m_ctm = CL_WHITE;
     Bitboard m_occ = 0;
     Bitboard m_pinned = 0;
+
+    std::array<std::array<Square, BOARD_SIDE_COUNT>, CL_COUNT> m_castle_rook_squares = {
+        std::array<Square, BOARD_SIDE_COUNT> { SQ_H1, SQ_A1 },
+        std::array<Square, BOARD_SIDE_COUNT> { SQ_H8, SQ_A8 }
+    };
 
     std::vector<BoardState> m_prev_states;
     BoardState m_state;

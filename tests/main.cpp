@@ -1,8 +1,7 @@
 #include "litetest.h"
-
-using namespace litetest;
-using namespace internal;
+#include "illumina.h"
 
 int main(int argc, char* argv[]) {
-    return litetest_main(argc, argv);
+    illumina::init();
+    return litetest::litetest_main(argc, argv);
 }

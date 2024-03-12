@@ -8,18 +8,6 @@
 
 #include "debug.h"
 
-//
-// Some useful bit manipulation macros.
-//
-
-#define BIT(n) ((1ULL) << (n))
-#define BITMASK(nbits) ((1ul << (nbits)) - 1ul)
-
-//
-// The following headers contain required intrinsics to manipulate bits on a bitboard.
-// We conditionally include them based on the compiler we're using.
-//
-
 #ifdef __GNUC__
 #include <cpuid.h>
 #elif defined(_MSC_VER)
@@ -29,11 +17,6 @@
 #endif
 
 namespace illumina {
-
-/**
- * Initializes the types module.
- */
-void init_types();
 
 //
 // Primitive integer types
@@ -47,6 +30,23 @@ using ui8  = std::uint8_t;
 using ui16 = std::uint16_t;
 using ui32 = std::uint32_t;
 using ui64 = std::uint64_t;
+
+
+//
+// Some useful bit manipulation functions/macros.
+//
+
+#define BIT(n) ((1ULL) << (n))
+#define BITMASK(nbits) ((1ul << (nbits)) - 1ul)
+
+inline constexpr ui8 lrot(ui8 val, ui8 rot) {
+    return (val << rot) | (val >> ((sizeof(val) * 8) - rot));
+}
+
+//
+// The following headers contain required intrinsics to manipulate bits on a bitboard.
+// We conditionally include them based on the compiler we're using.
+//
 
 //
 // Bitboards
@@ -130,6 +130,8 @@ enum {
     CL_COUNT
 };
 
+#define ILLUMINA_ASSERT_VALID_COLOR(c) ILLUMINA_ASSERT((c) == illumina::CL_WHITE || (c) == illumina::CL_BLACK)
+
 inline constexpr Color COLORS[] = { CL_WHITE, CL_BLACK };
 
 inline constexpr Color opposite_color(Color c) { return c ^ 1; }
@@ -140,6 +142,23 @@ inline constexpr Color opposite_color(Color c) { return c ^ 1; }
 
 enum class BoardSide {
     King, Queen
+};
+
+inline constexpr int BOARD_SIDE_COUNT = 2;
+
+//
+// Castle rights
+//
+
+using CastlingRights = ui8;
+
+enum {
+    CR_NONE      = 0,
+    CR_WHITE_OO  = BIT(0),
+    CR_WHITE_OOO = BIT(1),
+    CR_BLACK_OO  = BIT(2),
+    CR_BLACK_OOO = BIT(3),
+    CR_ALL = CR_WHITE_OO | CR_WHITE_OOO | CR_BLACK_OO | CR_BLACK_OOO
 };
 
 //
@@ -190,6 +209,8 @@ enum {
     RNK_5, RNK_6, RNK_7, RNK_8,
 };
 
+#define ILLUMINA_ASSERT_VALID_RANK(r) ILLUMINA_ASSERT((r) >= illumina::RNK_1 && (r) <= illumina::RNK_8)
+
 /**
  * Represents the index of a rank on the board.
  * Named by FL_* constants.
@@ -197,9 +218,23 @@ enum {
 using BoardFile = ui8;
 
 enum {
-    FL_1, FL_2, FL_3, FL_4,
-    FL_5, FL_6, FL_7, FL_8,
+    FL_A, FL_B, FL_C, FL_D,
+    FL_E, FL_F, FL_G, FL_H,
 };
+
+#define ILLUMINA_ASSERT_VALID_FILE(f) ILLUMINA_ASSERT((f) >= illumina::FL_A && (f) <= illumina::FL_H)
+
+inline char file_to_char(BoardFile f) {
+    ILLUMINA_ASSERT_VALID_FILE(f);
+
+    return "abcdefgh"[f];
+}
+
+inline char rank_to_char(BoardRank r) {
+    ILLUMINA_ASSERT_VALID_RANK(f);
+
+    return '1' + r;
+}
 
 /**
  * Represents the index of a square on the board.
@@ -221,6 +256,8 @@ enum {
     SQ_COUNT = 64
 };
 
+#define ILLUMINA_ASSERT_VALID_SQUARE(s) ILLUMINA_ASSERT((s) >= 0 && (s) <= 63)
+
 inline constexpr BoardFile square_file(Square s) {
     return (s % 8);
 }
@@ -234,6 +271,8 @@ inline constexpr Square make_square(BoardFile file, BoardRank rank) {
 }
 
 inline constexpr Square mirror_horizontal(Square s) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     constexpr Square MIRRORS[] {
         SQ_H1, SQ_G1, SQ_F1, SQ_E1, SQ_D1, SQ_C1, SQ_B1, SQ_A1,
         SQ_H2, SQ_G2, SQ_F2, SQ_E2, SQ_D2, SQ_C2, SQ_B2, SQ_A2,
@@ -249,6 +288,8 @@ inline constexpr Square mirror_horizontal(Square s) {
 }
 
 inline constexpr Square mirror_vertical(Square s) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     constexpr Square MIRRORS[] {
         SQ_A8, SQ_B8, SQ_C8, SQ_D8, SQ_E8, SQ_F8, SQ_G8, SQ_H8,
         SQ_A7, SQ_B7, SQ_C7, SQ_D7, SQ_E7, SQ_F7, SQ_G7, SQ_H7,
@@ -264,11 +305,15 @@ inline constexpr Square mirror_vertical(Square s) {
 }
 
 inline int chebyshev_distance(Square a, Square b) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     extern int g_chebyshev[SQ_COUNT][SQ_COUNT];
     return g_chebyshev[a][b];
 }
 
 inline int manhattan_distance(Square a, Square b) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     extern int g_manhattan[SQ_COUNT][SQ_COUNT];
     return g_manhattan[a][b];
 }
@@ -282,11 +327,31 @@ inline constexpr Square double_push_destination(Square src, Color color) {
 }
 
 inline constexpr Square castled_king_square(Color c, BoardSide side) {
+    ILLUMINA_ASSERT_VALID_COLOR(c);
+
     constexpr Square SQUARES[] { SQ_G1, SQ_G8, SQ_C1, SQ_C8 };
     return SQUARES[int(side) * 2 + c];
 }
 
+/**
+ * The square in which a eligible castling rook is expected to be in standard (non-FRC) chess
+ * in the starting position, given a color and a side.
+ *
+ * Ex: standard_castle_rook_src_square(CL_BLACK, BoardSide::Queen) = SQ_A8
+ */
+inline constexpr Square standard_castle_rook_src_square(Color color, BoardSide side) {
+    ILLUMINA_ASSERT_VALID_COLOR(color);
+
+    constexpr Square CASTLE_ROOK_SQ[CL_COUNT][BOARD_SIDE_COUNT] = {
+        { SQ_H1, SQ_A1 }, // White
+        { SQ_H8, SQ_A8 }  // Black
+    };
+
+    return CASTLE_ROOK_SQ[color][int(side)];
+}
+
 Square parse_square(std::string_view square_str);
+std::string square_name(Square s);
 
 //
 // Pieces
@@ -301,21 +366,36 @@ enum {
     PT_COUNT
 };
 
+#define ILLUMINA_ASSERT_VALID_PIECE_TYPE(pt) ILLUMINA_ASSERT((pt) >= illumina::PT_PAWN && (pt) <= illumina::PT_KING)
+#define ILLUMINA_ASSERT_VALID_PT_OR_NULL(pt) ILLUMINA_ASSERT((pt) >= illumina::PT_NULL && (pt) <= illumina::PT_KING)
+
 inline constexpr PieceType PIECE_TYPES[] = {
     PT_PAWN, PT_KNIGHT,
     PT_BISHOP, PT_ROOK,
     PT_QUEEN, PT_KING
 };
 
+inline constexpr char piece_type_to_char(PieceType pt) {
+    ILLUMINA_ASSERT_VALID_PT_OR_NULL(pt);
+
+    return "-pnbrqk"[pt];
+}
+
 class Piece {
 public:
     Piece() = default;
 
     inline constexpr Piece(Color color, PieceType type)
-        : m_data((color & BITMASK(1)) | ((type & BITMASK(3)) << 1)) {}
+        : m_data((color & BITMASK(1)) | ((type & BITMASK(3)) << 1)) {
+        ILLUMINA_ASSERT_VALID_COLOR(color);
+        ILLUMINA_ASSERT_VALID_PT_OR_NULL(type);
+    }
 
     inline explicit constexpr Piece(ui8 data)
-        : m_data(data) {}
+        : m_data(data) {
+        ILLUMINA_ASSERT_VALID_COLOR(color());
+        ILLUMINA_ASSERT_VALID_PT_OR_NULL(type());
+    }
 
     inline constexpr Color color() const    { return m_data & BITMASK(1); }
     inline constexpr PieceType type() const { return (m_data >> 1); }
@@ -368,6 +448,8 @@ enum {
     MT_SIMPLE_PROMOTION,
 };
 
+#define ILLUMINA_ASSERT_VALID_MOVE_TYPE(mt) ILLUMINA_ASSERT((mt) >= illumina::MT_NORMAL && (mt) <= illumina::MT_SIMPLE_PROMOTION)
+
 class Board; // Forward declaration of Board for some Move static methods.
 
 class Move {
@@ -385,11 +467,12 @@ class Move {
     //
 
 public:
-    Move(const Board& board, Square src, Square dst) {}
+    Move(const Board& board, Square src, Square dst, PieceType prom_piece_type = PT_NULL);
 
     inline explicit constexpr Move(ui32 data)
         : m_data(data) {}
 
+    inline constexpr ui32 raw() const                       { return m_data; }
     inline constexpr Square source() const                  { return m_data & BITMASK(6); }
     inline constexpr Square destination() const             { return (m_data >> 6) & BITMASK(6); }
     inline constexpr Piece source_piece() const             { return Piece((m_data >> 12) & BITMASK(4)); }
@@ -403,16 +486,25 @@ public:
         return (BIT(type()) & MASK) != 0;
     }
 
-    std::string to_uci() const; // TODO
+    inline constexpr bool is_promotion() const {
+        constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
+        return (BIT(type()) & MASK) != 0;
+    }
+
+    std::string to_uci(bool frc = false) const;
 
 private:
     ui32 m_data;
 
-    inline static constexpr Move base(Square source, Square dest, Piece src_piece, MoveType type) {
+    inline static constexpr Move base(Square src, Square dst, Piece src_piece, MoveType type) {
+        ILLUMINA_ASSERT_VALID_SQUARE(src);
+        ILLUMINA_ASSERT_VALID_SQUARE(dst);
+        ILLUMINA_ASSERT_VALID_MOVE_TYPE(type);
+
         Move move(0);
 
-        move.m_data |= (source & BITMASK(6))          << 0;
-        move.m_data |= (dest & BITMASK(6))            << 6;
+        move.m_data |= (src & BITMASK(6))             << 0;
+        move.m_data |= (dst & BITMASK(6))             << 6;
         move.m_data |= (src_piece.raw() & BITMASK(4)) << 12;
         move.m_data |= (type & BITMASK(3))            << 20;
 
@@ -440,6 +532,8 @@ public:
                                                        Color pawn_color,
                                                        Piece capt_piece,
                                                        PieceType prom_piece_type) {
+        ILLUMINA_ASSERT_VALID_PIECE_TYPE(prom_piece_type);
+
         Move move = Move::base(src, dst, Piece(pawn_color, PT_PAWN), MT_PROMOTION_CAPTURE);
         move.m_data |= (capt_piece.raw() & BITMASK(4)) << 16;
         move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
@@ -459,8 +553,19 @@ public:
         return move;
     }
 
-    inline static constexpr Move new_castles(Square src, Square dst, Color king_color, Square rook_square) {
-        Move move = Move::base(src, dst, Piece(king_color, PT_KING), MT_CASTLES);
+    inline static constexpr Move new_castles(Square src,
+                                             Color king_color,
+                                             BoardSide side) {
+        return new_castles(src, king_color, side, standard_castle_rook_src_square(king_color, side));
+    }
+
+    inline static constexpr Move new_castles(Square src,
+                                             Color king_color,
+                                             BoardSide side, Square
+                                             rook_square) {
+        ILLUMINA_ASSERT_VALID_SQUARE(rook_square);
+
+        Move move = Move::base(src, castled_king_square(king_color, side), Piece(king_color, PT_KING), MT_CASTLES);
         move.m_data |= (rook_square & BITMASK(6)) << 26;
         return move;
     }
@@ -469,6 +574,8 @@ public:
                                                       Square dst,
                                                       Color pawn_color,
                                                       PieceType prom_piece_type) {
+        ILLUMINA_ASSERT_VALID_PIECE_TYPE(prom_piece_type);
+
         Move move = Move::base(src, dst, Piece(pawn_color, PT_PAWN), MT_SIMPLE_PROMOTION);
         move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
         return move;
