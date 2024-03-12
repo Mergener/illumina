@@ -552,10 +552,9 @@ public:
         return move;
     }
 
-    inline static constexpr Move new_castles(Square src,
-                                             Color king_color,
+    inline static constexpr Move new_castles(Color king_color,
                                              BoardSide side) {
-        return new_castles(src, king_color, side, standard_castle_rook_src_square(king_color, side));
+        return new_castles(king_color == CL_WHITE ? SQ_E1 : SQ_E8, king_color, side, standard_castle_rook_src_square(king_color, side));
     }
 
     inline static constexpr Move new_castles(Square src,

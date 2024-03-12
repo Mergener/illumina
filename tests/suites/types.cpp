@@ -223,7 +223,7 @@ TEST_CASE(ToUCI) {
     EXPECT(double_push.to_uci()).to_be("g2g4");
 
     // Test castling move
-    Move castles = Move::new_castles(SQ_E1, CL_WHITE, BoardSide::King, SQ_H1);
+    Move castles = Move::new_castles(CL_WHITE, BoardSide::King);
     EXPECT(castles.to_uci()).to_be("e1g1");
 
     // Test simple promotion move
