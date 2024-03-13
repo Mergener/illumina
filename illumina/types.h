@@ -35,30 +35,43 @@ using ui16 = std::uint16_t;
 using ui32 = std::uint32_t;
 using ui64 = std::uint64_t;
 
-
 //
 // Some useful bit manipulation functions/macros.
 //
 
+/**
+ * Returns an integer with only the nth bit set.
+ * Example: BIT(3) = 0b1000
+ */
 #define BIT(n) ((1ULL) << (n))
-#define BITMASK(nbits) ((1ul << (nbits)) - 1ul)
 
+/**
+ * Returns an integer with the first n bits set.
+ * Example: BITMASK(5) = 0b11111
+ */
+#define BITMASK(n) ((1ULL << (n)) - 1ULL)
+
+/**
+ * Returns 'val', but with its nth bit unset.
+ * Example: unset_bit(0b100101, 2) = 0b100001
+ */
+inline constexpr ui64 unset_bit(ui64 val, ui8 n) {
+    return val & ~BIT(n);
+}
+/**
+ * Returns 'val', but with its nth bit set.
+ * Example: unset_bit(0b100101, 4) = 0b110101
+ */
+inline constexpr ui64 set_bit(ui64 val, ui8 n) {
+    return val | BIT(n);
+}
+
+/**
+ * Rotates bits leftwise.
+ * Example: lrot(0b00110010, 4) = 0b00100011
+ */
 inline constexpr ui8 lrot(ui8 val, ui8 rot) {
     return (val << rot) | (val >> ((sizeof(val) * 8) - rot));
-}
-
-//
-// Bitboards
-//
-
-using Bitboard = ui64;
-
-inline constexpr ui64 pop_bit(ui64 val, ui8 bit) {
-    return val & ~BIT(bit);
-}
-
-inline constexpr ui64 set_bit(ui64 val, ui8 bit) {
-    return val | BIT(bit);
 }
 
 /**
@@ -71,7 +84,7 @@ inline constexpr ui64 set_bit(ui64 val, ui8 bit) {
  * In this case, the least significant bit would be the 1 at the 4th position,
  * so this function would return 3 (zero-indexed).
  */
-inline ui8 pop_lsb(ui64 n) {
+inline ui8 lsb(ui64 n) {
     ILLUMINA_ASSERT(n != 0);
 #if defined(_MSC_VER)
     unsigned long idx;
@@ -94,7 +107,7 @@ inline ui8 pop_lsb(ui64 n) {
  * In this case, the most significant bit would be the 1 at the 12th position,
  * so this function would return 11 (zero-indexed).
  */
-inline ui8 pop_msb(ui64 n) {
+inline ui8 msb(ui64 n) {
     ILLUMINA_ASSERT(n != 0);
 #if defined(_MSC_VER)
     unsigned long idx;
@@ -106,6 +119,12 @@ inline ui8 pop_msb(ui64 n) {
 #error No bitscan function found.
 #endif
 }
+
+//
+// Bitboards
+//
+
+using Bitboard = ui64;
 
 /**
  * Given a 64 bit bitboard, a name for a ui8 iterator and a code block,
@@ -143,21 +162,41 @@ inline constexpr Color COLORS[] = { CL_WHITE, CL_BLACK };
 
 inline constexpr Color opposite_color(Color c) { return c ^ 1; }
 
+inline Color color_from_char(char c) {
+    ILLUMINA_ASSERT(c == 'w' || c == 'W' || c == 'b' || c == 'B');
+
+    c = std::tolower(c);
+    if (c == 'b') {
+        return CL_BLACK;
+    }
+    return CL_WHITE;
+}
+
 //
 // Board sides
 //
 
-enum class BoardSide {
-    King, Queen
-};
+using Side = ui8;
 
-inline constexpr int BOARD_SIDE_COUNT = 2;
+enum {
+    SIDE_KING,
+    SIDE_QUEEN,
+    SIDE_COUNT = 2
+};
 
 //
 // Castle rights
 //
 
 using CastlingRights = ui8;
+
+inline constexpr CastlingRights make_castling_rights(bool white_king_side,
+                                                     bool white_queen_side,
+                                                     bool black_king_side,
+                                                     bool black_queen_side) {
+    return (white_king_side) | (white_queen_side << 1)
+         | (black_king_side) | (black_queen_side);
+}
 
 enum {
     CR_NONE      = 0,
@@ -214,9 +253,27 @@ using BoardRank = ui8;
 enum {
     RNK_1, RNK_2, RNK_3, RNK_4,
     RNK_5, RNK_6, RNK_7, RNK_8,
+    RNK_NULL
 };
 
 #define ILLUMINA_ASSERT_VALID_RANK(r) ILLUMINA_ASSERT((r) >= illumina::RNK_1 && (r) <= illumina::RNK_8)
+
+inline constexpr BoardRank rank_from_char(char c) {
+    if (c > '9' || c < '0') {
+        return RNK_NULL;
+    }
+    return c - '1';
+}
+
+inline constexpr Bitboard rank_bb(BoardRank rank) {
+    constexpr Bitboard RANK_BBS[] {
+        0xff, 0xff00,
+        0xff0000, 0xff000000,
+        0xff00000000, 0xff0000000000,
+        0xff000000000000, 0xff00000000000000,
+    };
+    return RANK_BBS[rank];
+}
 
 /**
  * Represents the index of a rank on the board.
@@ -227,9 +284,20 @@ using BoardFile = ui8;
 enum {
     FL_A, FL_B, FL_C, FL_D,
     FL_E, FL_F, FL_G, FL_H,
+    FL_NULL
 };
 
 #define ILLUMINA_ASSERT_VALID_FILE(f) ILLUMINA_ASSERT((f) >= illumina::FL_A && (f) <= illumina::FL_H)
+
+inline BoardFile file_from_char(char c) {
+    c = std::tolower(c);
+
+    if (c > 'h' || c < 'a') {
+        return FL_NULL;
+    }
+
+    return c - 'a';
+}
 
 inline char file_to_char(BoardFile f) {
     ILLUMINA_ASSERT_VALID_FILE(f);
@@ -241,6 +309,16 @@ inline char rank_to_char(BoardRank r) {
     ILLUMINA_ASSERT_VALID_RANK(r);
 
     return '1' + r;
+}
+
+inline constexpr Bitboard file_bb(BoardFile file) {
+    constexpr Bitboard FILE_BBS[] {
+        0x101010101010101ULL,  0x202020202020202ULL,
+        0x404040404040404ULL,  0x808080808080808ULL,
+        0x1010101010101010ULL, 0x2020202020202020ULL,
+        0x4040404040404040ULL, 0x8080808080808080ULL,
+    };
+    return FILE_BBS[file];
 }
 
 /**
@@ -335,31 +413,44 @@ inline constexpr Square double_push_destination(Square src, Color color) {
     return src + pawn_push_direction(color) * 2;
 }
 
-inline constexpr Square castled_king_square(Color c, BoardSide side) {
+inline constexpr Square castled_king_square(Color c, Side side) {
     ILLUMINA_ASSERT_VALID_COLOR(c);
 
     constexpr Square SQUARES[] { SQ_G1, SQ_G8, SQ_C1, SQ_C8 };
-    return SQUARES[int(side) * 2 + c];
+    return SQUARES[side * 2 + c];
 }
 
 /**
  * The square in which a eligible castling rook is expected to be in standard (non-FRC) chess
  * in the starting position, given a color and a side.
  *
- * Ex: standard_castle_rook_src_square(CL_BLACK, BoardSide::Queen) = SQ_A8
+ * Ex: standard_castle_rook_src_square(CL_BLACK, BS_QUEEN) = SQ_A8
  */
-inline constexpr Square standard_castle_rook_src_square(Color color, BoardSide side) {
+inline constexpr Square standard_castle_rook_src_square(Color color, Side side) {
     ILLUMINA_ASSERT_VALID_COLOR(color);
 
-    constexpr Square CASTLE_ROOK_SQ[CL_COUNT][BOARD_SIDE_COUNT] = {
+    constexpr Square CASTLE_ROOK_SQ[CL_COUNT][SIDE_COUNT] = {
         { SQ_H1, SQ_A1 }, // White
         { SQ_H8, SQ_A8 }  // Black
     };
 
-    return CASTLE_ROOK_SQ[color][int(side)];
+    return CASTLE_ROOK_SQ[color][side];
 }
 
-Square parse_square(std::string_view square_str);
+inline Square parse_square(std::string_view square_str) {
+    BoardFile file = file_from_char(square_str[0]);
+    if (file == FL_NULL) {
+        return SQ_NULL;
+    }
+
+    BoardRank rank = square_str[1] - '1';
+    if (rank == RNK_NULL) {
+        return SQ_NULL;
+    }
+
+    return make_square(file, rank);
+}
+
 std::string square_name(Square s);
 
 //
@@ -563,13 +654,13 @@ public:
     }
 
     inline static constexpr Move new_castles(Color king_color,
-                                             BoardSide side) {
+                                             Side side) {
         return new_castles(king_color == CL_WHITE ? SQ_E1 : SQ_E8, king_color, side, standard_castle_rook_src_square(king_color, side));
     }
 
     inline static constexpr Move new_castles(Square src,
                                              Color king_color,
-                                             BoardSide side, Square
+                                             Side side, Square
                                              rook_square) {
         ILLUMINA_ASSERT_VALID_SQUARE(rook_square);
 

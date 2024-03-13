@@ -6,15 +6,6 @@
 
 namespace illumina {
 
-Square parse_square(std::string_view square_str) {
-    ILLUMINA_ASSERT(square_str.size() >= 2);
-
-    BoardFile file = std::tolower(square_str[0]) - 'a';
-    BoardRank rank = square_str[1] - '1';
-
-    return make_square(file, rank);
-}
-
 std::string square_name(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
@@ -137,18 +128,18 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
         // If a king tries to move more than a single file away, we can assume
         // it's trying to castle.
         if (file_delta > 1) {
-            m_data = new_castles(src, king_color, BoardSide::King, dst).raw();
+            m_data = new_castles(src, king_color, SIDE_KING, dst).raw();
         }
         else if (file_delta < 1) {
-            m_data = new_castles(src, king_color, BoardSide::Queen, dst).raw();
+            m_data = new_castles(src, king_color, SIDE_QUEEN, dst).raw();
         }
         else if (dst_piece.color() == src_piece.color() && dst_piece.type() == PT_ROOK) {
             // In chess960, castling moves can occur with a single file distance.
             // However, in these scenarios, the dst_piece is set to a rook with the same color
             // as the moving king.
-            BoardSide side = dst == board.get_castle_rook_square(king_color, BoardSide::King)
-                ? BoardSide::King
-                : BoardSide::Queen;
+            Side side = dst == board.castle_rook_square(king_color, SIDE_KING)
+                ? SIDE_KING
+                : SIDE_QUEEN;
 
             m_data = new_castles(src, king_color, side, dst).raw();
         }
