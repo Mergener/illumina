@@ -208,40 +208,7 @@ enum {
 };
 
 //
-// Directions
-//
-
-/**
- * A direction on the 64-square board.
- * Named by DIR_* constants.
- * Can perform arithmetic with squares.
- */
-using Direction = i8;
-
-enum {
-    DIR_NORTH     = 8,
-    DIR_SOUTH     = -8,
-    DIR_EAST      = 1,
-    DIR_WEST      = -1,
-    DIR_NORTHEAST = DIR_NORTH + DIR_EAST,
-    DIR_NORTHWEST = DIR_NORTH + DIR_WEST,
-    DIR_SOUTHEAST = DIR_SOUTH + DIR_EAST,
-    DIR_SOUTHWEST = DIR_SOUTH + DIR_WEST
-};
-
-inline constexpr Direction DIRECTIONS[] = {
-    DIR_NORTH, DIR_SOUTH, DIR_EAST, DIR_WEST,
-    DIR_NORTHEAST, DIR_NORTHWEST,
-    DIR_SOUTHEAST, DIR_SOUTHWEST
-};
-
-inline constexpr Direction pawn_push_direction(Color color) {
-    constexpr Direction PUSH_DIRS[] = { DIR_NORTH, DIR_SOUTH };
-    return PUSH_DIRS[color];
-}
-
-//
-// Board coordinates (squares -- ranks and files)
+// Ranks and Files
 //
 
 /**
@@ -320,6 +287,66 @@ inline constexpr Bitboard file_bb(BoardFile file) {
     };
     return FILE_BBS[file];
 }
+
+//
+// Directions
+//
+
+/**
+ * A direction on the 64-square board.
+ * Named by DIR_* constants.
+ * Can perform arithmetic with squares.
+ */
+using Direction = i8;
+
+enum {
+    DIR_NORTH     = 8,
+    DIR_SOUTH     = -8,
+    DIR_EAST      = 1,
+    DIR_WEST      = -1,
+    DIR_NORTHEAST = DIR_NORTH + DIR_EAST,
+    DIR_NORTHWEST = DIR_NORTH + DIR_WEST,
+    DIR_SOUTHEAST = DIR_SOUTH + DIR_EAST,
+    DIR_SOUTHWEST = DIR_SOUTH + DIR_WEST
+};
+
+inline constexpr Direction DIRECTIONS[] = {
+    DIR_NORTH, DIR_SOUTH, DIR_EAST, DIR_WEST,
+    DIR_NORTHEAST, DIR_NORTHWEST,
+    DIR_SOUTHEAST, DIR_SOUTHWEST
+};
+
+inline constexpr Direction pawn_push_direction(Color color) {
+    constexpr Direction PUSH_DIRS[] = { DIR_NORTH, DIR_SOUTH };
+    return PUSH_DIRS[color];
+}
+
+/**
+ * Moves all the bits on a given bitboard towards the specified direction.
+ *
+ * Note: for convenience with double pawn pushes, DIR_NORTH*2 and DIR_SOUTH*2 can
+ * be passed as an argument to D.
+ */
+template <Direction D>
+inline constexpr Bitboard shift_bb(Bitboard bb) {
+    switch (D) {
+        case DIR_NORTH:     return bb << 8;
+        case DIR_SOUTH:     return bb >> 8;
+        case DIR_NORTH * 2: return bb << 16;
+        case DIR_SOUTH * 2: return bb >> 16;
+        case DIR_EAST:      return (bb & ~file_bb(FL_H)) << 1;
+        case DIR_WEST:      return (bb & ~file_bb(FL_A)) << 1;
+        case DIR_NORTHEAST: return (bb & ~file_bb(FL_H)) << 9;
+        case DIR_NORTHWEST: return (bb & ~file_bb(FL_A)) << 7;
+        case DIR_SOUTHEAST: return (bb & ~file_bb(FL_H)) << 7;
+        case DIR_SOUTHWEST: return (bb & ~file_bb(FL_A)) << 9;
+        default: return 0;
+    }
+}
+
+//
+// Squares
+//
 
 /**
  * Represents the index of a square on the board.

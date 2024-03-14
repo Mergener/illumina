@@ -8,6 +8,7 @@ namespace illumina {
 
 static std::atomic_bool s_initialized = false;
 
+void init_attacks();
 void init_types();
 void init_zob();
 
@@ -20,6 +21,7 @@ void init() {
 
     init_types();
     init_zob();
+    init_attacks();
 }
 
 } // illumina
