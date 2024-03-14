@@ -9,6 +9,8 @@ namespace illumina {
 
 template <Color C>
 inline Bitboard pawn_pushes(Square s, Bitboard occ) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     if constexpr (C == CL_WHITE) {
         extern const Bitboard g_white_pawn_pushes[];
         occ |= shift_bb<DIR_NORTH>(occ);
@@ -22,6 +24,9 @@ inline Bitboard pawn_pushes(Square s, Bitboard occ) {
 }
 
 inline Bitboard pawn_pushes(Square s, Color c, Bitboard occ) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+    ILLUMINA_ASSERT_VALID_COLOR(c);
+
     return c == CL_WHITE
            ? pawn_pushes<CL_WHITE>(s, occ)
            : pawn_pushes<CL_BLACK>(s, occ);
@@ -29,6 +34,8 @@ inline Bitboard pawn_pushes(Square s, Color c, Bitboard occ) {
 
 template <Color C>
 inline Bitboard pawn_captures(Square s, Bitboard occ = 0xffffffffffffffff) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     if constexpr (C == CL_WHITE) {
         extern const Bitboard g_white_pawn_captures[];
         return g_white_pawn_captures[s] & occ;
@@ -40,6 +47,9 @@ inline Bitboard pawn_captures(Square s, Bitboard occ = 0xffffffffffffffff) {
 }
 
 inline Bitboard pawn_captures(Square s, Color c, Bitboard occ = 0xffffffffffffffff) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+    ILLUMINA_ASSERT_VALID_COLOR(c);
+
     return c == CL_WHITE
            ? pawn_captures<CL_WHITE>(s, occ)
            : pawn_captures<CL_BLACK>(s, occ);
@@ -56,12 +66,14 @@ inline Bitboard pawn_attacks(Square s, Bitboard occ, Color c) {
 
 inline Bitboard knight_attacks(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     extern const Bitboard g_knight_attacks[];
     return g_knight_attacks[s];
 }
 
 inline Bitboard bishop_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     extern Bitboard g_bishop_attacks[SQ_COUNT][512];
     extern const Bitboard g_bishop_masks[];
     return g_bishop_attacks[s][_pext_u64(occ, g_bishop_masks[s])];
@@ -69,22 +81,28 @@ inline Bitboard bishop_attacks(Square s, Bitboard occ) {
 
 inline Bitboard rook_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     extern Bitboard g_rook_attacks[SQ_COUNT][512];
     extern const Bitboard g_rook_masks[];
     return g_rook_attacks[s][_pext_u64(occ, g_rook_masks[s])];
 }
 
 inline Bitboard queen_attacks(Square s, Bitboard occ) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     return rook_attacks(s, occ) | bishop_attacks(s, occ);
 }
 
 inline Bitboard king_attacks(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     extern const Bitboard g_king_attacks[];
     return g_king_attacks[s];
 }
 
 inline Bitboard piece_attacks(Piece p, Square s, Bitboard occ) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
     switch (p.type()) {
         case PT_PAWN:   return pawn_attacks(s, occ, p.color());
         case PT_KNIGHT: return knight_attacks(s);
