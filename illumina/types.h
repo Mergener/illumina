@@ -23,8 +23,10 @@
 namespace illumina {
 
 //
-// Primitive integer types
+// Type definitions
 //
+
+// Primitive integer types
 
 using i8   = std::int8_t;
 using i16  = std::int16_t;
@@ -34,6 +36,19 @@ using ui8  = std::uint8_t;
 using ui16 = std::uint16_t;
 using ui32 = std::uint32_t;
 using ui64 = std::uint64_t;
+
+// Chess related types
+
+using Bitboard       = ui64;
+using Color          = ui8;
+using Side           = ui8;
+using CastlingRights = ui8;
+using BoardRank      = ui8;
+using BoardFile      = ui8;
+using Direction      = i8;
+using Square         = ui8;
+using PieceType      = ui8;
+using MoveType       = ui8;
 
 //
 // Some useful bit manipulation functions/macros.
@@ -55,14 +70,14 @@ using ui64 = std::uint64_t;
  * Returns 'val', but with its nth bit unset.
  * Example: unset_bit(0b100101, 2) = 0b100001
  */
-inline constexpr ui64 unset_bit(ui64 val, ui8 n) {
+constexpr ui64 unset_bit(ui64 val, ui8 n) {
     return val & ~BIT(n);
 }
 /**
  * Returns 'val', but with its nth bit set.
  * Example: unset_bit(0b100101, 4) = 0b110101
  */
-inline constexpr ui64 set_bit(ui64 val, ui8 n) {
+constexpr ui64 set_bit(ui64 val, ui8 n) {
     return val | BIT(n);
 }
 
@@ -70,8 +85,20 @@ inline constexpr ui64 set_bit(ui64 val, ui8 n) {
  * Rotates bits leftwise.
  * Example: lrot(0b00110010, 4) = 0b00100011
  */
-inline constexpr ui8 lrot(ui8 val, ui8 rot) {
+constexpr ui8 lrot(ui8 val, ui8 rot) {
     return (val << rot) | (val >> ((sizeof(val) * 8) - rot));
+}
+
+/**
+ * Taken from https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipVertically
+ */
+constexpr ui64 flip_bits_vert(ui64 x) {
+    const ui64 k1 = 0x00FF00FF00FF00FFULL;
+    const ui64 k2 = 0x0000FFFF0000FFFFULL;
+    x = ((x >>  8) & k1) | ((x & k1) <<  8);
+    x = ((x >> 16) & k2) | ((x & k2) << 16);
+    x = ( x >> 32)       | ( x       << 32);
+    return x;
 }
 
 /**
@@ -124,8 +151,6 @@ inline ui8 msb(ui64 n) {
 // Bitboards
 //
 
-using Bitboard = ui64;
-
 /**
  * Given a 64 bit bitboard, a name for a ui8 iterator and a code block,
  * iterates through every set bit on the bitboard, storing them on the specified bit
@@ -144,12 +169,6 @@ using Bitboard = ui64;
 // Colors
 //
 
-/**
- * Represents a color (black or white) in a chess game.
- * Named by CL_* constants.
- */
-using Color = ui8;
-
 enum {
     CL_WHITE,
     CL_BLACK,
@@ -158,9 +177,9 @@ enum {
 
 #define ILLUMINA_ASSERT_VALID_COLOR(c) ILLUMINA_ASSERT((c) == illumina::CL_WHITE || (c) == illumina::CL_BLACK)
 
-inline constexpr Color COLORS[] = { CL_WHITE, CL_BLACK };
+constexpr Color COLORS[] = { CL_WHITE, CL_BLACK };
 
-inline constexpr Color opposite_color(Color c) { return c ^ 1; }
+constexpr Color opposite_color(Color c) { return c ^ 1; }
 
 inline Color color_from_char(char c) {
     ILLUMINA_ASSERT(c == 'w' || c == 'W' || c == 'b' || c == 'B');
@@ -176,8 +195,6 @@ inline Color color_from_char(char c) {
 // Board sides
 //
 
-using Side = ui8;
-
 enum {
     SIDE_KING,
     SIDE_QUEEN,
@@ -188,9 +205,7 @@ enum {
 // Castle rights
 //
 
-using CastlingRights = ui8;
-
-inline constexpr CastlingRights make_castling_rights(bool white_king_side,
+constexpr CastlingRights make_castling_rights(bool white_king_side,
                                                      bool white_queen_side,
                                                      bool black_king_side,
                                                      bool black_queen_side) {
@@ -211,12 +226,6 @@ enum {
 // Ranks and Files
 //
 
-/**
- * Represents the index of a rank on the board.
- * Named by RNK_* constants.
- */
-using BoardRank = ui8;
-
 enum {
     RNK_1, RNK_2, RNK_3, RNK_4,
     RNK_5, RNK_6, RNK_7, RNK_8,
@@ -225,14 +234,14 @@ enum {
 
 #define ILLUMINA_ASSERT_VALID_RANK(r) ILLUMINA_ASSERT((r) >= illumina::RNK_1 && (r) <= illumina::RNK_8)
 
-inline constexpr BoardRank rank_from_char(char c) {
+constexpr BoardRank rank_from_char(char c) {
     if (c > '9' || c < '0') {
         return RNK_NULL;
     }
     return c - '1';
 }
 
-inline constexpr Bitboard rank_bb(BoardRank rank) {
+constexpr Bitboard rank_bb(BoardRank rank) {
     constexpr Bitboard RANK_BBS[] {
         0xff, 0xff00,
         0xff0000, 0xff000000,
@@ -241,12 +250,6 @@ inline constexpr Bitboard rank_bb(BoardRank rank) {
     };
     return RANK_BBS[rank];
 }
-
-/**
- * Represents the index of a rank on the board.
- * Named by FL_* constants.
- */
-using BoardFile = ui8;
 
 enum {
     FL_A, FL_B, FL_C, FL_D,
@@ -278,7 +281,7 @@ inline char rank_to_char(BoardRank r) {
     return '1' + r;
 }
 
-inline constexpr Bitboard file_bb(BoardFile file) {
+constexpr Bitboard file_bb(BoardFile file) {
     constexpr Bitboard FILE_BBS[] {
         0x101010101010101ULL,  0x202020202020202ULL,
         0x404040404040404ULL,  0x808080808080808ULL,
@@ -292,13 +295,6 @@ inline constexpr Bitboard file_bb(BoardFile file) {
 // Directions
 //
 
-/**
- * A direction on the 64-square board.
- * Named by DIR_* constants.
- * Can perform arithmetic with squares.
- */
-using Direction = i8;
-
 enum {
     DIR_NORTH     = 8,
     DIR_SOUTH     = -8,
@@ -310,13 +306,13 @@ enum {
     DIR_SOUTHWEST = DIR_SOUTH + DIR_WEST
 };
 
-inline constexpr Direction DIRECTIONS[] = {
+constexpr Direction DIRECTIONS[] = {
     DIR_NORTH, DIR_SOUTH, DIR_EAST, DIR_WEST,
     DIR_NORTHEAST, DIR_NORTHWEST,
     DIR_SOUTHEAST, DIR_SOUTHWEST
 };
 
-inline constexpr Direction pawn_push_direction(Color color) {
+constexpr Direction pawn_push_direction(Color color) {
     constexpr Direction PUSH_DIRS[] = { DIR_NORTH, DIR_SOUTH };
     return PUSH_DIRS[color];
 }
@@ -328,7 +324,7 @@ inline constexpr Direction pawn_push_direction(Color color) {
  * be passed as an argument to D.
  */
 template <Direction D>
-inline constexpr Bitboard shift_bb(Bitboard bb) {
+constexpr Bitboard shift_bb(Bitboard bb) {
     switch (D) {
         case DIR_NORTH:     return bb << 8;
         case DIR_SOUTH:     return bb >> 8;
@@ -348,12 +344,6 @@ inline constexpr Bitboard shift_bb(Bitboard bb) {
 // Squares
 //
 
-/**
- * Represents the index of a square on the board.
- * Named by SQ_* constants.
- */
-using Square = ui8;
-
 enum {
     SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
     SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2, SQ_H2,
@@ -370,19 +360,19 @@ enum {
 
 #define ILLUMINA_ASSERT_VALID_SQUARE(s) ILLUMINA_ASSERT((s) >= 0 && (s) <= 63)
 
-inline constexpr BoardFile square_file(Square s) {
+constexpr BoardFile square_file(Square s) {
     return (s % 8);
 }
 
-inline constexpr BoardRank square_rank(Square s) {
+constexpr BoardRank square_rank(Square s) {
     return (s / 8);
 }
 
-inline constexpr Square make_square(BoardFile file, BoardRank rank) {
+constexpr Square make_square(BoardFile file, BoardRank rank) {
     return rank * 8 + file;
 }
 
-inline constexpr Square mirror_horizontal(Square s) {
+constexpr Square mirror_horizontal(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
     constexpr Square MIRRORS[] {
@@ -399,7 +389,7 @@ inline constexpr Square mirror_horizontal(Square s) {
     return MIRRORS[s];
 }
 
-inline constexpr Square mirror_vertical(Square s) {
+constexpr Square mirror_vertical(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
     constexpr Square MIRRORS[] {
@@ -432,15 +422,15 @@ inline int manhattan_distance(Square a, Square b) {
     return g_manhattan[a][b];
 }
 
-inline constexpr Square pawn_push_destination(Square src, Color color) {
+constexpr Square pawn_push_destination(Square src, Color color) {
     return src + pawn_push_direction(color);
 }
 
-inline constexpr Square double_push_destination(Square src, Color color) {
+constexpr Square double_push_destination(Square src, Color color) {
     return src + pawn_push_direction(color) * 2;
 }
 
-inline constexpr Square castled_king_square(Color c, Side side) {
+constexpr Square castled_king_square(Color c, Side side) {
     ILLUMINA_ASSERT_VALID_COLOR(c);
 
     constexpr Square SQUARES[] { SQ_G1, SQ_G8, SQ_C1, SQ_C8 };
@@ -453,7 +443,7 @@ inline constexpr Square castled_king_square(Color c, Side side) {
  *
  * Ex: standard_castle_rook_src_square(CL_BLACK, BS_QUEEN) = SQ_A8
  */
-inline constexpr Square standard_castle_rook_src_square(Color color, Side side) {
+constexpr Square standard_castle_rook_src_square(Color color, Side side) {
     ILLUMINA_ASSERT_VALID_COLOR(color);
 
     constexpr Square CASTLE_ROOK_SQ[CL_COUNT][SIDE_COUNT] = {
@@ -480,12 +470,6 @@ inline Square parse_square(std::string_view square_str) {
 
 std::string square_name(Square s);
 
-//
-// Pieces
-//
-
-using PieceType = ui8;
-
 enum {
     PT_NULL,
     PT_PAWN, PT_KNIGHT, PT_BISHOP,
@@ -496,13 +480,13 @@ enum {
 #define ILLUMINA_ASSERT_VALID_PIECE_TYPE(pt) ILLUMINA_ASSERT((pt) >= illumina::PT_PAWN && (pt) <= illumina::PT_KING)
 #define ILLUMINA_ASSERT_VALID_PT_OR_NULL(pt) ILLUMINA_ASSERT((pt) >= illumina::PT_NULL && (pt) <= illumina::PT_KING)
 
-inline constexpr PieceType PIECE_TYPES[] = {
+constexpr PieceType PIECE_TYPES[] = {
     PT_PAWN, PT_KNIGHT,
     PT_BISHOP, PT_ROOK,
     PT_QUEEN, PT_KING
 };
 
-inline constexpr char piece_type_to_char(PieceType pt) {
+constexpr char piece_type_to_char(PieceType pt) {
     ILLUMINA_ASSERT_VALID_PT_OR_NULL(pt);
 
     return "-pnbrqk"[pt];
@@ -512,25 +496,24 @@ class Piece {
 public:
     Piece() = default;
 
-    inline constexpr Piece(Color color, PieceType type)
+    constexpr Piece(Color color, PieceType type)
         : m_data((color & BITMASK(1)) | ((type & BITMASK(3)) << 1)) {
         ILLUMINA_ASSERT_VALID_COLOR(color);
         ILLUMINA_ASSERT_VALID_PT_OR_NULL(type);
     }
 
-    inline explicit constexpr Piece(ui8 data)
+    explicit constexpr Piece(ui8 data)
         : m_data(data) {
         ILLUMINA_ASSERT_VALID_COLOR(color());
         ILLUMINA_ASSERT_VALID_PT_OR_NULL(type());
     }
 
-    inline constexpr Color color() const    { return m_data & BITMASK(1); }
-    inline constexpr PieceType type() const { return (m_data >> 1); }
+    constexpr Color     color() const;
+    constexpr PieceType type() const;
+    constexpr ui8       raw() const;
 
-    inline constexpr ui8 raw() const { return m_data; }
-
-    inline bool operator==(Piece other) const { return m_data == other.m_data; }
-    inline bool operator!=(Piece other) const { return m_data != other.m_data; }
+    bool operator==(Piece other) const;
+    bool operator!=(Piece other) const;
 
     char to_char() const;
     static Piece from_char(char c);
@@ -539,32 +522,51 @@ private:
     ui8 m_data = 0;
 };
 
+constexpr Color Piece::color() const {
+    return m_data & BITMASK(1);
+}
+
+constexpr PieceType Piece::type() const {
+    return (m_data >> 1);
+}
+
+constexpr ui8 Piece::raw() const {
+    return m_data;
+}
+
+inline bool Piece::operator==(Piece other) const {
+    return m_data == other.m_data;
+}
+
+inline bool Piece::operator!=(Piece other) const {
+    return m_data != other.m_data;
+}
+
 inline std::ostream& operator<<(std::ostream& stream, Piece p) {
     stream << p.to_char();
     return stream;
 }
 
-inline constexpr Piece PIECE_NULL(CL_WHITE, PT_NULL);
+constexpr Piece PIECE_NULL(CL_WHITE, PT_NULL);
 
-inline constexpr Piece WHITE_PAWN(CL_WHITE, PT_PAWN);
-inline constexpr Piece WHITE_KNIGHT(CL_WHITE, PT_KNIGHT);
-inline constexpr Piece WHITE_BISHOP(CL_WHITE, PT_BISHOP);
-inline constexpr Piece WHITE_ROOK(CL_WHITE, PT_ROOK);
-inline constexpr Piece WHITE_QUEEN(CL_WHITE, PT_QUEEN);
-inline constexpr Piece WHITE_KING(CL_WHITE, PT_KING);
+constexpr Piece WHITE_PAWN(CL_WHITE, PT_PAWN);
+constexpr Piece WHITE_KNIGHT(CL_WHITE, PT_KNIGHT);
+constexpr Piece WHITE_BISHOP(CL_WHITE, PT_BISHOP);
+constexpr Piece WHITE_ROOK(CL_WHITE, PT_ROOK);
+constexpr Piece WHITE_QUEEN(CL_WHITE, PT_QUEEN);
+constexpr Piece WHITE_KING(CL_WHITE, PT_KING);
 
-inline constexpr Piece BLACK_PAWN(CL_BLACK, PT_PAWN);
-inline constexpr Piece BLACK_KNIGHT(CL_BLACK, PT_KNIGHT);
-inline constexpr Piece BLACK_BISHOP(CL_BLACK, PT_BISHOP);
-inline constexpr Piece BLACK_ROOK(CL_BLACK, PT_ROOK);
-inline constexpr Piece BLACK_QUEEN(CL_BLACK, PT_QUEEN);
-inline constexpr Piece BLACK_KING(CL_BLACK, PT_KING);
+constexpr Piece BLACK_PAWN(CL_BLACK, PT_PAWN);
+constexpr Piece BLACK_KNIGHT(CL_BLACK, PT_KNIGHT);
+constexpr Piece BLACK_BISHOP(CL_BLACK, PT_BISHOP);
+constexpr Piece BLACK_ROOK(CL_BLACK, PT_ROOK);
+constexpr Piece BLACK_QUEEN(CL_BLACK, PT_QUEEN);
+constexpr Piece BLACK_KING(CL_BLACK, PT_KING);
 
 //
 // Moves
 //
 
-using MoveType = ui8;
 enum {
     MT_NORMAL,
     MT_SIMPLE_CAPTURE,
@@ -596,121 +598,191 @@ class Move {
 public:
     Move(const Board& board, Square src, Square dst, PieceType prom_piece_type = PT_NULL);
 
-    inline explicit constexpr Move(ui32 data)
+    explicit constexpr Move(ui32 data)
         : m_data(data) {}
 
-    inline constexpr ui32 raw() const                       { return m_data; }
-    inline constexpr Square source() const                  { return m_data & BITMASK(6); }
-    inline constexpr Square destination() const             { return (m_data >> 6) & BITMASK(6); }
-    inline constexpr Piece source_piece() const             { return Piece((m_data >> 12) & BITMASK(4)); }
-    inline constexpr Piece captured_piece() const           { return Piece((m_data >> 16) & BITMASK(4)); }
-    inline constexpr MoveType type() const                  { return (m_data >> 20) & BITMASK(3); }
-    inline constexpr PieceType promotion_piece_type() const { return (m_data >> 23) & BITMASK(3); }
-    inline constexpr Square castles_rook_square() const     { return (m_data >> 26) & BITMASK(6); }
-
-    inline constexpr bool is_capture() const {
-        constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_EN_PASSANT) | BIT(MT_PROMOTION_CAPTURE);
-        return (BIT(type()) & MASK) != 0;
-    }
-
-    inline constexpr bool is_promotion() const {
-        constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
-        return (BIT(type()) & MASK) != 0;
-    }
-
-    std::string to_uci(bool frc = false) const;
+    constexpr ui32      raw() const;
+    constexpr Square    source() const;
+    constexpr Square    destination() const;
+    constexpr Piece     source_piece() const;
+    constexpr Piece     captured_piece() const;
+    constexpr MoveType  type() const;
+    constexpr PieceType promotion_piece_type() const;
+    constexpr Square    castles_rook_square() const;
+    constexpr bool      is_capture() const;
+    constexpr bool      is_promotion() const;
+    std::string         to_uci(bool frc = false) const;
 
 private:
     ui32 m_data;
 
-    inline static constexpr Move base(Square src, Square dst, Piece src_piece, MoveType type) {
-        ILLUMINA_ASSERT_VALID_SQUARE(src);
-        ILLUMINA_ASSERT_VALID_SQUARE(dst);
-        ILLUMINA_ASSERT_VALID_MOVE_TYPE(type);
-
-        Move move(0);
-
-        move.m_data |= (src & BITMASK(6))             << 0;
-        move.m_data |= (dst & BITMASK(6))             << 6;
-        move.m_data |= (src_piece.raw() & BITMASK(4)) << 12;
-        move.m_data |= (type & BITMASK(3))            << 20;
-
-        return move;
-    }
+    static constexpr Move base(Square src, Square dst, Piece src_piece, MoveType type);
 
 public:
-    inline static constexpr Move new_normal(Square src,
-                                            Square dst,
-                                            Piece src_piece) {
-        return Move::base(src, dst, src_piece, MT_NORMAL);
-    }
+    static constexpr Move new_normal(Square src,
+                                     Square dst,
+                                     Piece src_piece);
 
-    inline static constexpr Move new_simple_capture(Square src,
-                                                    Square dst,
-                                                    Piece src_piece,
-                                                    Piece capt_piece) {
-        Move move = Move::base(src, dst, src_piece, MT_SIMPLE_CAPTURE);
-        move.m_data |= (capt_piece.raw() & BITMASK(4)) << 16;
-        return move;
-    }
+    static constexpr Move new_simple_capture(Square src,
+                                             Square dst,
+                                             Piece src_piece,
+                                             Piece capt_piece);
 
-    inline static constexpr Move new_promotion_capture(Square src,
-                                                       Square dst,
-                                                       Color pawn_color,
-                                                       Piece capt_piece,
-                                                       PieceType prom_piece_type) {
-        ILLUMINA_ASSERT_VALID_PIECE_TYPE(prom_piece_type);
+    static constexpr Move new_promotion_capture(Square src,
+                                                Square dst,
+                                                Color pawn_color,
+                                                Piece capt_piece,
+                                                PieceType prom_piece_type);
 
-        Move move = Move::base(src, dst, Piece(pawn_color, PT_PAWN), MT_PROMOTION_CAPTURE);
-        move.m_data |= (capt_piece.raw() & BITMASK(4)) << 16;
-        move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
-        return move;
-    }
+    static constexpr Move new_en_passant_capture(Square src,
+                                                 Square dst,
+                                                 Color pawn_color);
 
-    inline static constexpr Move new_en_passant_capture(Square src,
-                                                        Square dst,
-                                                        Color pawn_color) {
-        Move move = Move::base(src, dst, Piece(pawn_color, PT_PAWN), MT_EN_PASSANT);
-        move.m_data |= (Piece(opposite_color(pawn_color), PT_PAWN).raw() & BITMASK(4)) << 16;
-        return move;
-    }
+    static constexpr Move new_double_push(Square src, Color pawn_color);
 
-    inline static constexpr Move new_double_push(Square src, Color pawn_color) {
-        Move move = Move::base(src, double_push_destination(src, pawn_color), Piece(pawn_color, PT_PAWN), MT_DOUBLE_PUSH);
-        return move;
-    }
+    static constexpr Move new_castles(Color king_color,
+                                      Side side);
 
-    inline static constexpr Move new_castles(Color king_color,
-                                             Side side) {
-        return new_castles(king_color == CL_WHITE ? SQ_E1 : SQ_E8, king_color, side, standard_castle_rook_src_square(king_color, side));
-    }
+    static constexpr Move new_castles(Square src,
+                                      Color king_color,
+                                      Side side, Square
+                                      rook_square);
 
-    inline static constexpr Move new_castles(Square src,
-                                             Color king_color,
-                                             Side side, Square
-                                             rook_square) {
-        ILLUMINA_ASSERT_VALID_SQUARE(rook_square);
-
-        Move move = Move::base(src, castled_king_square(king_color, side), Piece(king_color, PT_KING), MT_CASTLES);
-        move.m_data |= (rook_square & BITMASK(6)) << 26;
-        return move;
-    }
-
-    inline static constexpr Move new_simple_promotion(Square src,
-                                                      Square dst,
-                                                      Color pawn_color,
-                                                      PieceType prom_piece_type) {
-        ILLUMINA_ASSERT_VALID_PIECE_TYPE(prom_piece_type);
-
-        Move move = Move::base(src, dst, Piece(pawn_color, PT_PAWN), MT_SIMPLE_PROMOTION);
-        move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
-        return move;
-    }
+    static constexpr Move new_simple_promotion(Square src,
+                                               Square dst,
+                                               Color pawn_color,
+                                               PieceType prom_piece_type);
 
     static Move parse_uci(const Board& board, std::string_view move_str);
 };
 
-inline constexpr Move MOVE_NULL(0);
+constexpr Move MOVE_NULL(0);
+
+constexpr ui32 Move::raw() const {
+    return m_data;
+}
+
+constexpr Square Move::source() const {
+    return m_data & BITMASK(6);
+}
+
+constexpr Square Move::destination() const {
+    return (m_data >> 6) & BITMASK(6);
+}
+
+constexpr Piece Move::source_piece() const {
+    return Piece((m_data >> 12) & BITMASK(4));
+}
+
+constexpr Piece Move::captured_piece() const {
+    return Piece((m_data >> 16) & BITMASK(4));
+}
+
+constexpr MoveType Move::type() const {
+    return (m_data >> 20) & BITMASK(3);
+}
+
+constexpr PieceType Move::promotion_piece_type() const {
+    return (m_data >> 23) & BITMASK(3);
+}
+
+constexpr Square Move::castles_rook_square() const     {
+    return (m_data >> 26) & BITMASK(6);
+}
+
+constexpr Move Move::base(Square src, Square dst, Piece src_piece, MoveType type) {
+    ILLUMINA_ASSERT_VALID_SQUARE(src);
+    ILLUMINA_ASSERT_VALID_SQUARE(dst);
+    ILLUMINA_ASSERT_VALID_MOVE_TYPE(type);
+
+    Move move(0);
+
+    move.m_data |= (src & BITMASK(6))             << 0;
+    move.m_data |= (dst & BITMASK(6))             << 6;
+    move.m_data |= (src_piece.raw() & BITMASK(4)) << 12;
+    move.m_data |= (type & BITMASK(3))            << 20;
+
+    return move;
+}
+
+constexpr Move Move::new_normal(Square src,
+                                Square dst,
+                                Piece src_piece) {
+    return base(src, dst, src_piece, MT_NORMAL);
+}
+
+constexpr Move Move::new_simple_capture(Square src,
+                                        Square dst,
+                                        Piece src_piece,
+                                        Piece capt_piece) {
+    Move move = base(src, dst, src_piece, MT_SIMPLE_CAPTURE);
+    move.m_data |= (capt_piece.raw() & BITMASK(4)) << 16;
+    return move;
+}
+
+constexpr Move Move::new_promotion_capture(Square src,
+                                           Square dst,
+                                           Color pawn_color,
+                                           Piece capt_piece,
+                                           PieceType prom_piece_type) {
+    ILLUMINA_ASSERT_VALID_PIECE_TYPE(prom_piece_type);
+
+    Move move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_PROMOTION_CAPTURE);
+    move.m_data |= (capt_piece.raw() & BITMASK(4)) << 16;
+    move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
+    return move;
+}
+
+constexpr Move Move::new_en_passant_capture(Square src,
+                                            Square dst,
+                                            Color pawn_color) {
+    Move move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_EN_PASSANT);
+    move.m_data |= (Piece(opposite_color(pawn_color), PT_PAWN).raw() & BITMASK(4)) << 16;
+    return move;
+}
+
+constexpr Move Move::new_double_push(Square src, Color pawn_color) {
+    Move move = base(src, double_push_destination(src, pawn_color), Piece(pawn_color, PT_PAWN), MT_DOUBLE_PUSH);
+    return move;
+}
+
+constexpr Move Move::new_castles(Color king_color,
+                                 Side side) {
+    return new_castles(king_color == CL_WHITE ? SQ_E1 : SQ_E8, king_color, side, standard_castle_rook_src_square(king_color, side));
+}
+
+constexpr Move Move::new_castles(Square src,
+                                         Color king_color,
+                                         Side side, Square
+                                         rook_square) {
+    ILLUMINA_ASSERT_VALID_SQUARE(rook_square);
+
+    Move move = base(src, castled_king_square(king_color, side), Piece(king_color, PT_KING), MT_CASTLES);
+    move.m_data |= (rook_square & BITMASK(6)) << 26;
+    return move;
+}
+
+constexpr Move Move::new_simple_promotion(Square src,
+                                          Square dst,
+                                          Color pawn_color,
+                                          PieceType prom_piece_type) {
+    ILLUMINA_ASSERT_VALID_PIECE_TYPE(prom_piece_type);
+
+    Move move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_SIMPLE_PROMOTION);
+    move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
+    return move;
+}
+
+constexpr bool Move::is_capture() const {
+    constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_EN_PASSANT) | BIT(MT_PROMOTION_CAPTURE);
+    return (BIT(type()) & MASK) != 0;
+}
+
+constexpr bool Move::is_promotion() const {
+    constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
+    return (BIT(type()) & MASK) != 0;
+}
+
 
 } // illumina
 

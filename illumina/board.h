@@ -10,7 +10,7 @@
 
 namespace illumina {
 
-inline constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
+constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
 
 class Board {
 public:
@@ -27,7 +27,7 @@ public:
     int      rule50() const;
     bool     legal() const; // TODO
     int      ply_count() const;
-    bool     has_castling_rights(Color color, Side side);
+    bool     has_castling_rights(Color color, Side side) const;
     CastlingRights castling_rights() const;
 
 
@@ -44,7 +44,7 @@ public:
     bool is_move_pseudo_legal(Move move) const; // TODO
     bool is_move_legal(Move move) const; // TODO
 
-    inline Square king_square(Color color) const { return lsb(piece_bb(Piece(color, PT_KING))); }
+    Square king_square(Color color) const;
 
     Board() = default;
     Board(std::string_view fen_str, bool force_frc = false);
@@ -86,7 +86,7 @@ private:
 
     bool m_frc = false;
 
-    inline Bitboard& piece_bb_ref(Piece piece) { return m_bbs[piece.color()][piece.type()]; }
+    Bitboard& piece_bb_ref(Piece piece);
 
     template <bool DO_ZOB>
     void set_piece_at_internal(Square s, Piece p);
@@ -136,11 +136,15 @@ inline int Board::ply_count() const {
     return m_base_ply_count + int(m_prev_states.size());
 }
 
+inline Square Board::king_square(Color color) const {
+    return lsb(piece_bb(Piece(color, PT_KING)));
+}
+
 inline Square Board::castle_rook_square(Color color, Side side) const {
     return m_castle_rook_squares[color][side];
 }
 
-inline bool Board::has_castling_rights(Color color, Side side) {
+inline bool Board::has_castling_rights(Color color, Side side) const {
     ui8 idx = color * 2 + ui8(side);
     return (castling_rights() & BIT(idx)) != 0;
 }
@@ -206,6 +210,10 @@ inline void Board::set_castling_rights(Color color, Side side, bool allow) {
     else {
         set_castling_rights(unset_bit(curr_rights, bit));
     }
+}
+
+inline Bitboard& Board::piece_bb_ref(Piece piece) {
+    return m_bbs[piece.color()][piece.type()];
 }
 
 } // illumina
