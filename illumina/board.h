@@ -17,6 +17,9 @@ public:
     Color    color_to_move() const;
     Bitboard occupancy() const;
     Bitboard piece_bb(Piece piece) const;
+    Bitboard color_bb(Color color) const; // TODO
+    Bitboard piece_attacks(Piece piece) const; // TODO
+    Bitboard color_attacks(Color color) const; // TODO
     Piece    piece_at(Square s) const;
     Square   ep_square() const;
     bool     frc() const;
@@ -29,6 +32,9 @@ public:
     int      ply_count() const;
     bool     has_castling_rights(Color color, Side side) const;
     CastlingRights castling_rights() const;
+    Move     last_move() const; // TODO
+    Bitboard pinned_bb() const; // TODO
+    Square   pinner_square(Square pinned_sq) const; // TODO
 
 
     void set_piece_at(Square s, Piece p);

@@ -31,6 +31,65 @@ static void initialize_distances() {
 
 }
 
+Bitboard g_between[SQ_COUNT][SQ_COUNT];
+Bitboard g_between_inclusive[SQ_COUNT][SQ_COUNT];
+
+static void initialize_between() {
+    g_between[SQ_COUNT - 1][SQ_COUNT - 1] = 0;
+    for (Square a = 0; a < SQ_COUNT - 1; ++a) {
+        g_between[a][a] = 0;
+        for (Square b = a + 1; b < SQ_COUNT; ++b) {
+            BoardFile file_a = square_file(a);
+            BoardRank rank_a = square_rank(a);
+
+            BoardFile file_b = square_file(b);
+            BoardRank rank_b = square_rank(b);
+
+            int x_delta = file_b - file_a;
+            int y_delta = rank_b - rank_a;
+            
+            // Note that y_delta is guaranteed to be >=0
+            // This premise allows us to not check for y_delta < 0 in
+            // the conditionals below.
+
+            Bitboard bb = 0;
+
+            if (y_delta == 0) {
+                // Horizontal
+                for (Square s = a + DIR_EAST; s < b; s += DIR_EAST) {
+                    bb = set_bit(bb, s);
+                }
+            }
+            else if (x_delta == 0) {
+                // Vertical
+                for (Square s = a + DIR_NORTH; s < b; s += DIR_NORTH) {
+                    bb = set_bit(bb, s);
+                }
+            }
+            else if (std::abs(x_delta) == std::abs(y_delta)) {
+                // Diagonal
+                if (x_delta < 0) {
+                    for (Square s = a + DIR_NORTHWEST; s < b; s += DIR_NORTHWEST) {
+                        bb = set_bit(bb, s);
+                    }
+                }
+                else { // deltaX > 0
+                    for (Square s = a + DIR_NORTHEAST; s < b; s += DIR_NORTHEAST) {
+                        bb = set_bit(bb, s);
+                    }
+                }
+            }
+
+            g_between[a][b] = bb;
+            g_between[b][a] = bb;
+
+            Bitboard bb_incl = bb | BIT(a) | BIT(b);
+            g_between_inclusive[a][b] = bb_incl;
+            g_between_inclusive[b][a] = bb_incl;
+        }
+    }
+}
+
 char Piece::to_char() const {
     return "--PpNnBbRrQqKk"[m_data & BITMASK(4)];
 }
@@ -157,6 +216,7 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
 
 void init_types() {
     initialize_distances();
+    initialize_between();
 }
 
 
