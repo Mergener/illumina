@@ -7,6 +7,7 @@
 #include "types.h"
 #include "board.h"
 #include "attacks.h"
+#include "staticlist.h"
 
 namespace illumina {
 
@@ -34,6 +35,10 @@ enum class MoveGenerationType {
 
     /** Generate all noisy moves that get out of check. */
     QUIET_EVASIONS,
+};
+
+class MoveList: public StaticList<Move, 256> {
+    MoveList(const Board& board); // TODO
 };
 
 template <MoveGenerationType TYPE = MoveGenerationType::ALL,
@@ -85,33 +90,33 @@ template <Color C,
 size_t generate_evasions_by_color(const Board& board, TMOVE* moves);
 
 template <Color C,
-    MoveGenerationType TYPE = MoveGenerationType::ALL,
-    typename TMOVE = Move>
+          MoveGenerationType TYPE = MoveGenerationType::ALL,
+          typename TMOVE = Move>
 size_t generate_pawn_evasions_by_color(const Board& board, TMOVE* moves);
 
 template <Color C,
-    MoveGenerationType TYPE = MoveGenerationType::ALL,
-    typename TMOVE = Move>
+          MoveGenerationType TYPE = MoveGenerationType::ALL,
+          typename TMOVE = Move>
 size_t generate_knight_evasions_by_color(const Board& board, TMOVE* moves);
 
 template <Color C,
-    MoveGenerationType TYPE = MoveGenerationType::ALL,
-    typename TMOVE = Move>
+          MoveGenerationType TYPE = MoveGenerationType::ALL,
+          typename TMOVE = Move>
 size_t generate_bishop_evasions_by_color(const Board& board, TMOVE* moves);
 
 template <Color C,
-    MoveGenerationType TYPE = MoveGenerationType::ALL,
-    typename TMOVE = Move>
+          MoveGenerationType TYPE = MoveGenerationType::ALL,
+          typename TMOVE = Move>
 size_t generate_rook_evasions_by_color(const Board& board, TMOVE* moves);
 
 template <Color C,
-    MoveGenerationType TYPE = MoveGenerationType::ALL,
-    typename TMOVE = Move>
+          MoveGenerationType TYPE = MoveGenerationType::ALL,
+          typename TMOVE = Move>
 size_t generate_queen_evasions_by_color(const Board& board, TMOVE* moves);
 
 template <Color C,
-    MoveGenerationType TYPE = MoveGenerationType::ALL,
-    typename TMOVE = Move>
+          MoveGenerationType TYPE = MoveGenerationType::ALL,
+          typename TMOVE = Move>
 size_t generate_king_evasions_by_color(const Board& board, TMOVE* moves);
 
 #define MOVEGEN_ASSERTIONS() \
