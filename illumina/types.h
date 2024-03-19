@@ -81,6 +81,10 @@ constexpr ui64 set_bit(ui64 val, ui8 n) {
     return val | BIT(n);
 }
 
+constexpr bool bit_is_set(ui64 val, ui8 bit) {
+    return (val & BIT(bit)) != 0;
+}
+
 /**
  * Rotates bits leftwise.
  * Example: lrot(0b00110010, 4) = 0b00100011
@@ -491,6 +495,11 @@ std::string square_name(Square s);
 //
 // Bitboards
 //
+
+inline Bitboard adjacent_bb(Square s) {
+    extern Bitboard g_adjacent[SQ_COUNT];
+    return g_adjacent[s];
+}
 
 inline Bitboard between_bb(Square a, Square b) {
     extern Bitboard g_between[SQ_COUNT][SQ_COUNT];

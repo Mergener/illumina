@@ -90,6 +90,24 @@ static void initialize_between() {
     }
 }
 
+Bitboard g_adjacent[SQ_COUNT];
+
+static void initialize_adjacent() {
+    for (Square s = 0; s < SQ_COUNT; ++s) {
+        Bitboard bb = 0;
+        BoardFile f = square_file(s);
+
+        if (f > FL_A) {
+            bb = set_bit(bb, s + DIR_EAST);
+        }
+        if (f < FL_H) {
+            bb = set_bit(bb, s + DIR_WEST);
+        }
+
+        g_adjacent[s] = bb;
+    }
+}
+
 char Piece::to_char() const {
     return "--PpNnBbRrQqKk"[m_data & BITMASK(4)];
 }
@@ -217,6 +235,7 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
 void init_types() {
     initialize_distances();
     initialize_between();
+    initialize_adjacent();
 }
 
 

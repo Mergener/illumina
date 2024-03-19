@@ -262,7 +262,7 @@ size_t generate_pawn_moves_by_color(const Board& board, TMOVE* moves) {
 
             for (PieceType pt: PROMOTION_PIECE_TYPES) {
                 Square dst = src + PUSH_DIR;
-                *moves++ = Move::new_simple_promotion(src, dst, C, pt);
+                *moves++   = Move::new_simple_promotion(src, dst, C, pt);
             }
 
             promoting_pawns = unset_lsb(promoting_pawns);
@@ -341,7 +341,7 @@ size_t generate_pawn_moves_by_color(const Board& board, TMOVE* moves) {
         for (Bitboard bb = push_bb; bb; bb = unset_lsb(bb)) {
             Square dst = lsb(bb);
             Square src = dst - PUSH_DIR;
-            *moves++ = Move::new_normal(src, dst, PAWN);
+            *moves++   = Move::new_normal(src, dst, PAWN);
         }
 
         // Double pushes
@@ -352,8 +352,8 @@ size_t generate_pawn_moves_by_color(const Board& board, TMOVE* moves) {
 
         while (push_bb) {
             Square dst = lsb(push_bb);
-            *moves++ = Move::new_double_push_from_dest(dst, C);
-            push_bb = unset_lsb(push_bb);
+            *moves++   = Move::new_double_push_from_dest(dst, C);
+            push_bb    = unset_lsb(push_bb);
         }
 
     }
@@ -392,8 +392,8 @@ size_t generate_knight_moves_by_color(const Board& board, TMOVE* moves) {
         if constexpr (GEN_SIMPLE_CAPTURES) {
             Bitboard capture_dsts = attacks & their_bb;
             while (capture_dsts) {
-                Square dst = lsb(capture_dsts);
-                *moves++ = Move::new_simple_capture(src, dst, KNIGHT, board.piece_at(dst));
+                Square dst   = lsb(capture_dsts);
+                *moves++     = Move::new_simple_capture(src, dst, KNIGHT, board.piece_at(dst));
                 capture_dsts = unset_lsb(capture_dsts);
             }
         }
@@ -401,8 +401,8 @@ size_t generate_knight_moves_by_color(const Board& board, TMOVE* moves) {
         if constexpr (GEN_QUIET) {
             Bitboard normal_dsts = attacks & (~occ);
             while (normal_dsts) {
-                Square dst = lsb(normal_dsts);
-                *moves++ = Move::new_normal(src, dst, KNIGHT);
+                Square dst  = lsb(normal_dsts);
+                *moves++    = Move::new_normal(src, dst, KNIGHT);
                 normal_dsts = unset_lsb(normal_dsts);
             }
         }
@@ -444,8 +444,8 @@ size_t generate_bishop_moves_by_color(const Board& board, TMOVE* moves) {
         if constexpr (GEN_SIMPLE_CAPTURES) {
             Bitboard capture_dsts = attacks & their_bb;
             while (capture_dsts) {
-                Square dst = lsb(capture_dsts);
-                *moves++ = Move::new_simple_capture(src, dst, BISHOP, board.piece_at(dst));
+                Square dst   = lsb(capture_dsts);
+                *moves++     = Move::new_simple_capture(src, dst, BISHOP, board.piece_at(dst));
                 capture_dsts = unset_lsb(capture_dsts);
             }
         }
@@ -453,8 +453,8 @@ size_t generate_bishop_moves_by_color(const Board& board, TMOVE* moves) {
         if constexpr (GEN_QUIET) {
             Bitboard normal_dsts = attacks & (~occ);
             while (normal_dsts) {
-                Square dst = lsb(normal_dsts);
-                *moves++ = Move::new_normal(src, dst, BISHOP);
+                Square dst  = lsb(normal_dsts);
+                *moves++    = Move::new_normal(src, dst, BISHOP);
                 normal_dsts = unset_lsb(normal_dsts);
             }
         }
@@ -496,8 +496,8 @@ size_t generate_rook_moves_by_color(const Board& board, TMOVE* moves) {
         if constexpr (GEN_SIMPLE_CAPTURES) {
             Bitboard capture_dsts = attacks & their_bb;
             while (capture_dsts) {
-                Square dst = lsb(capture_dsts);
-                *moves++ = Move::new_simple_capture(src, dst, ROOK, board.piece_at(dst));
+                Square dst   = lsb(capture_dsts);
+                *moves++     = Move::new_simple_capture(src, dst, ROOK, board.piece_at(dst));
                 capture_dsts = unset_lsb(capture_dsts);
             }
         }
@@ -505,8 +505,8 @@ size_t generate_rook_moves_by_color(const Board& board, TMOVE* moves) {
         if constexpr (GEN_QUIET) {
             Bitboard normal_dsts = attacks & (~occ);
             while (normal_dsts) {
-                Square dst = lsb(normal_dsts);
-                *moves++ = Move::new_normal(src, dst, ROOK);
+                Square dst  = lsb(normal_dsts);
+                *moves++    = Move::new_normal(src, dst, ROOK);
                 normal_dsts = unset_lsb(normal_dsts);
             }
         }
@@ -548,8 +548,8 @@ size_t generate_queen_moves_by_color(const Board& board, TMOVE* moves) {
         if constexpr (GEN_SIMPLE_CAPTURES) {
             Bitboard capture_dsts = attacks & their_bb;
             while (capture_dsts) {
-                Square dst = lsb(capture_dsts);
-                *moves++ = Move::new_simple_capture(src, dst, QUEEN, board.piece_at(dst));
+                Square dst   = lsb(capture_dsts);
+                *moves++     = Move::new_simple_capture(src, dst, QUEEN, board.piece_at(dst));
                 capture_dsts = unset_lsb(capture_dsts);
             }
         }
@@ -557,8 +557,8 @@ size_t generate_queen_moves_by_color(const Board& board, TMOVE* moves) {
         if constexpr (GEN_QUIET) {
             Bitboard normal_dsts = attacks & (~occ);
             while (normal_dsts) {
-                Square dst = lsb(normal_dsts);
-                *moves++ = Move::new_normal(src, dst, QUEEN);
+                Square dst  = lsb(normal_dsts);
+                *moves++    = Move::new_normal(src, dst, QUEEN);
                 normal_dsts = unset_lsb(normal_dsts);
             }
         }
@@ -599,8 +599,8 @@ size_t generate_king_moves_by_color(const Board& board, TMOVE* moves) {
         // Generate captures
         Bitboard capture_dsts = attacks & their_bb;
         while (capture_dsts) {
-            Square dst = lsb(capture_dsts);
-            *moves++ = Move::new_simple_capture(src, dst, KING, board.piece_at(dst));
+            Square dst   = lsb(capture_dsts);
+            *moves++     = Move::new_simple_capture(src, dst, KING, board.piece_at(dst));
             capture_dsts = unset_lsb(capture_dsts);
         }
     }
@@ -609,8 +609,8 @@ size_t generate_king_moves_by_color(const Board& board, TMOVE* moves) {
         // Generate normal moves
         Bitboard normal_dsts = attacks & (~occ);
         while (normal_dsts) {
-            Square dst = lsb(normal_dsts);
-            *moves++ = Move::new_normal(src, dst, KING);
+            Square dst  = lsb(normal_dsts);
+            *moves++    = Move::new_normal(src, dst, KING);
             normal_dsts = unset_lsb(normal_dsts);
         }
 
@@ -679,10 +679,102 @@ size_t generate_evasions_by_color(const Board& board, TMOVE* moves) {
         }
     }
 
+    if (board.in_double_check()) {
+        // Double check positions only have king legal moves.
+        // Since those have already been generated at this point, return.
+        return moves - begin;
+    }
+
     // Now, generate piece movements to block attacks towards the king.
-    // TODO
+
+    // Find king attacker.
+    Square checker_sq   = board.first_attacker_of(opposite_color(C), king_square);
+    Piece checker_piece = board.piece_at(checker_sq);
+
+    if (checker_piece.type() == PT_PAWN && board.ep_square() != SQ_NULL) {
+        // In this situation, we can assume the check comes from a double push move.
+        Bitboard adjacent    = adjacent_bb(checker_sq);
+        Bitboard our_pawns   = board.piece_bb(Piece(C, PT_PAWN));
+        Bitboard ep_blockers = our_pawns & adjacent;
+
+        while (ep_blockers) {
+            Square pawn_sq = lsb(ep_blockers);
+
+            if (!bit_is_set(board.pinned_bb(), pawn_sq)) {
+                *moves++ = Move::new_en_passant_capture(pawn_sq, board.ep_square(), C);
+            }
+
+            ep_blockers = unset_lsb(ep_blockers);
+        }
+    }
+
+    if constexpr (GEN_QUIET) {
+        Bitboard between = between_bb(king_square, checker_sq);
+        while (between) {
+            Square s = lsb(between);
+
+            Bitboard all_blockers = board.all_attackers_of(C, s);
+            while (all_blockers) {
+                Square blocker_sq   = lsb(all_blockers);
+                Piece blocker_piece = board.piece_at(blocker_sq);
+
+                // A piece can only block a check if it's not being pinned
+                // from another angle.
+                if (!bit_is_set(board.pinned_bb(), blocker_sq)) {
+                    // Blocker is not pinned
+                    if (blocker_piece.type() != PT_PAWN || square_rank(checker_sq) != promotion_rank(C)) {
+                        // Blocker is not a pawn or is not going to the promotion rank.
+                        *moves++ = Move::new_normal(blocker_sq, checker_sq, blocker_piece);
+                    }
+                    else {
+                        // Blocker is a pawn and is going to the promotion rank.
+                        for (PieceType pt: PROMOTION_PIECE_TYPES) {
+                            *moves++ = Move::new_simple_promotion(blocker_sq,
+                                                                  checker_sq,
+                                                                  C, pt);
+                        }
+                    }
+                }
+
+                all_blockers = unset_lsb(all_blockers);
+            }
+
+            between = unset_lsb(between);
+        }
+    }
 
     // Finally, generate captures from our other pieces against checking opponent pieces.
+    if constexpr (GEN_NOISY) {
+        Bitboard all_blockers = board.all_attackers_of(C, checker_sq);
+        while (all_blockers) {
+            Square blocker_sq   = lsb(all_blockers);
+            Piece blocker_piece = board.piece_at(blocker_sq);
+
+            // A piece can only block a check if it's not being pinned
+            // from another angle.
+            if (!bit_is_set(board.pinned_bb(), blocker_sq)) {
+                // Blocker is not pinned
+                if (blocker_piece.type() != PT_PAWN || square_rank(checker_sq) != promotion_rank(C)) {
+                    // Blocker is not a pawn or is not going to the promotion rank.
+                    *moves++ = Move::new_simple_capture(blocker_sq, checker_sq, blocker_piece,
+                                                        board.piece_at(checker_sq));
+                }
+                else {
+                    // Blocker is a pawn and is going to the promotion rank.
+                    for (PieceType pt: PROMOTION_PIECE_TYPES) {
+                        *moves++ = Move::new_promotion_capture(blocker_sq,
+                                                               checker_sq,
+                                                               C,
+                                                               checker_piece,
+                                                               pt);
+
+                    }
+                }
+            }
+
+            all_blockers = unset_lsb(all_blockers);
+        }
+    }
 
     return moves - begin;
 }
