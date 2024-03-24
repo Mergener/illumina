@@ -115,7 +115,7 @@ std::string UCICommandContext::all_after(std::string_view arg_name,
 UCICommandContext::UCICommandContext(UCIServer* server,
                                      std::string_view command_name,
                                      std::string_view arg)
-    : m_server(server), m_cmd_name(std::string(command_name)), m_arg(std::string(arg)) { }
+    : m_cmd_name(std::string(command_name)), m_arg(std::string(arg)) { }
 
 
 //

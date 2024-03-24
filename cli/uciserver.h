@@ -36,7 +36,6 @@ public:
                           std::optional<i64> default_val = std::nullopt) const;
 
 private:
-    UCIServer*  m_server;
     std::string m_cmd_name;
     std::string m_arg;
 
