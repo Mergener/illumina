@@ -10,7 +10,8 @@ class ParseHelper {
 public:
     std::string_view read_chunk();
     void rewind_all();
-    bool finished();
+    bool finished() const;
+    std::string_view remainder() const;
 
     explicit ParseHelper(std::string_view sv, size_t offset = 0);
 
@@ -20,7 +21,7 @@ private:
     size_t m_offset = 0;
 };
 
-inline bool ParseHelper::finished() {
+inline bool ParseHelper::finished() const {
     return m_pos >= m_str.size();
 }
 
@@ -47,6 +48,10 @@ inline std::string_view ParseHelper::read_chunk() {
 
 inline void ParseHelper::rewind_all() {
     m_pos = m_offset;
+}
+
+inline std::string_view ParseHelper::remainder() const {
+    return m_str.substr(m_pos, m_str.size() - m_pos - m_offset);
 }
 
 inline ParseHelper::ParseHelper(std::string_view sv, size_t offset)
