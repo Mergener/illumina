@@ -105,6 +105,14 @@ constexpr ui64 flip_bits_vert(ui64 x) {
     return x;
 }
 
+inline ui64 popcount(ui64 x) {
+#ifdef __GNUC__
+    return __builtin_popcountll(x);
+#elif defined(_MSC_VER)
+    return __popcnt64(x);
+#endif
+}
+
 /**
  * Returns the position of the least significant bit from a given non-zero 64 bit integer.
  *
@@ -175,10 +183,25 @@ inline Color color_from_char(char c) {
     ILLUMINA_ASSERT(c == 'w' || c == 'W' || c == 'b' || c == 'B');
 
     c = std::tolower(c);
+
     if (c == 'b') {
         return CL_BLACK;
     }
     return CL_WHITE;
+}
+
+constexpr char color_to_char(Color color) {
+    ILLUMINA_ASSERT_VALID_COLOR(color);
+    return color == CL_WHITE
+                  ? 'w'
+                  : 'b';
+}
+
+constexpr const char* color_name(Color color) {
+    ILLUMINA_ASSERT_VALID_COLOR(color);
+    return color == CL_WHITE
+                  ? "white"
+                  : "black";
 }
 
 //
@@ -224,6 +247,16 @@ enum {
     RNK_NULL
 };
 
+constexpr BoardRank RANKS[] = {
+    RNK_1, RNK_2, RNK_3, RNK_4,
+    RNK_5, RNK_6, RNK_7, RNK_8,
+};
+
+constexpr BoardRank RANKS_REVERSE[] = {
+    RNK_8, RNK_7, RNK_6, RNK_5,
+    RNK_4, RNK_3, RNK_2, RNK_1
+};
+
 #define ILLUMINA_ASSERT_VALID_RANK(r) ILLUMINA_ASSERT((r) >= illumina::RNK_1 && (r) <= illumina::RNK_8)
 
 constexpr BoardRank rank_from_char(char c) {
@@ -262,6 +295,11 @@ enum {
     FL_A, FL_B, FL_C, FL_D,
     FL_E, FL_F, FL_G, FL_H,
     FL_NULL
+};
+
+constexpr BoardFile FILES[] = {
+    FL_A, FL_B, FL_C, FL_D,
+    FL_E, FL_F, FL_G, FL_H,
 };
 
 #define ILLUMINA_ASSERT_VALID_FILE(f) ILLUMINA_ASSERT((f) >= illumina::FL_A && (f) <= illumina::FL_H)
@@ -351,8 +389,8 @@ constexpr Bitboard shift_bb(Bitboard bb) {
         case DIR_WEST:      return (bb & ~file_bb(FL_A)) << 1;
         case DIR_NORTHEAST: return (bb & ~file_bb(FL_H)) << 9;
         case DIR_NORTHWEST: return (bb & ~file_bb(FL_A)) << 7;
-        case DIR_SOUTHEAST: return (bb & ~file_bb(FL_H)) << 7;
-        case DIR_SOUTHWEST: return (bb & ~file_bb(FL_A)) << 9;
+        case DIR_SOUTHEAST: return (bb & ~file_bb(FL_H)) >> 7;
+        case DIR_SOUTHWEST: return (bb & ~file_bb(FL_A)) >> 9;
         default: return 0;
     }
 }
@@ -451,12 +489,35 @@ constexpr Square double_push_destination(Square src, Color color) {
     return src + pawn_push_direction(color) * 2;
 }
 
+inline Square parse_square(std::string_view square_str) {
+    BoardFile file = file_from_char(square_str[0]);
+    if (file == FL_NULL) {
+        return SQ_NULL;
+    }
+
+    BoardRank rank = square_str[1] - '1';
+    if (rank == RNK_NULL) {
+        return SQ_NULL;
+    }
+
+    return make_square(file, rank);
+}
+
 constexpr Square castled_king_square(Color c, Side side) {
     ILLUMINA_ASSERT_VALID_COLOR(c);
 
     constexpr Square SQUARES[] { SQ_G1, SQ_G8, SQ_C1, SQ_C8 };
     return SQUARES[side * 2 + c];
 }
+
+constexpr Square castled_rook_square(Color c, Side side) {
+    ILLUMINA_ASSERT_VALID_COLOR(c);
+
+    constexpr Square SQUARES[] { SQ_F1, SQ_F8, SQ_D1, SQ_D8 };
+    return SQUARES[side * 2 + c];
+}
+
+std::string square_name(Square s);
 
 /**
  * The square in which a eligible castling rook is expected to be in standard (non-FRC) chess
@@ -474,22 +535,6 @@ constexpr Square standard_castle_rook_src_square(Color color, Side side) {
 
     return CASTLE_ROOK_SQ[color][side];
 }
-
-inline Square parse_square(std::string_view square_str) {
-    BoardFile file = file_from_char(square_str[0]);
-    if (file == FL_NULL) {
-        return SQ_NULL;
-    }
-
-    BoardRank rank = square_str[1] - '1';
-    if (rank == RNK_NULL) {
-        return SQ_NULL;
-    }
-
-    return make_square(file, rank);
-}
-
-std::string square_name(Square s);
 
 
 //
@@ -642,10 +687,12 @@ class Move {
     //  16 - 19:    Captured piece
     //  20 - 22:    Move type
     //  23 - 25:    Promotion piece type
-    //  26 - 31:    Castles rook square
+    //  26 - 28:    Castles rook file
+    //  29:         Castling side
     //
 
 public:
+    Move() = default;
     Move(const Board& board, Square src, Square dst, PieceType prom_piece_type = PT_NULL);
 
     explicit constexpr Move(ui32 data)
@@ -658,7 +705,9 @@ public:
     constexpr Piece     captured_piece() const;
     constexpr MoveType  type() const;
     constexpr PieceType promotion_piece_type() const;
-    constexpr Square    castles_rook_square() const;
+    constexpr Square    castles_rook_src_square() const;
+    constexpr BoardFile castles_rook_src_file() const;
+    constexpr Side      castles_side() const;
     constexpr bool      is_capture() const;
     constexpr bool      is_promotion() const;
     std::string         to_uci(bool frc = false) const;
@@ -737,8 +786,16 @@ constexpr PieceType Move::promotion_piece_type() const {
     return (m_data >> 23) & BITMASK(3);
 }
 
-constexpr Square Move::castles_rook_square() const     {
-    return (m_data >> 26) & BITMASK(6);
+constexpr Square Move::castles_rook_src_file() const {
+    return (m_data >> 26) & BITMASK(3);
+}
+
+constexpr Square Move::castles_rook_src_square() const {
+    return make_square(castles_rook_src_file(), square_rank(source()));
+}
+
+constexpr Square Move::castles_side() const     {
+    return (m_data >> 29) & BITMASK(1);
 }
 
 constexpr Move Move::base(Square src, Square dst, Piece src_piece, MoveType type) {
@@ -809,12 +866,12 @@ constexpr Move Move::new_castles(Color king_color,
 
 constexpr Move Move::new_castles(Square src,
                                  Color king_color,
-                                 Side side, Square
-                                 rook_square) {
+                                 Side side, Square rook_square) {
     ILLUMINA_ASSERT_VALID_SQUARE(rook_square);
 
     Move move = base(src, castled_king_square(king_color, side), Piece(king_color, PT_KING), MT_CASTLES);
-    move.m_data |= (rook_square & BITMASK(6)) << 26;
+    move.m_data |= (square_file(rook_square) & BITMASK(3)) << 26;
+    move.m_data |= (side & BITMASK(1)) << 29;
     return move;
 }
 

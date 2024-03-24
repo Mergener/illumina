@@ -15,55 +15,58 @@ constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
 
 class Board {
 public:
-    Color    color_to_move() const;
-    Bitboard occupancy() const;
-    Bitboard piece_bb(Piece piece) const;
-    Bitboard color_bb(Color color) const; // TODO
-    Bitboard piece_attacks(Piece piece) const; // TODO
-    Bitboard color_attacks(Color color) const; // TODO
-    Piece    piece_at(Square s) const;
-    Square   ep_square() const;
-    bool     frc() const;
-    bool     in_check() const;
-    bool     in_double_check() const;
-    ui64     hash_key() const;
-    Square   castle_rook_square(Color color, Side side) const;
-    int      rule50() const;
-    bool     legal() const; // TODO
-    int      ply_count() const;
-    bool     has_castling_rights(Color color, Side side) const;
+    Color          color_to_move() const;
+    Bitboard       occupancy() const;
+    Bitboard       piece_bb(Piece piece) const;
+    Bitboard       color_bb(Color color) const;
+    Bitboard       piece_type_bb(PieceType pt) const;
+    Piece          piece_at(Square s) const;
+    Square         ep_square() const;
+    bool           frc() const;
+    bool           in_check() const;
+    bool           in_double_check() const;
+    ui64           hash_key() const;
+    Square         castle_rook_square(Color color, Side side) const;
+    int            rule50() const;
+    bool           legal() const;
+    int            ply_count() const;
     CastlingRights castling_rights() const;
-    Move     last_move() const; // TODO
-    Bitboard pinned_bb() const; // TODO
-    Square   pinner_square(Square pinned_sq) const; // TODO
+    bool           has_castling_rights(Color color, Side side) const;
+    Move           last_move() const;
+    Bitboard       pinned_bb() const;
+    bool           is_pinned(Square s) const;
+    Square         pinner_square(Square pinned_sq) const;
+    Square         king_square(Color color) const;
+    bool           is_attacked_by(Color c, Square s) const;
+    bool           is_attacked_by(Color c, Square s, Bitboard occ) const;
+    std::string    fen() const;
+    std::string    pretty() const;
 
     void set_piece_at(Square s, Piece p);
-    void put_piece(Square s, Piece p); // TODO
-    void remove_piece(Square s); // TODO
     void set_color_to_move(Color c);
     void set_ep_square(Square s);
 
     void set_castling_rights(CastlingRights castling_rights);
     void set_castling_rights(Color color, Side side, bool allow);
-    void make_move(Move move); // TODO
-    void undo_move(); // TODO
-    void make_null_move(); // TODO
-    void undo_null_move(); // TODO
+    void make_move(Move move);
+    void undo_move();
+    void make_null_move();
+    void undo_null_move();
     bool is_move_pseudo_legal(Move move) const; // TODO
-    bool is_move_legal(Move move) const; // TODO
+    bool is_move_legal(Move move) const;
 
-    Square king_square(Color color) const;
-    template <bool EXCLUDE_KING_ATKS = false>
+    template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
     Square first_attacker_of(Color c, Square s) const;
 
-    template <bool EXCLUDE_KING_ATKS = false>
+    template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
     Bitboard all_attackers_of(Color c, Square s) const;
 
-    template <PieceType pt>
+    template <PieceType pt, bool QUIET_PAWN_MOVES = false>
     Bitboard all_attackers_of_type(Color c, Square s) const;
 
     Board() = default;
-    Board(std::string_view fen_str, bool force_frc = false);
+    Board(const Board& rhs) = default;
+    explicit Board(std::string_view fen_str, bool force_frc = false);
     ~Board() = default;
     Board(Board&& rhs) = default;
     Board& operator=(const Board& rhs) = default;
@@ -73,8 +76,11 @@ private:
     std::array<std::array<Bitboard, PT_COUNT>, CL_COUNT> m_bbs {};
     Color m_ctm = CL_WHITE;
     Bitboard m_occ = 0;
-    Bitboard m_pinned = 0;
-    int m_base_ply_count = 0;
+
+    std::array<Square, SQ_COUNT> m_pinners;
+    Bitboard m_pinned_bb = 0;
+
+    int m_base_ply_count = 0; // Gets added by m_prev_states.size()
 
     std::array<std::array<Square, SIDE_COUNT>, CL_COUNT> m_castle_rook_squares = {
         std::array<Square, SIDE_COUNT> {
@@ -93,7 +99,6 @@ private:
         ui64 hash_key    = EMPTY_BOARD_HASH_KEY;
         ui16 rule50      = 0;
         ui8 n_checkers   = 0;
-        std::array<std::array<Bitboard, PT_COUNT>, CL_COUNT> attacks {};
         CastlingRights castle_rights = CR_NONE;
     };
 
@@ -105,11 +110,21 @@ private:
     Bitboard& piece_bb_ref(Piece piece);
     Bitboard& color_bb_ref(Color color);
 
-    template <bool DO_ZOB>
-    void put_piece_internal(Square s, Piece p);
+    template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
+    void set_piece_at_internal(Square s, Piece p);
 
-    template <bool DO_ZOB>
-    void remove_piece_internal(Square s);
+    template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
+    void piece_added(Square s, Piece p);
+
+    template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
+    void piece_removed(Square s);
+
+    template <bool CHECK>
+    bool is_move_legal(Move move) const;
+
+    void compute_checkers();
+    void compute_pins();
+    void scan_pins(Bitboard attackers, Square king_square, Color pinned_color);
 };
 
 inline Color Board::color_to_move() const {
@@ -122,6 +137,14 @@ inline Bitboard Board::occupancy() const {
 
 inline Bitboard Board::piece_bb(Piece piece) const {
     return m_bbs[piece.color()][piece.type()];
+}
+
+inline Bitboard Board::color_bb(Color color) const {
+    return m_bbs[color][PT_NULL];
+}
+
+inline Bitboard Board::piece_type_bb(PieceType pt) const {
+    return piece_bb(Piece(CL_WHITE, pt)) | piece_bb(Piece(CL_BLACK, pt));
 }
 
 inline Piece Board::piece_at(Square s) const {
@@ -170,68 +193,31 @@ inline CastlingRights Board::castling_rights() const {
 }
 
 inline void Board::set_piece_at(Square s, Piece p) {
-    ILLUMINA_ASSERT_VALID_SQUARE(s);
-    if (p != PIECE_NULL) {
-        put_piece(s, p);
-    }
-    else {
-        remove_piece(s);
-    }
+    set_piece_at_internal<true, true>(s, p);
 }
 
-inline void Board::put_piece(Square s, Piece p) {
-    ILLUMINA_ASSERT_VALID_SQUARE(s);
-    ILLUMINA_ASSERT_VALID_PIECE_TYPE(p.type());
-
-    put_piece_internal<true>(s, p);
+inline Move Board::last_move() const {
+    return m_state.last_move;
 }
 
-inline void Board::remove_piece(Square s) {
-    ILLUMINA_ASSERT_VALID_SQUARE(s);
-    remove_piece_internal<true>(s);
+inline Bitboard Board::pinned_bb() const {
+    return m_pinned_bb;
 }
 
-template <bool DO_ZOB>
-inline void Board::put_piece_internal(Square s, Piece p) {
-    Piece prev_piece        = piece_at(s);
-
-    Bitboard& prev_color_bb = color_bb_ref(prev_piece.color());
-    Bitboard& new_color_bb  = color_bb_ref(p.color());
-    Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
-    Bitboard& new_piece_bb  = piece_bb_ref(p);
-
-    prev_piece_bb = unset_bit(prev_piece_bb, s);
-    prev_piece_bb = unset_bit(prev_color_bb, s);
-    new_piece_bb  = set_bit(new_piece_bb, s);
-    new_piece_bb  = set_bit(new_color_bb, s);
-
-    m_pieces[s] = p;
-
-    m_occ = set_bit(m_occ, s);
-
-    if constexpr (DO_ZOB) {
-        m_state.hash_key ^= zob_piece_square_key(prev_piece, s);
-        m_state.hash_key ^= zob_piece_square_key(p, s);
-    }
+inline bool Board::is_pinned(Square s) const {
+    return bit_is_set(pinned_bb(), s);
 }
 
-template <bool DO_ZOB>
-inline void Board::remove_piece_internal(Square s) {
-    Piece prev_piece = piece_at(s);
+inline Square Board::pinner_square(Square pinned_sq) const {
+    return m_pinners[pinned_sq];
+}
 
-    Bitboard& prev_color_bb = color_bb_ref(prev_piece.color());
-    Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
+inline Square Board::king_square(Color color) const {
+    return lsb(piece_bb(Piece(color, PT_KING)));
+}
 
-    prev_piece_bb = unset_bit(prev_piece_bb, s);
-    prev_piece_bb = unset_bit(prev_color_bb, s);
-
-    m_pieces[s] = PIECE_NULL;
-
-    m_occ = unset_bit(m_occ, s);
-
-    if constexpr (DO_ZOB) {
-        m_state.hash_key ^= zob_piece_square_key(prev_piece, s);
-    }
+inline bool Board::is_move_legal(Move move) const {
+    return in_check() ? is_move_legal<true>(move) : is_move_legal<false>(move);
 }
 
 inline void Board::set_color_to_move(Color c) {
@@ -264,11 +250,92 @@ inline void Board::set_castling_rights(Color color, Side side, bool allow) {
     }
 }
 
-inline Square Board::king_square(Color color) const {
-    return lsb(piece_bb(Piece(color, PT_KING)));
+inline Bitboard& Board::piece_bb_ref(Piece piece) {
+    return m_bbs[piece.color()][piece.type()];
 }
 
-template <bool EXCLUDE_KING_ATKS>
+inline Bitboard& Board::color_bb_ref(Color color) {
+    return m_bbs[color][PT_NULL];
+}
+
+template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
+inline void Board::set_piece_at_internal(Square s, Piece p) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
+    Piece prev_piece = piece_at(s);
+    if (p == prev_piece) {
+        return;
+    }
+
+    if (p == PIECE_NULL) {
+        // Note that we can assume there was a piece on 's' because
+        // of the check 'p == prev_piece' above.
+        piece_removed<DO_ZOB, false>(s);
+        m_occ = unset_bit(m_occ, s);
+    }
+    else {
+        if (prev_piece != PIECE_NULL) {
+            // We removed a piece but placed a new one on the same square.
+            // Don't change the occupancy.
+            piece_removed<DO_ZOB, false>(s);
+        }
+        else {
+            // We're adding a new piece, set bit on occupancy.
+            m_occ = set_bit(m_occ, s);
+        }
+        piece_added<DO_ZOB, false>(s, p);
+    }
+
+    if constexpr (DO_PINS_AND_CHECKS) {
+        compute_pins();
+    }
+}
+
+template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
+inline void Board::piece_added(Square s, Piece p) {
+    Color piece_color = p.color();
+
+    Bitboard& new_color_bb  = color_bb_ref(piece_color);
+    Bitboard& new_piece_bb  = piece_bb_ref(p);
+
+    new_piece_bb = set_bit(new_piece_bb, s);
+    new_color_bb = set_bit(new_color_bb, s);
+
+    m_pieces[s] = p;
+
+    if constexpr (DO_ZOB) {
+        m_state.hash_key ^= zob_piece_square_key(p, s);
+    }
+
+    if constexpr (DO_PINS_AND_CHECKS) {
+        compute_pins();
+        compute_checkers();
+    }
+}
+
+template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
+inline void Board::piece_removed(Square s) {
+    Piece prev_piece = piece_at(s);
+
+    Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
+    Bitboard& prev_color_bb = color_bb_ref(prev_piece.color());
+
+    prev_piece_bb = unset_bit(prev_piece_bb, s);
+    prev_color_bb = unset_bit(prev_color_bb, s);
+
+    m_pieces[s] = PIECE_NULL;
+
+    if constexpr (DO_ZOB) {
+        m_state.hash_key ^= zob_piece_square_key(prev_piece, s);
+    }
+
+    if constexpr (DO_PINS_AND_CHECKS) {
+        compute_pins();
+        compute_checkers();
+    }
+}
+
+template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>
 inline Square Board::first_attacker_of(Color c, Square s) const {
     Bitboard occ = occupancy();
 
@@ -301,8 +368,14 @@ inline Square Board::first_attacker_of(Color c, Square s) const {
     }
 
     Bitboard their_pawns   = piece_bb(Piece(c, PT_PAWN));
-    Bitboard pawn_atks     = pawn_attacks(s, occ, opposite_color(c));
-    Bitboard pawn_attacker = pawn_atks & their_pawns;
+    Bitboard pawn_targets;
+    if constexpr (QUIET_PAWN_MOVES) {
+        pawn_targets = pawn_pushes(s, opposite_color(c), occ);
+    }
+    else {
+        pawn_targets = pawn_attacks(s, opposite_color(c));
+    }
+    Bitboard pawn_attacker = pawn_targets & their_pawns;
     if (pawn_attacker) {
         return lsb(pawn_attacker);
     }
@@ -319,7 +392,7 @@ inline Square Board::first_attacker_of(Color c, Square s) const {
     return SQ_NULL;
 }
 
-template <PieceType pt>
+template <PieceType pt, bool QUIET_PAWN_MOVES>
 inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
     if constexpr (pt == PT_KNIGHT) {
         return piece_bb(Piece(c, PT_KNIGHT)) & knight_attacks(s);
@@ -329,7 +402,16 @@ inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
     }
     Bitboard occ = occupancy();
     if constexpr (pt == PT_PAWN) {
-        return piece_bb(Piece(c, PT_PAWN)) & pawn_attacks(s, occ, opposite_color(c));
+        Bitboard pawn_targets;
+        Bitboard our_pawns = piece_bb(Piece(c, PT_PAWN));
+        if constexpr (QUIET_PAWN_MOVES) {
+            pawn_targets = pawn_pushes<true>(s, opposite_color(c), occ & ~(our_pawns));
+        }
+        else {
+            pawn_targets = pawn_attacks(s, opposite_color(c));
+        }
+
+        return our_pawns & pawn_targets;
     }
     if constexpr (pt == PT_BISHOP) {
         return piece_bb(Piece(c, PT_BISHOP)) & bishop_attacks(s, occ);
@@ -342,11 +424,11 @@ inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
     }
 }
 
-template <bool EXCLUDE_KING_ATKS>
+template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>
 inline Bitboard Board::all_attackers_of(Color c, Square s) const {
     Bitboard ret = 0;
 
-    ret |= all_attackers_of_type<PT_PAWN>(c, s);
+    ret |= all_attackers_of_type<PT_PAWN, QUIET_PAWN_MOVES>(c, s);
     ret |= all_attackers_of_type<PT_KNIGHT>(c, s);
     ret |= all_attackers_of_type<PT_BISHOP>(c, s);
     ret |= all_attackers_of_type<PT_ROOK>(c, s);
@@ -359,12 +441,104 @@ inline Bitboard Board::all_attackers_of(Color c, Square s) const {
     return ret;
 }
 
-inline Bitboard& Board::piece_bb_ref(Piece piece) {
-    return m_bbs[piece.color()][piece.type()];
-}
+template <bool CHECK>
+inline bool Board::is_move_legal(Move move) const {
+    Color us        = color_to_move();
+    Square our_king = king_square(us);
+    if (our_king == SQ_NULL) {
+        // Any pseudo legal move is legal with no king
+        // on the board.
+        return true;
+    }
 
-inline Bitboard& Board::color_bb_ref(Color color) {
-    return m_bbs[PT_NULL][color];
+    Color them      = opposite_color(us);
+    Bitboard occ    = occupancy();
+    Square src      = move.source();
+    Square dest     = move.destination();
+    Piece src_piece = move.source_piece();
+
+    // Regardless of the position being a check or not, pinned
+    // pieces can only move alongside their pins.
+    if (is_pinned(src)) {
+        Square pinner    = m_pinners[src];
+        Bitboard between = between_bb(our_king, pinner);
+        between          = set_bit(between, pinner);
+
+        if (!bit_is_set(between, dest)) {
+            // Trying to move away from pin, illegal.
+            return false;
+        }
+    }
+
+    // En-passant must be treated with extra care.
+    if (move.type() == MT_EN_PASSANT) {
+        Square capt_pawn_sq = dest + pawn_push_direction(them);
+        Bitboard ep_occ     = occ;
+
+        // Pretend there are no pawns
+        ep_occ = unset_bit(ep_occ, capt_pawn_sq);
+        ep_occ = unset_bit(ep_occ, src);
+
+        Bitboard king_rank_bb = rank_bb(square_rank(our_king));
+
+        Bitboard their_rooks    = piece_bb(Piece(them, PT_ROOK));
+        Bitboard their_queens   = piece_bb(Piece(them, PT_QUEEN));
+        Bitboard their_hor_atks = rook_attacks(our_king, ep_occ) & (their_rooks | their_queens) & king_rank_bb;
+
+        if (rook_attacks(our_king, ep_occ) & their_hor_atks) {
+            return false;
+        }
+
+        if (CHECK) {
+            Bitboard their_bishops        = piece_bb(Piece(them, PT_BISHOP));
+            Bitboard their_diag_attackers = their_bishops | their_queens;
+            if (bishop_attacks(our_king, occ) & their_diag_attackers) {
+                return false;
+            }
+        }
+    }
+    else if (src_piece.type() == PT_KING) {
+        // King cannot be moving to a square attacked by any piece
+        if (is_attacked_by(them, dest)) {
+            return false;
+        }
+
+        // The conditional above does not cover cases where the king runs
+        // in the same direction a slider is attacking them.
+        Bitboard occ_without_king = occ & (~BIT(our_king));
+
+        Bitboard their_bishops = piece_bb(Piece(them, PT_BISHOP));
+        Bitboard their_rooks   = piece_bb(Piece(them, PT_ROOK));
+        Bitboard their_queens  = piece_bb(Piece(them, PT_QUEEN));
+
+        Bitboard their_diag_atks = bishop_attacks(dest, occ_without_king) & (their_bishops | their_queens);
+        if (their_diag_atks != 0) {
+            return false;
+        }
+
+        Bitboard their_line_atks = rook_attacks(dest, occ_without_king) & (their_rooks | their_queens);
+        if (their_line_atks != 0) {
+            return false;
+        }
+    }
+    else if constexpr (CHECK) {
+        if (m_state.n_checkers > 1) {
+            // Only king moves allowed in double checks
+            return false;
+        }
+
+        // We're in a single check and trying to move a piece that is not the king.
+        // The piece we're trying to move can only move to a square between the king
+        // and the checker...
+        Square atk_square = first_attacker_of(them, our_king);
+        Bitboard between  = between_bb(our_king, atk_square);
+        between = set_bit(between, atk_square); // ... or capture the checker!
+
+        if (!bit_is_set(between, dest)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 } // illumina

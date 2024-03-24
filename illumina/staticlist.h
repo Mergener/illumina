@@ -36,11 +36,11 @@ public:
     StaticList();
     ~StaticList();
     StaticList(const StaticList& other);
-    StaticList(StaticList&& other);
+    StaticList(StaticList&& other) noexcept;
     StaticList& operator=(const StaticList& other);
 
 private:
-    std::aligned_storage<T, ALIGN> m_elems[N];
+    std::aligned_storage<sizeof(T), ALIGN> m_elems[N];
     T* m_end;
 };
 
@@ -103,22 +103,22 @@ inline void StaticList<T, N, ALIGN>::pop_back() {
 }
 
 template <typename T, size_t N, size_t ALIGN>
-inline StaticList<T, N, ALIGN>::Iterator StaticList<T, N, ALIGN>::begin() {
+inline typename StaticList<T, N, ALIGN>::Iterator StaticList<T, N, ALIGN>::begin() {
     return m_elems;
 }
 
 template <typename T, size_t N, size_t ALIGN>
-inline StaticList<T, N, ALIGN>::Iterator StaticList<T, N, ALIGN>::end() {
+inline typename StaticList<T, N, ALIGN>::Iterator StaticList<T, N, ALIGN>::end() {
     return m_end;
 }
 
 template <typename T, size_t N, size_t ALIGN>
-inline StaticList<T, N, ALIGN>::ConstIterator StaticList<T, N, ALIGN>::cbegin() const {
+inline typename StaticList<T, N, ALIGN>::ConstIterator StaticList<T, N, ALIGN>::cbegin() const {
     return m_elems;
 }
 
 template <typename T, size_t N, size_t ALIGN>
-inline StaticList<T, N, ALIGN>::ConstIterator StaticList<T, N, ALIGN>::cend() const {
+inline typename StaticList<T, N, ALIGN>::ConstIterator StaticList<T, N, ALIGN>::cend() const {
     return m_end;
 }
 
@@ -129,7 +129,7 @@ inline StaticList<T, N, ALIGN>::StaticList()
 
 template <typename T, size_t N, size_t ALIGN>
 inline StaticList<T, N, ALIGN>::~StaticList() {
-    if constexpr (!std::is_trivially_destructible_v) {
+    if constexpr (!std::is_trivially_destructible_v<T>) {
         std::destroy(begin(), end());
     }
 }
@@ -140,12 +140,16 @@ inline StaticList<T, N, ALIGN>::StaticList(const StaticList& other) {
 }
 
 template <typename T, size_t N, size_t ALIGN>
-inline StaticList<T, N, ALIGN>::StaticList(StaticList&& other) {
+inline StaticList<T, N, ALIGN>::StaticList(StaticList&& other) noexcept {
     m_end = std::move(other.cbegin(), other.cend(), begin());
 }
 
 template <typename T, size_t N, size_t ALIGN>
 inline StaticList<T, N, ALIGN>& StaticList<T, N, ALIGN>::operator=(const StaticList& other) {
+    if (&other == this) {
+        return *this;
+    }
+
     m_end = std::copy(other.cbegin(), other.cend(), begin());
 }
 

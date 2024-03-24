@@ -142,7 +142,7 @@ std::string Move::to_uci(bool frc) const {
 
         case MT_CASTLES:
             if (frc) {
-                return square_name(source()) + square_name(castles_rook_square());
+                return square_name(source()) + square_name(castles_rook_src_square());
             }
             return square_name(source()) + square_name(destination());
 
@@ -215,8 +215,8 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
             // However, in these scenarios, the dst_piece is set to a rook with the same color
             // as the moving king.
             Side side = dst == board.castle_rook_square(king_color, SIDE_KING)
-                ? SIDE_KING
-                : SIDE_QUEEN;
+                             ? SIDE_KING
+                             : SIDE_QUEEN;
 
             m_data = new_castles(src, king_color, side, dst).raw();
         }

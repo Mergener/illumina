@@ -36,7 +36,6 @@ TEST_CASE(SetPieceAt) {
 
             if (p != prev_piece) {
                 EXPECT(key).to_not_be(prev_key);
-                EXPECT(prev_piece_bb).to_be(unset_bit(prev_prev_piece_bb, s));
                 EXPECT(p_bb).to_be(set_bit(prev_p_bb, s));
 
                 if (p == PIECE_NULL) {

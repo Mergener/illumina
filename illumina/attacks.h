@@ -7,61 +7,52 @@
 
 namespace illumina {
 
-template <Color C>
-inline Bitboard pawn_pushes(Square s, Bitboard occ) {
+constexpr size_t N_ATTACK_KEYS = 4096;
+
+template <Color C, bool ASSUME_STARTING_RANK = false>
+inline Bitboard pawn_pushes(Square s, Bitboard occ = 0) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-    if constexpr (C == CL_WHITE) {
-        extern const Bitboard g_white_pawn_pushes[];
-        occ |= shift_bb<DIR_NORTH>(occ);
-        return g_white_pawn_pushes[s] & (~occ);
+    constexpr Direction PUSH_DIR = pawn_push_direction(C);
+
+    Bitboard not_occ = ~occ;
+    Bitboard pushes  = shift_bb<PUSH_DIR>(BIT(s)) & not_occ;
+    if (pushes && (ASSUME_STARTING_RANK || square_rank(s) == pawn_starting_rank(C))) {
+        pushes |= shift_bb<PUSH_DIR>(pushes) & not_occ;
     }
-    else {
-        extern const Bitboard g_black_pawn_pushes[];
-        occ |= shift_bb<DIR_SOUTH>(occ);
-        return g_black_pawn_pushes[s] & (~occ);
-    }
+    return pushes;
 }
 
-inline Bitboard pawn_pushes(Square s, Color c, Bitboard occ) {
-    ILLUMINA_ASSERT_VALID_SQUARE(s);
-    ILLUMINA_ASSERT_VALID_COLOR(c);
-
-    return c == CL_WHITE
-           ? pawn_pushes<CL_WHITE>(s, occ)
-           : pawn_pushes<CL_BLACK>(s, occ);
-}
-
-template <Color C>
-inline Bitboard pawn_captures(Square s, Bitboard occ = 0xffffffffffffffff) {
-    ILLUMINA_ASSERT_VALID_SQUARE(s);
-
-    if constexpr (C == CL_WHITE) {
-        extern const Bitboard g_white_pawn_captures[];
-        return g_white_pawn_captures[s] & occ;
-    }
-    else {
-        extern const Bitboard g_black_pawn_captures[];
-        return g_black_pawn_captures[s] & occ;
-    }
-}
-
-inline Bitboard pawn_captures(Square s, Color c, Bitboard occ = 0xffffffffffffffff) {
+template <bool ASSUME_STARTING_RANK = false>
+inline Bitboard pawn_pushes(Square s, Color c, Bitboard occ = 0) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
     ILLUMINA_ASSERT_VALID_COLOR(c);
 
     return c == CL_WHITE
-           ? pawn_captures<CL_WHITE>(s, occ)
-           : pawn_captures<CL_BLACK>(s, occ);
+           ? pawn_pushes<CL_WHITE, ASSUME_STARTING_RANK>(s, occ)
+           : pawn_pushes<CL_BLACK, ASSUME_STARTING_RANK>(s, occ);
 }
 
 template <Color C>
-inline Bitboard pawn_attacks(Square s, Bitboard occ) {
-    return pawn_pushes<C>(s, occ) | pawn_captures<C>(s, occ);
+inline Bitboard pawn_attacks(Square s) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
+    Bitboard s_bb = BIT(s);
+    if constexpr (C == CL_WHITE) {
+        return shift_bb<DIR_NORTHEAST>(s_bb) | shift_bb<DIR_NORTHWEST>(s_bb);
+    }
+    else {
+        return shift_bb<DIR_SOUTHEAST>(s_bb) | shift_bb<DIR_SOUTHWEST>(s_bb);
+    }
 }
 
-inline Bitboard pawn_attacks(Square s, Bitboard occ, Color c) {
-    return pawn_pushes(s, occ, c) | pawn_captures(s, occ, c);
+inline Bitboard pawn_attacks(Square s, Color c) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+    ILLUMINA_ASSERT_VALID_COLOR(c);
+
+    return c == CL_WHITE
+           ? pawn_attacks<CL_WHITE>(s)
+           : pawn_attacks<CL_BLACK>(s);
 }
 
 inline Bitboard knight_attacks(Square s) {
@@ -74,7 +65,7 @@ inline Bitboard knight_attacks(Square s) {
 inline Bitboard bishop_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-    extern Bitboard g_bishop_attacks[SQ_COUNT][512];
+    extern Bitboard g_bishop_attacks[SQ_COUNT][N_ATTACK_KEYS];
     extern const Bitboard g_bishop_masks[];
     return g_bishop_attacks[s][_pext_u64(occ, g_bishop_masks[s])];
 }
@@ -82,7 +73,7 @@ inline Bitboard bishop_attacks(Square s, Bitboard occ) {
 inline Bitboard rook_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-    extern Bitboard g_rook_attacks[SQ_COUNT][512];
+    extern Bitboard g_rook_attacks[SQ_COUNT][N_ATTACK_KEYS];
     extern const Bitboard g_rook_masks[];
     return g_rook_attacks[s][_pext_u64(occ, g_rook_masks[s])];
 }
@@ -104,7 +95,7 @@ inline Bitboard piece_attacks(Piece p, Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
     switch (p.type()) {
-        case PT_PAWN:   return pawn_attacks(s, occ, p.color());
+        case PT_PAWN:   return pawn_attacks(s, p.color());
         case PT_KNIGHT: return knight_attacks(s);
         case PT_BISHOP: return bishop_attacks(s, occ);
         case PT_ROOK:   return rook_attacks(s, occ);
