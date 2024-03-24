@@ -575,4 +575,8 @@ void Board::compute_checkers() {
     m_state.n_checkers = popcount(checkers);
 }
 
+Board Board::standard_startpos() {
+    return Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+}
+
 } // illumina

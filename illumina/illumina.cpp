@@ -24,4 +24,8 @@ void init() {
     init_attacks();
 }
 
+bool initialized() {
+    return s_initialized;
+}
+
 } // illumina

@@ -152,15 +152,27 @@ std::string Move::to_uci(bool frc) const {
 }
 
 Move Move::parse_uci(const Board& board, std::string_view move_str) {
-    ILLUMINA_ASSERT(move_str.size() >= 4);
+    if (move_str.size() < 4) {
+        return MOVE_NULL;
+    }
 
     Square src = parse_square(move_str);
+    if (src == SQ_NULL) {
+        return MOVE_NULL;
+    }
     Square dst = parse_square(move_str.substr(2));
+    if (dst == SQ_NULL) {
+        return MOVE_NULL;
+    }
+
     PieceType prom_piece_type = PT_NULL;
 
     if (move_str.size() > 4) {
         // Try to parse a promotion piece
         Piece p = Piece::from_char(move_str[4]);
+        if (p == PIECE_NULL) {
+            return MOVE_NULL;
+        }
         prom_piece_type = p.type();
     }
 

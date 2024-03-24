@@ -71,6 +71,8 @@ public:
     Board(Board&& rhs) = default;
     Board& operator=(const Board& rhs) = default;
 
+    static Board standard_startpos();
+
 private:
     std::array<Piece, SQ_COUNT> m_pieces {};
     std::array<std::array<Bitboard, PT_COUNT>, CL_COUNT> m_bbs {};
