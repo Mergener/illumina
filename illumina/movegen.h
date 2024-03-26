@@ -138,9 +138,11 @@ TMOVE* generate_moves(const Board& board, TMOVE* moves) {
         TMOVE* last = moves - 1;
 
         for (moves = begin; moves <= last;) {
-            Move& move = *moves;
+            TMOVE& move = *moves;
             if (!board.is_move_legal(move)) {
-                std::swap(move, *last);
+                TMOVE temp = move;
+                move       = *last;
+                *last      = temp;
                 --last;
             }
             else {
@@ -351,7 +353,7 @@ TMOVE* generate_pawn_moves_by_color(const Board& board, TMOVE* moves) {
         for (Bitboard bb = push_bb; bb; bb = unset_lsb(bb)) {
             Square dst = lsb(bb);
             Square src = dst - PUSH_DIR;
-            Move move = Move::new_normal(src, dst, PAWN);
+            TMOVE move = Move::new_normal(src, dst, PAWN);
             *moves++   = move;
         }
 

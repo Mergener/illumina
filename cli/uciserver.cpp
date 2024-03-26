@@ -16,12 +16,18 @@ static std::string generate_missing_arg_error_string(std::string_view command_na
     std::stringstream stream;
 
     if (!missing_arg.empty()) {
-        stream << "Missing or invalid required " << expected_arg_type_name << " argument for command '" << command_name
+        stream << "Missing or invalid required "
+               << expected_arg_type_name
+               << " argument for command '"
+               << command_name
                << "': '"
                << missing_arg << "'";
     }
     else {
-        stream << "Missing or invalid required " << expected_arg_type_name << " positional argument for command '" << command_name << "'.";
+        stream << "Missing or invalid required "
+               << expected_arg_type_name
+               << " positional argument for command '"
+               << command_name << "'.";
     }
     return stream.str();
 }

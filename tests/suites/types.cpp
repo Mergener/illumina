@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "board.h"
 #include "types.h"
 
 using namespace litetest;
@@ -639,4 +640,11 @@ TEST_CASE(ToUCI) {
     // Test simple promotion move
     Move promotion = Move::new_simple_promotion(SQ_H7, SQ_H8, CL_BLACK, PT_QUEEN);
     EXPECT(promotion.to_uci()).to_be("h7h8q");
+}
+
+TEST_CASE(FromUCI) {
+//    EXPECT(Move::new_castles(SQ_E8, CL_BLACK, SIDE_KING, SQ_H8))
+//        .to_be(Move::new_castles(CL_BLACK, SIDE_KING));
+    EXPECT(Move::parse_uci(Board("rnbqk2r/pppp1ppp/4pn2/8/1bP5/2N2N2/PPQPPPPP/R1B1KB1R b KQkq - 3 4"), "e8g8"))
+        .to_be(Move::new_castles(CL_BLACK, SIDE_KING));
 }

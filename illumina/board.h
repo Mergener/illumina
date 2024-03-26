@@ -41,6 +41,7 @@ public:
     bool           is_attacked_by(Color c, Square s, Bitboard occ) const;
     std::string    fen() const;
     std::string    pretty() const;
+    bool           is_repetition_draw(int max_appearances = 3) const;
 
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
@@ -335,6 +336,26 @@ inline void Board::piece_removed(Square s) {
         compute_pins();
         compute_checkers();
     }
+}
+
+inline bool Board::is_repetition_draw(int max_appearances) const {
+    int appearances = 1;
+
+    for (auto it = m_prev_states.crbegin(); it != m_prev_states.crend(); ++it) {
+        const auto& state = *it;
+
+        if (state.last_move.makes_progress()) {
+            break;
+        }
+        if (state.hash_key == m_state.hash_key) {
+            appearances++;
+            if (appearances == max_appearances) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>

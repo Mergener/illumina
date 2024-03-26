@@ -39,7 +39,7 @@ public:
     StaticList(StaticList&& other) noexcept;
     StaticList& operator=(const StaticList& other);
 
-private:
+protected:
     std::aligned_storage<sizeof(T), ALIGN> m_elems[N];
     T* m_end;
 };
@@ -104,7 +104,7 @@ inline void StaticList<T, N, ALIGN>::pop_back() {
 
 template <typename T, size_t N, size_t ALIGN>
 inline typename StaticList<T, N, ALIGN>::Iterator StaticList<T, N, ALIGN>::begin() {
-    return m_elems;
+    return reinterpret_cast<T*>(std::launder(m_elems));
 }
 
 template <typename T, size_t N, size_t ALIGN>
@@ -114,7 +114,7 @@ inline typename StaticList<T, N, ALIGN>::Iterator StaticList<T, N, ALIGN>::end()
 
 template <typename T, size_t N, size_t ALIGN>
 inline typename StaticList<T, N, ALIGN>::ConstIterator StaticList<T, N, ALIGN>::cbegin() const {
-    return m_elems;
+    return reinterpret_cast<T*>(std::launder(m_elems));
 }
 
 template <typename T, size_t N, size_t ALIGN>
@@ -124,7 +124,7 @@ inline typename StaticList<T, N, ALIGN>::ConstIterator StaticList<T, N, ALIGN>::
 
 template <typename T, size_t N, size_t ALIGN>
 inline StaticList<T, N, ALIGN>::StaticList()
-    : m_end(m_elems) {
+    : m_end(std::launder(reinterpret_cast<T*>(m_elems))) {
 }
 
 template <typename T, size_t N, size_t ALIGN>

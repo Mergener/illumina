@@ -166,9 +166,8 @@ Move Move::parse_uci(const Board& board, std::string_view move_str) {
     }
 
     PieceType prom_piece_type = PT_NULL;
-
     if (move_str.size() > 4) {
-        // Try to parse a promotion piece
+        // Try to parse a promotion piece.
         Piece p = Piece::from_char(move_str[4]);
         if (p == PIECE_NULL) {
             return MOVE_NULL;
@@ -184,9 +183,10 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
     Piece dst_piece = board.piece_at(dst);
 
     if (src_piece.type() == PT_PAWN) {
-        // Pawn moves
+        // For pawn moves, we'll assume every capture is a diagonal move and
+        // every vertical move is a push.
         if (square_file(src) == square_file(dst)) {
-            // Pawn push
+            // Same file, vertical move. Assume it's a pawn push.
             int delta = std::abs(square_rank(dst) - square_rank(src));
             if (delta == 2) {
                 m_data = new_double_push(src, src_piece.color()).raw();
@@ -199,6 +199,7 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
             }
         }
         else {
+            // Different file, diagonal move. Assume it's a capture.
             if (dst_piece == PIECE_NULL) {
                 m_data = new_en_passant_capture(src, dst, src_piece.color()).raw();
             }
@@ -211,19 +212,25 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
         }
     }
     else if (src_piece.type() == PT_KING) {
-        // Check if castles
+        // For king moves, we must differentiate between regular moves
+        // or castles. Also, we have two supported encondings for castling:
+        //
+        //  Encoding a: dst square is destination. Used for standard chess castling (e1g1, e1c1, e8c8, e8g8).
+        //  Encoding b: dst square is castle rook source square. Used for FRC or standard.
         Color king_color = src_piece.color();
-        int file_delta = square_file(src) - square_file(dst);
-        // If a king tries to move more than a single file away, we can assume
-        // it's trying to castle.
+        int file_delta = square_file(dst) - square_file(src);
+
         if (file_delta > 1) {
-            m_data = new_castles(src, king_color, SIDE_KING, dst).raw();
+            // file_delta > 1 means Encoding a.
+            m_data = new_castles(src, king_color, SIDE_KING, board.castle_rook_square(king_color, SIDE_KING)).raw();
         }
-        else if (file_delta < 1) {
-            m_data = new_castles(src, king_color, SIDE_QUEEN, dst).raw();
+        else if (file_delta < -1) {
+            // file_delta < 1 also means Encoding a.
+            m_data = new_castles(src, king_color, SIDE_QUEEN, board.castle_rook_square(king_color, SIDE_QUEEN)).raw();
         }
         else if (dst_piece.color() == src_piece.color() && dst_piece.type() == PT_ROOK) {
-            // In chess960, castling moves can occur with a single file distance.
+            // file_delta = 1.
+            // In FRC, castling moves can occur with a single file distance.
             // However, in these scenarios, the dst_piece is set to a rook with the same color
             // as the moving king.
             Side side = dst == board.castle_rook_square(king_color, SIDE_KING)
@@ -233,13 +240,20 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
             m_data = new_castles(src, king_color, side, dst).raw();
         }
         else if (dst_piece != PIECE_NULL) {
+            // King is capturing a piece.
             m_data = new_simple_capture(src, dst, src_piece, dst_piece).raw();
+        }
+        else {
+            // King is simply moving.
+            m_data = new_normal(src, dst, src_piece).raw();
         }
     }
     else if (dst_piece != PIECE_NULL) {
+        // We have a piece on the target square, it's a capture.
         m_data = new_simple_capture(src, dst, src_piece, dst_piece).raw();
     }
     else {
+        // No pieces on destination, normal move.
         m_data = new_normal(src, dst, src_piece).raw();
     }
 }

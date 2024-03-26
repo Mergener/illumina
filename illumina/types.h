@@ -710,9 +710,13 @@ public:
     constexpr Side      castles_side() const;
     constexpr bool      is_capture() const;
     constexpr bool      is_promotion() const;
+    constexpr bool      makes_progress() const;
     std::string         to_uci(bool frc = false) const;
 
-private:
+    bool operator==(Move other) const;
+    bool operator!=(Move other) const;
+
+protected:
     ui32 m_data;
 
     static constexpr Move base(Square src, Square dst, Piece src_piece, MoveType type);
@@ -861,7 +865,9 @@ constexpr Move Move::new_double_push_from_dest(Square dst, Color pawn_color) {
 
 constexpr Move Move::new_castles(Color king_color,
                                  Side side) {
-    return new_castles(king_color == CL_WHITE ? SQ_E1 : SQ_E8, king_color, side, standard_castle_rook_src_square(king_color, side));
+    return new_castles(king_color == CL_WHITE ? SQ_E1 : SQ_E8,
+                       king_color, side,
+                       standard_castle_rook_src_square(king_color, side));
 }
 
 constexpr Move Move::new_castles(Square src,
@@ -896,6 +902,22 @@ constexpr bool Move::is_promotion() const {
     return (BIT(type()) & MASK) != 0;
 }
 
+constexpr bool Move::makes_progress() const {
+    return is_capture() || source_piece().type() == PT_PAWN;
+}
+
+inline bool Move::operator==(Move other) const {
+    return m_data == other.m_data;
+}
+
+inline bool Move::operator!=(Move other) const {
+    return m_data != other.m_data;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, Move move) {
+    stream << move.to_uci() << std::hex << " (0x" << ui32(move.raw()) << ")" << std::dec;
+    return stream;
+}
 
 } // illumina
 

@@ -44,8 +44,8 @@ private:
                       std::string_view arg);
 };
 
-using UCICommandHandler      = std::function<void(UCICommandContext&)>;
-using UCIErrorHandler        = std::function<void(UCIServer&, const std::exception&)>;
+using UCICommandHandler = std::function<void(UCICommandContext&)>;
+using UCIErrorHandler   = std::function<void(UCIServer&, const std::exception&)>;
 
 class UCIServer {
 public:

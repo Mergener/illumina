@@ -69,11 +69,11 @@ void UCIOptionString::parse_and_set_handler(std::string_view str) {
 }
 
 std::string UCIOptionString::default_value_str() const {
-    return m_default_val;
+    return default_value();
 }
 
 std::string UCIOptionString::current_value_str() const {
-    return m_val;
+    return value();
 }
 
 std::string UCIOptionString::type_name() const {

@@ -92,7 +92,7 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_default.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_A1);
     EXPECT(board_default.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_H8);
     EXPECT(board_default.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_A8);
-//    EXPECT(board_default.legal()).to_be(true);
+    EXPECT(board_default.legal()).to_be(true);
 
 //    // Test constructor with FEN string representing the starting position
     Board board_startpos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -118,7 +118,7 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_startpos.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_A1);
     EXPECT(board_startpos.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_H8);
     EXPECT(board_startpos.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_A8);
-//    EXPECT(board_startpos.legal()).to_be(true);
+    EXPECT(board_startpos.legal()).to_be(true);
 
     // Test constructor with FEN string representing custom positions.
     Board board_custompos_1("7k/8/8/3K4/8/8/P7/8 b - - 32 1");
@@ -145,7 +145,7 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_custompos_1.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_A1);
     EXPECT(board_custompos_1.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_H8);
     EXPECT(board_custompos_1.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_A8);
-//    EXPECT(board_custompos_1.legal()).to_be(true);
+    EXPECT(board_custompos_1.legal()).to_be(true);
 
     // Test FRC construction with FEN.
     Board frc_board_1("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w KQkq - 0 1");

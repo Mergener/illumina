@@ -23,7 +23,7 @@ public:
     virtual std::string type_name() const = 0;
     virtual std::string default_value_str() const = 0;
     virtual std::string current_value_str() const = 0;
-    virtual bool        has_value() const; // Defaults to returning true.
+    virtual bool        has_value() const;     // Defaults to returning true.
     virtual bool        has_min_value() const; // Defaults to returning false.
     virtual bool        has_max_value() const; // Defaults to returning false.
     virtual std::string min_value_str() const;
@@ -113,6 +113,11 @@ public:
                    std::string default_val,
                    std::vector<std::string> options);
 
+    template <typename... TArgs>
+    UCIOptionCombo(std::string name,
+                   std::string default_val,
+                   TArgs&&... args);
+
 private:
     std::vector<std::string> m_opts;
 };
@@ -143,8 +148,14 @@ private:
     std::map<std::string, std::unique_ptr<UCIOption>>  m_options;
 };
 
+template <typename... TArgs>
+inline UCIOptionCombo::UCIOptionCombo(std::string name,
+                                      std::string default_val,
+                                      TArgs&&... args)
+   : UCIOptionString(name, default_val), m_opts({args...}) { }
+
 template <typename TOption, typename... TArgs>
-TOption& UCIOptionManager::register_option(const std::string& name, TArgs&&... args) {
+inline TOption& UCIOptionManager::register_option(const std::string& name, TArgs&&... args) {
     static_assert(std::is_base_of_v<UCIOption, TOption>, "TOption must be derived from UCIOption.");
 
     std::unique_ptr<TOption> option_ptr = std::make_unique<TOption>(name, args...);

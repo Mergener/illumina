@@ -8,6 +8,8 @@
 #include "movegen.h"
 #include "parsehelper.h"
 #include "perft.h"
+#include "search.h"
+#include "searchdefs.h"
 #include "staticlist.h"
 #include "types.h"
 #include "utils.h"
