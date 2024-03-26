@@ -75,11 +75,11 @@ inline ui64 TimeManager::hard_bound() const {
 }
 
 inline bool TimeManager::finished_soft() const {
-    return delta_ms(now(), m_time_start) >= m_soft_bound;
+    return m_running && delta_ms(now(), m_time_start) >= m_soft_bound;
 }
 
 inline bool TimeManager::finished_hard() const {
-    return delta_ms(now(), m_time_start) >= m_hard_bound;
+    return m_running && delta_ms(now(), m_time_start) >= m_hard_bound;
 }
 
 inline TimeManager::TimeManager() {

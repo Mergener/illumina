@@ -18,6 +18,7 @@ struct PVResults {
     Score score;
     ui64  nodes;
     ui64  time;
+    std::vector<Move> line;
 };
 
 struct SearchSettings {

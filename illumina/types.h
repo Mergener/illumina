@@ -73,6 +73,7 @@ using MoveType       = ui8;
 constexpr ui64 unset_bit(ui64 val, ui8 n) {
     return val & ~BIT(n);
 }
+
 /**
  * Returns 'val', but with its nth bit set.
  * Example: unset_bit(0b100101, 4) = 0b110101

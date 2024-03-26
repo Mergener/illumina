@@ -94,13 +94,20 @@ void State::evaluate() const {
     std::cout << "info score cp " << eval.get() << std::endl;
 }
 
+static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& line) {
+    for (Move m: line) {
+        stream << m.to_uci() << ' ';
+    }
+    return stream;
+}
+
 void State::setup_searcher() {
     m_searcher.set_pv_finish_listener([](const PVResults& res) {
         std::cout << "info"
                   << " depth "    << res.depth
                   << " score cp " << res.score
-                  << " pv "       << res.best_move.to_uci()
-                  << " nodes "    << res.nodes
+                  << " pv "       << res.line
+                  << "nodes "     << res.nodes
                   << " time "     << res.time
                   << std::endl;
     });

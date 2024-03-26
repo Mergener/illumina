@@ -176,11 +176,40 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         return quiescence_search(ply, alpha, beta);
     }
 
-    int n_searched_moves = 0;
+    // Setup some important values.
+    TranspositionTable& tt = m_context->tt();
+    Score original_alpha   = alpha;
+    ui64  board_key        = m_board.hash_key();
+    int n_searched_moves   = 0;
+    Move best_move         = MOVE_NULL;
+    Move hash_move         = MOVE_NULL;
 
-    MovePicker move_picker(m_board);
-    Move move;
-    Move best_move;
+    // Step 1. Probe from transposition table. This will allow us
+    // to use information gathered in other searches (or transpositions
+    // to improve the current search.
+    TranspositionTableEntry tt_entry {};
+    bool found_in_tt = tt.probe(board_key, tt_entry);
+    if (found_in_tt) {
+        hash_move = tt_entry.move();
+
+        if (tt_entry.depth() >= depth) {
+            if (!ROOT && tt_entry.node_type() == NT_PV) {
+                // TT Cuttoff. We found a TT entry that was searched in a depth higher or
+                // equal to ours, so we have an accurate score of this position and don't
+                // need to search further here.
+                return tt_entry.score();
+            }
+            else if (tt_entry.node_type() == NT_CUT) {
+                alpha = tt_entry.score();
+            }
+            else {
+                beta = tt_entry.score();
+            }
+        }
+    }
+
+    MovePicker move_picker(m_board, hash_move);
+    Move move {};
     while ((move = move_picker.next()) != MOVE_NULL) {
         if constexpr (ROOT) {
             if (m_results.best_move == MOVE_NULL) {
@@ -197,6 +226,7 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
 
         if (score >= beta) {
             alpha = beta;
+            best_move = move;
             break;
         }
         if (score > alpha) {
@@ -204,12 +234,26 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
             best_move = move;
         }
     }
+    if (should_stop()) {
+        return alpha;
+    }
+    else if constexpr (ROOT) {
+        m_results.score = alpha;
+        m_results.best_move = best_move;
+    }
 
-    if constexpr (ROOT) {
-        if (!should_stop()) {
-            m_results.score = alpha;
-            m_results.best_move = best_move;
-        }
+    // Store in transposition table.
+    if (alpha >= beta) {
+        // Beta-Cutoff, lowerbound score.
+        tt.try_store(board_key, best_move, alpha, depth, NT_CUT);
+    }
+    else if (alpha <= original_alpha) {
+        // Couldn't raise alpha, score is an upperbound.
+        tt.try_store(board_key, best_move, alpha, depth, NT_ALL);
+    }
+    else {
+        // We have an exact score.
+        tt.try_store(board_key, best_move, alpha, depth, NT_PV);
     }
 
     if (n_searched_moves == 0) {
@@ -229,6 +273,29 @@ void SearchWorker::aspiration_windows(Depth depth) {
         results.score     = m_results.score;
         results.nodes     = m_results.nodes;
         results.time      = m_context->time_manager().elapsed();
+
+        // Extract the PV line.
+        results.line.push_back(m_results.best_move);
+        m_board.make_move(m_results.best_move);
+
+        TranspositionTableEntry tt_entry;
+        while (m_context->tt().probe(m_board.hash_key(), tt_entry)) {
+            Move move = tt_entry.move();
+            if (move == MOVE_NULL) {
+                break;
+            }
+
+            results.line.push_back(tt_entry.move());
+            m_board.make_move(tt_entry.move());
+
+            if (m_board.is_repetition_draw()) {
+                break;
+            }
+        }
+
+        for (Move move: results.line) {
+            m_board.undo_move();
+        }
 
         m_context->listeners().pv_finish(results);
     }
@@ -268,6 +335,7 @@ SearchResults Searcher::search(const Board& board,
                                const SearchSettings& settings) {
     // Create search context.
     m_stop = false;
+    m_tt.new_search();
     SearchContext context(&m_tt, &m_stop, &m_listeners, &m_tm);
 
     SearchWorker worker(true, board, &context, &settings);
@@ -280,6 +348,9 @@ SearchResults Searcher::search(const Board& board,
     }
     else if (board.color_to_move() == CL_BLACK && settings.black_time.has_value()) {
         m_tm.start_tourney_time(settings.black_time.value(), 0, 0, 0);
+    }
+    else {
+        m_tm.stop();
     }
 
     worker.iterative_deepening();
