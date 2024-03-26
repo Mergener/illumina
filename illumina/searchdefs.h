@@ -32,6 +32,18 @@ static_assert(MAX_SCORE        <= SCORE_UPPERBOUND);
 static_assert(MATE_SCORE       < MAX_SCORE);
 static_assert(MATE_THRESHOLD   < MATE_SCORE);
 
+constexpr Score is_mate_score(Score score) {
+    return score >= MATE_THRESHOLD;
+}
+
+constexpr int plies_to_mate(Score score) {
+    return std::abs(MATE_SCORE - score);
+}
+
+constexpr int moves_to_mate(Score score) {
+    return (plies_to_mate(score) + 1) / 2;
+}
+
 //
 // Node types
 //

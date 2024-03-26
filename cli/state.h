@@ -45,6 +45,7 @@ private:
     bool             m_searching = false;
 
     void setup_searcher();
+    void register_options();
 };
 
 void initialize_global_state();

@@ -19,6 +19,7 @@ public:
     bool finished_soft() const;
     bool finished_hard() const;
     ui64 elapsed() const;
+    bool running() const;
     void stop();
 
     TimeManager();
@@ -38,6 +39,10 @@ inline void TimeManager::setup() {
     m_running = true;
 }
 
+inline bool TimeManager::running() const {
+    return m_running;
+}
+
 inline ui64 TimeManager::elapsed() const {
     return m_running ? delta_ms(now(), m_time_start) : m_elapsed;
 }
@@ -52,7 +57,7 @@ inline void TimeManager::stop() {
 
 inline void TimeManager::start_movetime(ui64 movetime_ms) {
     setup();
-    m_soft_bound = movetime_ms - 50;
+    m_soft_bound = movetime_ms - 25;
     m_hard_bound = m_soft_bound;
 }
 
@@ -63,7 +68,7 @@ inline void TimeManager::start_tourney_time(ui64 our_time_ms,
                                             int moves_to_go) {
     setup();
     m_soft_bound = our_time_ms / 20;
-    m_hard_bound = m_soft_bound;
+    m_hard_bound = our_time_ms / 18;
 }
 
 inline ui64 TimeManager::soft_bound() const {

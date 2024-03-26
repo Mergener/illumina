@@ -37,16 +37,17 @@ private:
                  ui8 generation);
 };
 
-constexpr size_t TT_DEFAULT_SIZE = (8 * 1024 * 1024) / sizeof(TranspositionTableEntry);
+constexpr size_t TT_DEFAULT_SIZE_MB = 8;
 
 class TranspositionTable {
 public:
     void clear();
+    void resize(size_t new_size_bytes);
     void new_search();
     bool probe(ui64 key, TranspositionTableEntry& entry);
     void try_store(ui64 key, Move move, Score score, Depth depth, NodeType node_type);
 
-    explicit TranspositionTable(size_t size = TT_DEFAULT_SIZE);
+    explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
     ~TranspositionTable() = default;
     TranspositionTable(TranspositionTable&& rhs) = default;
     TranspositionTable(const TranspositionTable& rhs) = delete;
@@ -55,6 +56,7 @@ public:
 private:
     std::unique_ptr<TranspositionTableEntry[]> m_buf = nullptr;
     size_t m_size;
+    size_t m_n_entries;
     ui8 m_gen = 0;
 
     TranspositionTableEntry& entry_ref(ui64 key);

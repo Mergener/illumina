@@ -3,6 +3,7 @@
 #include "movepicker.h"
 #include "uciserver.h"
 #include "evaluation.h"
+#include "transpositiontable.h"
 
 namespace illumina {
 
@@ -101,14 +102,23 @@ static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& l
     return stream;
 }
 
+static std::string score_string(Score score) {
+    if (!is_mate_score(score)) {
+        return "cp " + std::to_string(score);
+    }
+    int n_moves = moves_to_mate(score);
+    return "mate " + std::to_string(score > 0 ? n_moves : -n_moves);
+}
+
 void State::setup_searcher() {
     m_searcher.set_pv_finish_listener([](const PVResults& res) {
         std::cout << "info"
-                  << " depth "    << res.depth
-                  << " score cp " << res.score
-                  << " pv "       << res.line
-                  << "nodes "     << res.nodes
-                  << " time "     << res.time
+                  << " depth " << res.depth
+                  << " score " << score_string(res.score)
+                  << " pv "    << res.line
+                  << "nodes "  << res.nodes
+                  << " nps "   << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
+                  << " time "  << res.time
                   << std::endl;
     });
 }
@@ -148,8 +158,17 @@ void State::quit() {
     std::exit(EXIT_SUCCESS);
 }
 
+void State::register_options() {
+    m_options.register_option<UCIOptionSpin>("Hash", TT_DEFAULT_SIZE_MB, 1, 1024 * 1024)
+        .add_update_handler([this](const UCIOption& opt) {
+            const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+            m_searcher.tt().resize(spin.value() * 1024 * 1024);
+        });
+}
+
 State::State() {
     setup_searcher();
+    register_options();
 }
 
 }

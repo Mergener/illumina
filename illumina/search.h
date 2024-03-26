@@ -43,6 +43,8 @@ class Searcher {
 public:
     using PVFinishListener = std::function<void(PVResults&)>;
 
+    TranspositionTable& tt();
+
     SearchResults search(const Board& board,
                          const SearchSettings& settings);
     void stop();

@@ -24,6 +24,7 @@ void UCIOption::parse_and_set(std::string_view str) {
 
 void UCIOption::add_update_handler(const UCIOptionUpdateHandler& handler) {
     m_update_handlers.push_back(handler);
+    handler(*this);
 }
 
 bool UCIOption::has_value() const {

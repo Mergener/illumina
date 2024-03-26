@@ -64,18 +64,33 @@ void TranspositionTable::try_store(ui64 key,
 }
 
 void TranspositionTable::clear() {
-    m_buf = std::make_unique<TranspositionTableEntry[]>(m_size);
-    std::memset(m_buf.get(), 0, m_size * sizeof(TranspositionTableEntry));
+    std::memset(m_buf.get(), 0, m_n_entries * sizeof(TranspositionTableEntry));
 }
 
 inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
-    return m_buf[key % m_size];
+    return m_buf[key % m_n_entries];
+}
+
+void TranspositionTable::resize(size_t new_size) {
+    try {
+        if (new_size == m_size && m_buf != nullptr) {
+            return;
+        }
+
+        size_t new_n_entries = new_size / sizeof(TranspositionTableEntry);
+        auto new_buf         = std::make_unique<TranspositionTableEntry[]>(new_n_entries);
+        m_buf                = std::move(new_buf);
+        m_n_entries          = new_n_entries;
+    }
+    catch (const std::bad_alloc& bad_alloc) {
+        std::cerr << "Failed to resize transposition table, not enough memory." << std::endl;
+    }
 }
 
 TranspositionTable::TranspositionTable(size_t size)
-    : m_size(size) {
-    m_buf = std::make_unique<TranspositionTableEntry[]>(m_size);
-    std::memset(m_buf.get(), 0, m_size * sizeof(TranspositionTableEntry));
+    : m_size(size), m_n_entries(size / sizeof(TranspositionTableEntry)) {
+    resize(size);
+    clear();
 }
 
 } // illumina

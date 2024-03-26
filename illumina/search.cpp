@@ -12,6 +12,8 @@ public:
     TranspositionTable&        tt() const;
     const Searcher::Listeners& listeners() const;
 
+    ui64 elapsed() const;
+
     void stop_search() const;
     bool should_stop() const;
 
@@ -21,10 +23,11 @@ public:
                   TimeManager* time_manager);
 
 private:
-    TranspositionTable* m_tt;
+    TranspositionTable*        m_tt;
     const Searcher::Listeners* m_listeners;
-    bool* m_stop;
-    TimeManager* m_time_manager;
+    bool*                      m_stop;
+    TimeManager*               m_time_manager;
+    TimePoint                  m_search_start;
 };
 
 inline TranspositionTable& SearchContext::tt() const {
@@ -33,6 +36,10 @@ inline TranspositionTable& SearchContext::tt() const {
 
 inline bool SearchContext::should_stop() const {
     return *m_stop;
+}
+
+inline ui64 SearchContext::elapsed() const {
+    return delta_ms(now(), m_search_start);
 }
 
 inline const Searcher::Listeners& SearchContext::listeners() const {
@@ -45,7 +52,8 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              TimeManager* time_manager)
                              : m_stop(should_stop),
                              m_tt(tt), m_listeners(listeners),
-                             m_time_manager(time_manager) { }
+                             m_time_manager(time_manager),
+                             m_search_start(now()) { }
 
 void SearchContext::stop_search() const {
     *m_stop = true;
@@ -273,7 +281,7 @@ void SearchWorker::aspiration_windows(Depth depth) {
         results.best_move = m_results.best_move;
         results.score     = m_results.score;
         results.nodes     = m_results.nodes;
-        results.time      = m_context->time_manager().elapsed();
+        results.time      = m_context->elapsed();
 
         // Extract the PV line.
         results.line.push_back(m_results.best_move);
@@ -294,7 +302,7 @@ void SearchWorker::aspiration_windows(Depth depth) {
             }
         }
 
-        for (Move move: results.line) {
+        for (Move _: results.line) {
             m_board.undo_move();
         }
 
@@ -312,7 +320,7 @@ void SearchWorker::iterative_deepening() {
         check_time_bounds();
 
         aspiration_windows(d);
-        if (should_stop()) {
+        if (should_stop() || m_context->time_manager().finished_soft()) {
             break;
         }
     }
@@ -367,6 +375,10 @@ SearchResults Searcher::search(const Board& board,
 
 void Searcher::stop() {
     m_stop = true;
+}
+
+TranspositionTable& Searcher::tt() {
+    return m_tt;
 }
 
 }
