@@ -188,12 +188,8 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         return alpha;
     }
 
-    if (m_board.is_repetition_draw(2)) {
+    if (!ROOT && (m_board.is_repetition_draw(2) || m_board.rule50() >= 100)) {
         return 0;
-    }
-
-    if (depth <= 0) {
-        return quiescence_search(ply, alpha, beta);
     }
 
     // Setup some important values.
@@ -202,7 +198,6 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     int n_searched_moves   = 0;
     Move best_move         = MOVE_NULL;
     Move hash_move         = MOVE_NULL;
-    Score static_eval      = m_eval.get();
     ui64  board_key        = m_board.hash_key();
     bool in_check          = m_board.in_check();
     Color us               = m_board.color_to_move();
@@ -232,17 +227,23 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         }
     }
 
+    if (depth <= 0) {
+        return quiescence_search(ply, alpha, beta);
+    }
+
+    Score static_eval = m_eval.get();
+
     // Null move pruning.
     if (!PV        &&
         !SKIP_NULL &&
         !in_check  &&
         popcount(m_board.color_bb(us)) >= 4 &&
         static_eval >= beta &&
-        depth >= 2) {
-        Depth reduction = 2;
+        depth >= 3) {
+        Depth reduction = std::max(depth, std::min(2, 2 + (static_eval - beta) / 200));
 
         make_null_move();
-        Score score = -pvs<false, true>(depth - 1 - reduction, ply + 1, -alpha - 1, -alpha);
+        Score score = -pvs<false, true>(depth - 1 - reduction, ply + 1, -beta, -beta + 1);
         undo_null_move();
 
         if (score >= beta) {
@@ -272,19 +273,19 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
             score = -pvs<false>(depth - 1, ply + 1, -alpha - 1, -alpha);
-            if (score > alpha) {
+            if (score > alpha && score < beta) {
                 score = -pvs<true>(depth - 1, ply + 1, -beta, -alpha);
             }
         }
         undo_move();
 
         if (score >= beta) {
-            alpha = beta;
+            alpha     = beta;
             best_move = move;
             break;
         }
         if (score > alpha) {
-            alpha = score;
+            alpha     = score;
             best_move = move;
         }
     }

@@ -508,15 +508,20 @@ bool Board::is_attacked_by(Color c, Square s, Bitboard occ) const {
 void Board::make_null_move() {
     m_prev_states.push_back(m_state);
 
-    set_ep_square(SQ_NULL);
     set_color_to_move(opposite_color(color_to_move()));
+    set_ep_square(SQ_NULL);
+
+    compute_checkers();
+    compute_pins();
 }
 
 void Board::undo_null_move() {
+    set_color_to_move(opposite_color(color_to_move()));
+
     m_state = m_prev_states.back();
     m_prev_states.pop_back();
 
-    set_color_to_move(opposite_color(color_to_move()));
+    compute_pins();
 }
 
 void Board::compute_pins() {

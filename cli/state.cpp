@@ -97,6 +97,9 @@ void State::evaluate() const {
 
 static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& line) {
     for (Move m: line) {
+        if (m == MOVE_NULL) {
+            break;
+        }
         stream << m.to_uci() << ' ';
     }
     return stream;
