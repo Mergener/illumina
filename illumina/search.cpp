@@ -219,7 +219,6 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
 
         n_searched_moves++;
 
-
         make_move(move);
         Score score = -pvs<NT_PV>(depth - 1, ply + 1, -beta, -alpha);
         undo_move();
@@ -234,6 +233,12 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
             best_move = move;
         }
     }
+
+    // Check if we have a checkmate or stalemate.
+    if (n_searched_moves == 0) {
+        return m_board.in_check() ? (-MATE_SCORE + ply) : 0;
+    }
+
     if (should_stop()) {
         return alpha;
     }
@@ -254,10 +259,6 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     else {
         // We have an exact score.
         tt.try_store(board_key, best_move, alpha, depth, NT_PV);
-    }
-
-    if (n_searched_moves == 0) {
-        return m_board.in_check() ? (-MATE_SCORE + ply) : 0;
     }
 
     return alpha;
