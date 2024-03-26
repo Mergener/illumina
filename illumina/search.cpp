@@ -93,7 +93,7 @@ private:
 
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
-    template <NodeType NODE, bool ROOT = false>
+    template <bool PV, bool SKIP_NULL = false, bool ROOT = false>
     Score pvs(Depth depth,
               Depth ply,
               Score alpha,
@@ -103,6 +103,8 @@ private:
 
     void make_move(Move move);
     void undo_move();
+    void make_null_move();
+    void undo_null_move();
 };
 
 inline void SearchWorker::make_move(Move move) {
@@ -113,6 +115,16 @@ inline void SearchWorker::make_move(Move move) {
 inline void SearchWorker::undo_move() {
     m_board.undo_move();
     m_eval.on_undo_move(m_board);
+}
+
+inline void SearchWorker::make_null_move() {
+    m_board.make_null_move();
+    m_eval.on_new_board(m_board);
+}
+
+inline void SearchWorker::undo_null_move() {
+    m_board.undo_null_move();
+    m_eval.on_new_board(m_board);
 }
 
 inline bool SearchWorker::should_stop() const {
@@ -168,7 +180,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     return alpha;
 }
 
-template<NodeType NODE, bool ROOT>
+template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     m_results.nodes++;
 
@@ -176,23 +188,22 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         return alpha;
     }
 
-    if (m_board.is_repetition_draw(2)) {
+    if (!ROOT && (m_board.is_repetition_draw(2) || m_board.rule50() >= 100)) {
         return 0;
-    }
-
-    if (depth <= 0) {
-        return quiescence_search(ply, alpha, beta);
     }
 
     // Setup some important values.
     TranspositionTable& tt = m_context->tt();
     Score original_alpha   = alpha;
-    ui64  board_key        = m_board.hash_key();
     int n_searched_moves   = 0;
     Move best_move         = MOVE_NULL;
     Move hash_move         = MOVE_NULL;
+    ui64  board_key        = m_board.hash_key();
+    bool in_check          = m_board.in_check();
+    Color us               = m_board.color_to_move();
+    Color them             = opposite_color(us);
 
-    // Step 1. Probe from transposition table. This will allow us
+    // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
@@ -216,6 +227,30 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         }
     }
 
+    if (depth <= 0) {
+        return quiescence_search(ply, alpha, beta);
+    }
+
+    Score static_eval = m_eval.get();
+
+    // Null move pruning.
+    if (!PV        &&
+        !SKIP_NULL &&
+        !in_check  &&
+        popcount(m_board.color_bb(us)) >= 4 &&
+        static_eval >= beta &&
+        depth >= 3) {
+        Depth reduction = std::max(depth, std::min(2, 2 + (static_eval - beta) / 200));
+
+        make_null_move();
+        Score score = -pvs<false, true>(depth - 1 - reduction, ply + 1, -beta, -beta + 1);
+        undo_null_move();
+
+        if (score >= beta) {
+            return beta;
+        }
+    }
+
     MovePicker move_picker(m_board, hash_move);
     Move move {};
     while ((move = move_picker.next()) != MOVE_NULL) {
@@ -228,16 +263,29 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         n_searched_moves++;
 
         make_move(move);
-        Score score = -pvs<NT_PV>(depth - 1, ply + 1, -beta, -alpha);
+        Score score;
+        if (n_searched_moves == 1) {
+            // Perform PVS. First move of the list is always PVS.
+            score = -pvs<true>(depth - 1, ply + 1, -beta, -alpha);
+        }
+        else {
+            // Perform a null window search. Searches after the first move are
+            // performed with a null window. If the search fails high, do a
+            // re-search with the full window.
+            score = -pvs<false>(depth - 1, ply + 1, -alpha - 1, -alpha);
+            if (score > alpha && score < beta) {
+                score = -pvs<true>(depth - 1, ply + 1, -beta, -alpha);
+            }
+        }
         undo_move();
 
         if (score >= beta) {
-            alpha = beta;
+            alpha     = beta;
             best_move = move;
             break;
         }
         if (score > alpha) {
-            alpha = score;
+            alpha     = score;
             best_move = move;
         }
     }
@@ -273,7 +321,7 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
 }
 
 void SearchWorker::aspiration_windows(Depth depth) {
-    pvs<NT_PV, true>(depth, 0, -MAX_SCORE, MAX_SCORE);
+    pvs<true, false, true>(depth, 0, -MAX_SCORE, MAX_SCORE);
 
     if (m_main) {
         PVResults results;

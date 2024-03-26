@@ -33,7 +33,7 @@ static_assert(MATE_SCORE       < MAX_SCORE);
 static_assert(MATE_THRESHOLD   < MATE_SCORE);
 
 constexpr Score is_mate_score(Score score) {
-    return score >= MATE_THRESHOLD;
+    return score >= MATE_THRESHOLD || score <= -MATE_THRESHOLD;
 }
 
 constexpr int plies_to_mate(Score score) {
