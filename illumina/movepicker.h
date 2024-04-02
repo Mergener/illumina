@@ -15,8 +15,12 @@ public:
     void set_killer(Depth ply, Move killer);
     void reset();
 
+    int get_history_score(Move move) const;
+    void increment_history_score(Move move, Depth depth);
+
 private:
     std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
+    std::array<std::array<int, SQ_COUNT>, SQ_COUNT> m_history {};
 };
 
 template <bool QUIESCE = false>
@@ -60,6 +64,14 @@ inline void MoveHistory::reset() {
     std::fill(m_killers.begin(), m_killers.end(), std::array<Move, 2> { MOVE_NULL, MOVE_NULL });
 }
 
+inline int MoveHistory::get_history_score(Move move) const {
+    return m_history[move.source()][move.destination()];
+}
+
+inline void MoveHistory::increment_history_score(Move move, Depth depth) {
+    m_history[move.source()][move.destination()] += depth * depth;
+}
+
 template <bool QUIESCE>
 inline MovePicker<QUIESCE>::MovePicker(const Board& board,
                                        Depth ply,
@@ -90,10 +102,10 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         return;
     }
     if (move.is_promotion()) {
-        move.add_value(2048);
+        move.add_value(65536);
     }
     if (move.is_capture()) {
-        move.add_value(1024);
+        move.add_value(32768);
 
         // Perform MMV-LVA: Most valuable victims -> Least valuable attackers
         constexpr i32 MVV_LVA[PT_COUNT][PT_COUNT] {
@@ -112,8 +124,9 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
 
     if (!move.is_promotion() && !move.is_capture()) {
         if (m_mv_hist->is_killer(m_ply, move)) {
-            move.add_value(128);
+            move.add_value(16384);
         }
+        move.add_value(m_mv_hist->get_history_score(move));
     }
 }
 

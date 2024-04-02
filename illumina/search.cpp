@@ -284,6 +284,7 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
 
             if (!move.is_capture() && !move.is_promotion()) {
                 m_hist.set_killer(ply, move);
+                m_hist.increment_history_score(move, depth);
             }
 
             if (ROOT && m_main && (!should_stop() || depth <= 2)) {
