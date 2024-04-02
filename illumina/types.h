@@ -709,6 +709,7 @@ public:
     constexpr Square    castles_rook_src_square() const;
     constexpr BoardFile castles_rook_src_file() const;
     constexpr Side      castles_side() const;
+    constexpr bool      is_quiet() const;
     constexpr bool      is_capture() const;
     constexpr bool      is_promotion() const;
     constexpr bool      makes_progress() const;
@@ -901,6 +902,11 @@ constexpr bool Move::is_capture() const {
 constexpr bool Move::is_promotion() const {
     constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
     return (BIT(type()) & MASK) != 0;
+}
+
+constexpr bool Move::is_quiet() const {
+    constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_EN_PASSANT) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
+    return (BIT(type()) & MASK) == 0;
 }
 
 constexpr bool Move::makes_progress() const {
