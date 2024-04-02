@@ -66,6 +66,8 @@ public:
 
     i32 value() const;
     void set_value(i32 val);
+    void add_value(i32 val);
+    void reduce_value(i32 val);
 
 private:
     i32 m_val;
@@ -90,6 +92,14 @@ inline i32 SearchMove::value() const {
 
 inline void SearchMove::set_value(i32 val) {
     m_val = val;
+}
+
+inline void SearchMove::add_value(i32 val) {
+    m_val += val;
+}
+
+inline void SearchMove::reduce_value(i32 val) {
+    m_val -= val;
 }
 
 }
