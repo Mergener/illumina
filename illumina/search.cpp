@@ -50,10 +50,10 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              bool* should_stop,
                              const Searcher::Listeners* listeners,
                              TimeManager* time_manager)
-                             : m_stop(should_stop),
-                             m_tt(tt), m_listeners(listeners),
-                             m_time_manager(time_manager),
-                             m_search_start(now()) { }
+    : m_stop(should_stop),
+      m_tt(tt), m_listeners(listeners),
+      m_time_manager(time_manager),
+      m_search_start(now()) { }
 
 void SearchContext::stop_search() const {
     *m_stop = true;
@@ -67,6 +67,7 @@ struct WorkerResults {
     Move  best_move = MOVE_NULL;
     Score score     = 0;
     ui64  nodes     = 0;
+    BoundType bound_type = BT_EXACT;
 };
 
 class SearchWorker {
@@ -90,6 +91,7 @@ private:
     Evaluation m_eval {};
     Board      m_board;
     bool       m_main;
+    Depth      m_curr_depth;
 
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
@@ -99,12 +101,14 @@ private:
               Score alpha,
               Score beta);
 
-    void aspiration_windows(Depth depth);
+    void aspiration_windows();
 
     void make_move(Move move);
     void undo_move();
     void make_null_move();
     void undo_null_move();
+
+    void update_results();
 };
 
 inline void SearchWorker::make_move(Move move) {
@@ -136,7 +140,7 @@ inline SearchWorker::SearchWorker(bool main,
                                   SearchContext* context,
                                   const SearchSettings* settings)
     : m_main(main), m_board(std::move(board)),
-    m_context(context), m_settings(settings) {
+      m_context(context), m_settings(settings) {
     m_eval.on_new_board(m_board);
 }
 
@@ -212,13 +216,13 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         hash_move = tt_entry.move();
 
         if (tt_entry.depth() >= depth) {
-            if (!ROOT && tt_entry.node_type() == NT_PV) {
+            if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff. We found a TT entry that was searched in a depth higher or
                 // equal to ours, so we have an accurate score of this position and don't
                 // need to search further here.
                 return tt_entry.score();
             }
-            else if (tt_entry.node_type() == NT_CUT) {
+            else if (tt_entry.bound_type() == BT_LOWERBOUND) {
                 alpha = tt_entry.score();
             }
             else {
@@ -254,12 +258,6 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     MovePicker move_picker(m_board, hash_move);
     Move move {};
     while ((move = move_picker.next()) != MOVE_NULL) {
-        if constexpr (ROOT) {
-            if (m_results.best_move == MOVE_NULL) {
-                m_results.best_move = move;
-            }
-        }
-
         n_searched_moves++;
 
         make_move(move);
@@ -282,11 +280,21 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         if (score >= beta) {
             alpha     = beta;
             best_move = move;
+
+            if (ROOT && m_main && (!should_stop() || depth <= 2)) {
+                m_results.best_move = move;
+                m_results.score     = alpha;
+            }
             break;
         }
         if (score > alpha) {
             alpha     = score;
             best_move = move;
+
+            if (ROOT && m_main && (!should_stop() || depth <= 2)) {
+                m_results.best_move = move;
+                m_results.score     = alpha;
+            }
         }
     }
 
@@ -298,77 +306,123 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     if (should_stop()) {
         return alpha;
     }
-    else if constexpr (ROOT) {
-        m_results.score = alpha;
-        m_results.best_move = best_move;
-    }
 
     // Store in transposition table.
     if (alpha >= beta) {
         // Beta-Cutoff, lowerbound score.
-        tt.try_store(board_key, best_move, alpha, depth, NT_CUT);
+        tt.try_store(board_key, best_move, alpha, depth, BT_LOWERBOUND);
     }
     else if (alpha <= original_alpha) {
         // Couldn't raise alpha, score is an upperbound.
-        tt.try_store(board_key, best_move, alpha, depth, NT_ALL);
+        tt.try_store(board_key, best_move, alpha, depth, BT_UPPERBOUND);
     }
     else {
         // We have an exact score.
-        tt.try_store(board_key, best_move, alpha, depth, NT_PV);
+        tt.try_store(board_key, best_move, alpha, depth, BT_EXACT);
     }
 
     return alpha;
 }
 
-void SearchWorker::aspiration_windows(Depth depth) {
-    pvs<true, false, true>(depth, 0, -MAX_SCORE, MAX_SCORE);
+void SearchWorker::aspiration_windows() {
+    Score prev_score = m_results.score;
+    Score alpha      = -MAX_SCORE;
+    Score beta       = MAX_SCORE;
+    Score window     = 50;
+    Depth depth      = m_curr_depth;
 
-    if (m_main) {
-        PVResults results;
-        results.depth     = depth;
-        results.best_move = m_results.best_move;
-        results.score     = m_results.score;
-        results.nodes     = m_results.nodes;
-        results.time      = m_context->elapsed();
+    if (depth >= 6) {
+        alpha = std::max(-MAX_SCORE, prev_score - window);
+        beta  = std::min(MAX_SCORE,  prev_score + window);
+    }
 
-        // Extract the PV line.
-        results.line.push_back(m_results.best_move);
-        m_board.make_move(m_results.best_move);
+    Move best_move = m_results.best_move;
 
-        TranspositionTableEntry tt_entry;
-        while (m_context->tt().probe(m_board.hash_key(), tt_entry)) {
-            Move move = tt_entry.move();
-            if (move == MOVE_NULL) {
-                break;
-            }
+    while (!should_stop()) {
+        Score score = pvs<true, false, true>(depth, 0, alpha, beta);
 
-            results.line.push_back(tt_entry.move());
-            m_board.make_move(tt_entry.move());
-
-            if (m_board.is_repetition_draw()) {
-                break;
-            }
+        if (score > alpha && score < beta) {
+            m_results.bound_type = BT_EXACT;
+            update_results();
+            break;
         }
 
-        for (Move _: results.line) {
-            m_board.undo_move();
+        if (score <= alpha) {
+            beta  = (alpha + beta) / 2;
+            alpha = std::max(-MAX_SCORE, alpha - window);
+            depth = m_curr_depth;
+
+            m_results.score     = prev_score;
+            m_results.best_move = best_move;
+        }
+        else if (score >= beta) {
+            beta = std::min(MAX_SCORE, beta + window);
+
+            prev_score = score;
+            best_move  = m_results.best_move;
+            m_results.bound_type = BT_LOWERBOUND;
+            update_results();
         }
 
-        m_context->listeners().pv_finish(results);
+        check_time_bounds();
+
+        window += window / 2;
     }
 }
 
+void SearchWorker::update_results() {
+    if (!m_main) {
+        return;
+    }
+
+    PVResults results;
+
+    results.depth      = m_curr_depth;
+    results.best_move  = m_results.best_move;
+    results.score      = m_results.score;
+    results.nodes      = m_results.nodes;
+    results.time       = m_context->elapsed();
+    results.bound_type = m_results.bound_type;
+
+    // Extract the PV line.
+    results.line.push_back(m_results.best_move);
+    m_board.make_move(m_results.best_move);
+
+    TranspositionTableEntry tt_entry;
+    while (m_context->tt().probe(m_board.hash_key(), tt_entry)) {
+        Move move = tt_entry.move();
+        if (move == MOVE_NULL) {
+            break;
+        }
+
+        results.line.push_back(tt_entry.move());
+        m_board.make_move(tt_entry.move());
+
+        if (m_board.is_repetition_draw()) {
+            break;
+        }
+    }
+
+    for (Move _: results.line) {
+        m_board.undo_move();
+    }
+
+    m_context->listeners().pv_finish(results);
+}
+
 void SearchWorker::iterative_deepening() {
+    // Make sure we set a valid move as the best move so that
+    // we can return it if our search is interrupted early.
     Move moves[MAX_GENERATED_MOVES];
     generate_moves(m_board, moves);
     m_results.best_move = moves[0];
 
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
-    for (Depth d = 1; d <= max_depth; ++d) {
+    for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
         check_time_bounds();
-
-        aspiration_windows(d);
+        aspiration_windows();
         if (should_stop() || m_context->time_manager().finished_soft()) {
+            // If we finished soft, we don't want to start a new iteration.
             break;
         }
     }

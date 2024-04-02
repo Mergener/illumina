@@ -12,7 +12,7 @@ namespace illumina {
 class State {
 public:
     // Board-related operations
-    void new_game() const;
+    void new_game();
     void display_board() const;
     const Board& board() const;
     void set_board(const Board& board);

@@ -18,6 +18,7 @@ struct PVResults {
     Score score;
     ui64  nodes;
     ui64  time;
+    BoundType bound_type;
     std::vector<Move> line;
 };
 

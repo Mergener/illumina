@@ -10,13 +10,13 @@ namespace illumina {
 class TranspositionTableEntry {
     friend class TranspositionTable;
 public:
-    ui64     key() const;
-    Move     move() const;
-    NodeType node_type() const;
-    bool     valid() const;
-    ui8      generation() const;
-    Score    score() const;
-    Depth    depth() const;
+    ui64      key() const;
+    Move      move() const;
+    BoundType bound_type() const;
+    bool      valid() const;
+    ui8       generation() const;
+    Score     score() const;
+    Depth     depth() const;
 
 private:
     ui64 m_key;
@@ -24,7 +24,7 @@ private:
 
     // m_info  encoding:
     //  0:     valid
-    //  1-2:   node_type
+    //  1-2:   bound_type
     //  3-10:  generation
     //  11-18: depth
     ui32 m_info;
@@ -33,7 +33,7 @@ private:
 
     void replace(ui64 key, Move move,
                  Score score, Depth depth,
-                 NodeType node_type,
+                 BoundType bound_type,
                  ui8 generation);
 };
 
@@ -45,7 +45,7 @@ public:
     void resize(size_t new_size_bytes);
     void new_search();
     bool probe(ui64 key, TranspositionTableEntry& entry);
-    void try_store(ui64 key, Move move, Score score, Depth depth, NodeType node_type);
+    void try_store(ui64 key, Move move, Score score, Depth depth, BoundType bound_type);
 
     explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
     ~TranspositionTable() = default;
@@ -74,8 +74,8 @@ inline bool TranspositionTableEntry::valid() const {
     return m_info & 1;
 }
 
-inline NodeType TranspositionTableEntry::node_type() const {
-    return NodeType((m_info >> 1) & BITMASK(2));
+inline BoundType TranspositionTableEntry::bound_type() const {
+    return BoundType((m_info >> 1) & BITMASK(2));
 }
 
 inline ui8 TranspositionTableEntry::generation() const {

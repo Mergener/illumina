@@ -45,13 +45,13 @@ constexpr int moves_to_mate(Score score) {
 }
 
 //
-// Node types
+// Bound types
 //
 
-enum NodeType : ui8 {
-    NT_PV,
-    NT_ALL,
-    NT_CUT
+enum BoundType : ui8 {
+    BT_EXACT,
+    BT_UPPERBOUND,
+    BT_LOWERBOUND
 };
 
 //

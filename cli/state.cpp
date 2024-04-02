@@ -34,7 +34,8 @@ State& global_state() {
 // State methods
 //
 
-void State::new_game() const {
+void State::new_game() {
+    m_searcher.tt().clear();
 }
 
 void State::display_board() const {
@@ -113,11 +114,20 @@ static std::string score_string(Score score) {
     return "mate " + std::to_string(score > 0 ? n_moves : -n_moves);
 }
 
+static std::string bound_type_string(BoundType boundType) {
+    switch (boundType) {
+        case BT_EXACT:      return "";
+        case BT_LOWERBOUND: return " lowerbound";
+        case BT_UPPERBOUND: return " upperbound";
+    }
+}
+
 void State::setup_searcher() {
     m_searcher.set_pv_finish_listener([](const PVResults& res) {
         std::cout << "info"
                   << " depth " << res.depth
                   << " score " << score_string(res.score)
+                  << bound_type_string(res.bound_type)
                   << " pv "    << res.line
                   << "nodes "  << res.nodes
                   << " nps "   << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
