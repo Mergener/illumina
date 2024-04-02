@@ -9,14 +9,14 @@ void TranspositionTableEntry::replace(ui64 key,
                                       Move move,
                                       Score score,
                                       Depth depth,
-                                      NodeType node_type,
+                                      BoundType bound_type,
                                       ui8 generation) {
     m_key   = key;
     m_move  = move;
     m_score = score;
 
     m_info = 1; // Start with 1 for 'valid' bit.
-    m_info |= (node_type  & BITMASK(2)) << 1;
+    m_info |= (bound_type & BITMASK(2)) << 1;
     m_info |= (generation & BITMASK(8)) << 3;
     m_info |= (depth      & BITMASK(8)) << 11;
 }
@@ -40,25 +40,25 @@ void TranspositionTable::try_store(ui64 key,
                                    Move move,
                                    Score score,
                                    Depth depth,
-                                   NodeType node_type) {
+                                   BoundType bound_type) {
     TranspositionTableEntry& entry = entry_ref(key);
 
     if (!entry.valid() || entry.generation() != m_gen) {
-        entry.replace(key, move, score, depth, node_type, m_gen);
+        entry.replace(key, move, score, depth, bound_type, m_gen);
         return;
     }
 
     if (entry.depth() <= depth &&
-        node_type == NT_PV     &&
-        entry.node_type() != NT_PV) {
+        bound_type == BT_EXACT &&
+        entry.bound_type() != BT_EXACT) {
         // Replace since we now have an exact score.
-        entry.replace(key, move, score, depth, node_type, m_gen);
+        entry.replace(key, move, score, depth, bound_type, m_gen);
         return;
     }
 
     if (entry.depth() <= depth) {
         // Higher depth, replace it.
-        entry.replace(key, move, score, depth, node_type, m_gen);
+        entry.replace(key, move, score, depth, bound_type, m_gen);
         return;
     }
 }
