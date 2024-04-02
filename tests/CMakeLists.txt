@@ -1,6 +1,6 @@
 
-add_executable(illumina_tests main.cpp suites/types.cpp suites/board.cpp suites/parsehelper.cpp suites/utils.cpp suites/attacks.cpp suites/perft.cpp)
-set_target_properties(illumina_tests PROPERTIES OUTPUT_NAME illumina)
+add_executable(illumina_tests main.cpp suites/types.cpp suites/board.cpp suites/parsehelper.cpp suites/utils.cpp suites/attacks.cpp suites/perft.cpp suites/staticlist.cpp)
+set_target_properties(illumina_tests PROPERTIES OUTPUT_NAME illumina-tests)
 target_link_libraries(illumina_tests PRIVATE illumina_lib)
 target_link_libraries(illumina_tests PRIVATE litetest)
 target_include_directories(illumina_tests PRIVATE ${ILLUMINA_LIBRARY_SOURCE_DIR})
