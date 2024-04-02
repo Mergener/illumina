@@ -1,5 +1,6 @@
 #ifndef ILLUMINA_STATICLIST_H
 #define ILLUMINA_STATICLIST_H
+#include <iostream>
 
 #include <type_traits>
 #include <cstdlib>
@@ -40,13 +41,13 @@ public:
     StaticList& operator=(const StaticList& other);
 
 protected:
-    std::aligned_storage<sizeof(T), ALIGN> m_elems[N];
+    typename std::aligned_storage<sizeof(T), ALIGN>::type m_elems[N];
     T* m_end;
 };
 
 template <typename T, size_t N, size_t ALIGN>
 inline bool StaticList<T, N, ALIGN>::empty() const {
-    return begin() == end();
+    return cbegin() == cend();
 }
 
 template <typename T, size_t N, size_t ALIGN>
@@ -56,7 +57,7 @@ inline bool StaticList<T, N, ALIGN>::full() const {
 
 template <typename T, size_t N, size_t ALIGN>
 inline size_t StaticList<T, N, ALIGN>::size() const {
-    return end() - begin();
+    return cend() - cbegin();
 }
 
 template <typename T, size_t N, size_t ALIGN>
@@ -66,12 +67,12 @@ inline size_t StaticList<T, N, ALIGN>::capacity() const {
 
 template <typename T, size_t N, size_t ALIGN>
 inline T& StaticList<T, N, ALIGN>::operator[](size_t idx) {
-    return m_elems[idx];
+    return *(begin() + idx);
 }
 
 template <typename T, size_t N, size_t ALIGN>
 inline const T& StaticList<T, N, ALIGN>::operator[](size_t idx) const {
-    return m_elems[idx];
+    return *(cbegin() + idx);
 }
 
 template <typename T, size_t N, size_t ALIGN>
@@ -99,27 +100,27 @@ inline void StaticList<T, N, ALIGN>::push_back(const T& elem) {
 template <typename T, size_t N, size_t ALIGN>
 inline void StaticList<T, N, ALIGN>::pop_back() {
     ILLUMINA_ASSERT(!empty());
-    std::destroy_at(*m_end--);
+    std::destroy_at(m_end--);
 }
 
 template <typename T, size_t N, size_t ALIGN>
 inline typename StaticList<T, N, ALIGN>::Iterator StaticList<T, N, ALIGN>::begin() {
-    return reinterpret_cast<T*>(std::launder(m_elems));
+    return reinterpret_cast<T*>(std::launder(&m_elems));
 }
 
 template <typename T, size_t N, size_t ALIGN>
 inline typename StaticList<T, N, ALIGN>::Iterator StaticList<T, N, ALIGN>::end() {
-    return m_end;
+    return reinterpret_cast<T*>(std::launder(m_end));
 }
 
 template <typename T, size_t N, size_t ALIGN>
 inline typename StaticList<T, N, ALIGN>::ConstIterator StaticList<T, N, ALIGN>::cbegin() const {
-    return reinterpret_cast<T*>(std::launder(m_elems));
+    return reinterpret_cast<const T*>(std::launder(&m_elems));
 }
 
 template <typename T, size_t N, size_t ALIGN>
 inline typename StaticList<T, N, ALIGN>::ConstIterator StaticList<T, N, ALIGN>::cend() const {
-    return m_end;
+    return reinterpret_cast<const T*>(std::launder(m_end));
 }
 
 template <typename T, size_t N, size_t ALIGN>
@@ -136,6 +137,10 @@ inline StaticList<T, N, ALIGN>::~StaticList() {
 
 template <typename T, size_t N, size_t ALIGN>
 inline StaticList<T, N, ALIGN>::StaticList(const StaticList& other) {
+    if (&other == this) {
+        return;
+    }
+
     m_end = std::copy(other.cbegin(), other.cend(), begin());
 }
 
@@ -151,6 +156,7 @@ inline StaticList<T, N, ALIGN>& StaticList<T, N, ALIGN>::operator=(const StaticL
     }
 
     m_end = std::copy(other.cbegin(), other.cend(), begin());
+    return *this;
 }
 
 } // illumina
