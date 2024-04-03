@@ -7,6 +7,22 @@
 #include "movegen.h"
 
 namespace illumina {
+
+class MoveHistory {
+public:
+    const std::array<Move, 2>& killers(Depth ply) const;
+    bool is_killer(Depth ply, Move move) const;
+    void set_killer(Depth ply, Move killer);
+    void reset();
+
+    int get_history_score(Move move) const;
+    void increment_history_score(Move move, Depth depth);
+
+private:
+    std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
+    std::array<std::array<int, SQ_COUNT>, SQ_COUNT> m_history {};
+};
+
 template <bool QUIESCE = false>
 class MovePicker {
 public:
@@ -15,6 +31,8 @@ public:
     void score_move(SearchMove& move);
 
     explicit MovePicker(const Board& board,
+                        Depth ply,
+                        const MoveHistory& move_hist,
                         Move hash_move = MOVE_NULL);
 
 private:
@@ -22,11 +40,44 @@ private:
     Move         m_hash_move;
     size_t       m_count;
     const Board* m_board;
+    const MoveHistory* m_mv_hist;
+    Depth        m_ply;
 };
 
+
+inline const std::array<Move, 2>& MoveHistory::killers(Depth ply) const {
+    return m_killers[ply];
+}
+
+inline bool MoveHistory::is_killer(Depth ply, Move move) const {
+    const std::array<Move, 2>& arr = killers(ply);
+    return arr[0] == move || arr[1] == move;
+}
+
+inline void MoveHistory::set_killer(Depth ply, Move killer) {
+    std::array<Move, 2>& arr = m_killers[ply];
+    arr[1] = arr[0];
+    arr[0] = killer;
+}
+
+inline void MoveHistory::reset() {
+    std::fill(m_killers.begin(), m_killers.end(), std::array<Move, 2> { MOVE_NULL, MOVE_NULL });
+}
+
+inline int MoveHistory::get_history_score(Move move) const {
+    return m_history[move.source()][move.destination()];
+}
+
+inline void MoveHistory::increment_history_score(Move move, Depth depth) {
+    m_history[move.source()][move.destination()] += depth * depth;
+}
+
 template <bool QUIESCE>
-inline MovePicker<QUIESCE>::MovePicker(const Board& board, Move hash_move)
-    : m_board(&board), m_hash_move(hash_move) {
+inline MovePicker<QUIESCE>::MovePicker(const Board& board,
+                                       Depth ply,
+                                       const MoveHistory& move_hist,
+                                       Move hash_move)
+    : m_board(&board), m_ply(ply), m_hash_move(hash_move), m_mv_hist(&move_hist) {
     // Start by generating and counting all moves.
     SearchMove* end;
     if (m_board->in_check()) {
@@ -48,9 +99,13 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     if (move == m_hash_move) {
         // Hash moves always receive maximum value.
         move.set_value(INT32_MAX);
+        return;
     }
-    else if (move.is_capture()) {
-        i32 value = 1024; // Start with base capture value.
+    if (move.is_promotion()) {
+        move.add_value(65536);
+    }
+    if (move.is_capture()) {
+        move.add_value(32768);
 
         // Perform MMV-LVA: Most valuable victims -> Least valuable attackers
         constexpr i32 MVV_LVA[PT_COUNT][PT_COUNT] {
@@ -64,9 +119,14 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
             /* Kx */ { 0,   100,  200,  300,  400,  500,  9999 },
         };
 
-        value += MVV_LVA[move.source()][move.destination()];
+        move.add_value(MVV_LVA[move.source()][move.destination()]);
+    }
 
-        move.set_value(value);
+    if (!move.is_promotion() && !move.is_capture()) {
+        if (m_mv_hist->is_killer(m_ply, move)) {
+            move.add_value(16384);
+        }
+        move.add_value(m_mv_hist->get_history_score(move));
     }
 }
 
@@ -113,6 +173,8 @@ template <bool QUIESCE>
 inline bool MovePicker<QUIESCE>::finished() const {
     return m_count == 0;
 }
+
+
 
 } // illumina
 

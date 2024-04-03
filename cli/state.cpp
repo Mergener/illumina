@@ -120,6 +120,7 @@ static std::string bound_type_string(BoundType boundType) {
         case BT_LOWERBOUND: return " lowerbound";
         case BT_UPPERBOUND: return " upperbound";
     }
+    return "";
 }
 
 void State::setup_searcher() {

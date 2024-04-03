@@ -104,10 +104,11 @@ private:
     const SearchContext*  m_context;
     WorkerResults         m_results;
 
-    Evaluation m_eval {};
-    Board      m_board;
-    bool       m_main;
-    Depth      m_curr_depth;
+    MoveHistory m_hist;
+    Evaluation  m_eval {};
+    Board       m_board;
+    bool        m_main;
+    Depth       m_curr_depth;
 
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
@@ -181,7 +182,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         return alpha;
     }
 
-    MovePicker<true> move_picker(m_board);
+    MovePicker<true> move_picker(m_board, ply, m_hist);
     SearchMove move;
     while ((move = move_picker.next()) != MOVE_NULL) {
         make_move(move);
@@ -271,7 +272,7 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         }
     }
 
-    MovePicker move_picker(m_board, hash_move);
+    MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     while ((move = move_picker.next()) != MOVE_NULL) {
         make_move(move);
@@ -307,6 +308,11 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         if (score >= beta) {
             alpha     = beta;
             best_move = move;
+
+            if (!move.is_capture() && !move.is_promotion()) {
+                m_hist.set_killer(ply, move);
+                m_hist.increment_history_score(move, depth);
+            }
 
             if (ROOT && m_main && (!should_stop() || depth <= 2)) {
                 m_results.best_move = move;
