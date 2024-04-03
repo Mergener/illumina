@@ -1,10 +1,26 @@
 #include "search.h"
 
+#include <cmath>
+
 #include "timemanager.h"
 #include "movepicker.h"
 #include "evaluation.h"
 
 namespace illumina {
+
+static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
+
+static void init_lmr_table() {
+    for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
+        for (Depth d = 0; d < MAX_DEPTH; ++d) {
+            s_lmr_table[m][d] = Depth(1.25 + std::log(d) * std::log(m) * 100.0 / 267.0);
+        }
+    }
+}
+
+void init_search() {
+    init_lmr_table();
+}
 
 class SearchContext {
 public:
@@ -259,11 +275,19 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     while ((move = move_picker.next()) != MOVE_NULL) {
-        n_searched_moves++;
-
         make_move(move);
+
+        // Late move reductions.
+        Depth reductions = 0;
+        if (n_searched_moves >= 1 &&
+            depth >= 2            &&
+            move.is_quiet()       &&
+            !m_board.in_check()) {
+            reductions += s_lmr_table[n_searched_moves - 1][depth];
+        }
+
         Score score;
-        if (n_searched_moves == 1) {
+        if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
             score = -pvs<true>(depth - 1, ply + 1, -beta, -alpha);
         }
@@ -271,12 +295,14 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -pvs<false>(depth - 1, ply + 1, -alpha - 1, -alpha);
+            score = -pvs<false>(depth - 1 - reductions, ply + 1, -alpha - 1, -alpha);
             if (score > alpha && score < beta) {
                 score = -pvs<true>(depth - 1, ply + 1, -beta, -alpha);
             }
         }
         undo_move();
+
+        n_searched_moves++;
 
         if (score >= beta) {
             alpha     = beta;
