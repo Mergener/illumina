@@ -279,12 +279,11 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
 
         // Late move reductions.
         Depth reductions = 0;
-        if (!PV                   &&
-            n_searched_moves >= 2 &&
+        if (n_searched_moves >= 1 &&
             depth >= 2            &&
             move.is_quiet()       &&
             !m_board.in_check()) {
-            reductions += s_lmr_table[n_searched_moves][depth];
+            reductions += s_lmr_table[n_searched_moves - 1][depth];
         }
 
         Score score;
