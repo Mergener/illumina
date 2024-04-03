@@ -254,6 +254,16 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
 
     Score static_eval = m_eval.get();
 
+    // Reverse futility pruning.
+    Score rfp_margin = 50 + 70 * depth;
+    if (!PV        &&
+        !in_check  &&
+        depth <= 7 &&
+        alpha < MATE_THRESHOLD &&
+        static_eval - rfp_margin > beta) {
+        return static_eval - rfp_margin;
+    }
+
     // Null move pruning.
     if (!PV        &&
         !SKIP_NULL &&
