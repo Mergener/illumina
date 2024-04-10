@@ -282,6 +282,11 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         }
     }
 
+    // Internal iterative reductions.
+    if (depth >= 4 && !found_in_tt) {
+        depth--;
+    }
+
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     while ((move = move_picker.next()) != MOVE_NULL) {
