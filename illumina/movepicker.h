@@ -2,6 +2,7 @@
 #define ILLUMINA_MOVEPICKER_H
 
 #include "board.h"
+#include "boardutils.h"
 #include "staticlist.h"
 #include "searchdefs.h"
 #include "movegen.h"
@@ -106,6 +107,11 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     }
     if (move.is_capture()) {
         move.add_value(32768);
+
+        bool good_see = has_good_see(*m_board, move.source(), move.destination());
+        if (!good_see) {
+            move.reduce_value(16384);
+        }
 
         // Perform MMV-LVA: Most valuable victims -> Least valuable attackers
         constexpr i32 MVV_LVA[PT_COUNT][PT_COUNT] {
