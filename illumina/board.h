@@ -60,6 +60,9 @@ public:
     Square first_attacker_of(Color c, Square s) const;
 
     template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
+    Square first_attacker_of(Color c, Square s, Bitboard occ) const;
+
+    template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
     Bitboard all_attackers_of(Color c, Square s) const;
 
     template <PieceType pt, bool QUIET_PAWN_MOVES = false>
@@ -360,7 +363,30 @@ inline bool Board::is_repetition_draw(int max_appearances) const {
 
 template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>
 inline Square Board::first_attacker_of(Color c, Square s) const {
-    Bitboard occ = occupancy();
+    return first_attacker_of(c, s, occupancy());
+}
+
+template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>
+inline Square Board::first_attacker_of(Color c, Square s, Bitboard occ) const {
+    Bitboard their_pawns   = piece_bb(Piece(c, PT_PAWN));
+    Bitboard pawn_targets;
+    if constexpr (QUIET_PAWN_MOVES) {
+        pawn_targets = pawn_pushes(s, opposite_color(c), occ);
+    }
+    else {
+        pawn_targets = pawn_attacks(s, opposite_color(c));
+    }
+    Bitboard pawn_attacker = pawn_targets & their_pawns;
+    if (pawn_attacker) {
+        return lsb(pawn_attacker);
+    }
+
+    Bitboard their_knights   = piece_bb(Piece(c, PT_KNIGHT));
+    Bitboard knight_atks     = knight_attacks(s);
+    Bitboard knight_attacker = knight_atks & their_knights;
+    if (knight_attacker) {
+        return lsb(knight_attacker);
+    }
 
     Bitboard their_bishops   = piece_bb(Piece(c, PT_BISHOP));
     Bitboard bishop_atks     = bishop_attacks(s, occ);
@@ -381,26 +407,6 @@ inline Square Board::first_attacker_of(Color c, Square s) const {
     Bitboard queen_attacker = queen_atks & their_queens;
     if (queen_attacker) {
         return lsb(queen_attacker);
-    }
-
-    Bitboard their_knights   = piece_bb(Piece(c, PT_KNIGHT));
-    Bitboard knight_atks     = knight_attacks(s);
-    Bitboard knight_attacker = knight_atks & their_knights;
-    if (knight_attacker) {
-        return lsb(knight_attacker);
-    }
-
-    Bitboard their_pawns   = piece_bb(Piece(c, PT_PAWN));
-    Bitboard pawn_targets;
-    if constexpr (QUIET_PAWN_MOVES) {
-        pawn_targets = pawn_pushes(s, opposite_color(c), occ);
-    }
-    else {
-        pawn_targets = pawn_attacks(s, opposite_color(c));
-    }
-    Bitboard pawn_attacker = pawn_targets & their_pawns;
-    if (pawn_attacker) {
-        return lsb(pawn_attacker);
     }
 
     if constexpr (!EXCLUDE_KING_ATKS) {
