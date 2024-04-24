@@ -43,10 +43,10 @@ using Bitboard       = ui64;
 using Color          = ui8;
 using Side           = ui8;
 using CastlingRights = ui8;
-using BoardRank      = ui8;
-using BoardFile      = ui8;
-using Direction      = i8;
-using Square         = ui8;
+using BoardRank      = int;
+using BoardFile      = int;
+using Direction      = int;
+using Square         = int;
 using PieceType      = ui8;
 using MoveType       = ui8;
 
@@ -800,7 +800,7 @@ constexpr Square Move::castles_rook_src_square() const {
     return make_square(castles_rook_src_file(), square_rank(source()));
 }
 
-constexpr Square Move::castles_side() const     {
+constexpr Side Move::castles_side() const     {
     return (m_data >> 29) & BITMASK(1);
 }
 
