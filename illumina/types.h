@@ -578,8 +578,8 @@ constexpr PieceType PIECE_TYPES[] = {
 };
 
 constexpr PieceType PROMOTION_PIECE_TYPES[] = {
-    PT_KNIGHT, PT_BISHOP,
-    PT_ROOK,   PT_QUEEN
+    PT_QUEEN,  PT_ROOK,
+    PT_BISHOP, PT_KNIGHT,
 };
 
 constexpr char piece_type_to_char(PieceType pt) {

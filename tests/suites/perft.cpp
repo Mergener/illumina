@@ -17,7 +17,7 @@ TEST_CASE(Perft) {
         void run() {
             Board board(fen);
 
-            for (int depth = 1; depth <= std::min(expected_result.size(), size_t(3)); ++depth) {
+            for (int depth = 1; depth <= std::min(expected_result.size(), size_t(5)); ++depth) {
                 ui64 res = perft(board, depth, { false });
                 EXPECT(int(res)).to_be(int(expected_result[depth - 1]));
             }

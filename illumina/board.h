@@ -53,7 +53,7 @@ public:
     void undo_move();
     void make_null_move();
     void undo_null_move();
-    bool is_move_pseudo_legal(Move move) const; // TODO
+    bool is_move_pseudo_legal(Move move) const;
     bool is_move_legal(Move move) const;
 
     template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
