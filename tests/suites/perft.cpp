@@ -2,12 +2,40 @@
 
 #include <iostream>
 
+#include "movepicker.h"
 #include "perft.h"
 
 using namespace litetest;
 using namespace illumina;
 
 TEST_SUITE(Perft);
+
+static MoveHistory s_mv_hist;
+
+static ui64 move_picker_perft_internal(Board& board, int depth) {
+    if (depth <= 0) {
+        return 1;
+    }
+
+    Move move {};
+    MovePicker<false> move_picker(board, 0, s_mv_hist);
+    ui64 n = 0;
+    while ((move = move_picker.next()) != MOVE_NULL) {
+        board.make_move(move);
+        ui64 it_leaves = move_picker_perft_internal(board, depth - 1);
+        board.undo_move();
+
+        n += it_leaves;
+    }
+
+    return n;
+
+}
+
+static ui64 move_picker_perft(const Board& board, int depth) {
+    Board replica = board;
+    return move_picker_perft_internal(replica, depth);
+}
 
 TEST_CASE(Perft) {
     struct {
@@ -20,6 +48,10 @@ TEST_CASE(Perft) {
             for (int depth = 1; depth <= std::min(expected_result.size(), size_t(5)); ++depth) {
                 ui64 res = perft(board, depth, { false });
                 EXPECT(int(res)).to_be(int(expected_result[depth - 1]));
+
+                if (depth <= 3) {
+                    EXPECT(int(move_picker_perft(board, depth))).to_be(expected_result[depth - 1]);
+                }
             }
         }
     } tests[] = {

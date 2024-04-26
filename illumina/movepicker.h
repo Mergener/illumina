@@ -7,6 +7,9 @@
 #include "searchdefs.h"
 #include "movegen.h"
 
+#include <iostream>
+#define DBG() //std::cout << "Line " << __LINE__ << " FEN " << m_board->fen() << std::endl
+
 namespace illumina {
 
 class MoveHistory {
@@ -25,15 +28,15 @@ private:
 };
 
 enum {
-    MPS_NOT_STARTED,
-    MPS_HASH_MOVE,
+    MPS_NOT_STARTED = 0,
+    MPS_HASH_MOVE = 0,
 
     // For non-check positions:
     MPS_PROMOTION_CAPTURES = MPS_HASH_MOVE + 1,
     MPS_PROMOTIONS,
     MPS_GOOD_CAPTURES,
     MPS_EP,
-    MPS_KILLER_MOVES,
+    MPS_KILLER_MOVES = 999,
     MPS_BAD_CAPTURES,
     MPS_QUIET,
     MPS_END_NOT_CHECK,
@@ -268,26 +271,34 @@ inline MovePicker<QUIESCE>::MovePicker(const Board& board,
       m_hash_move(hash_move), m_mv_hist(&move_hist),
       m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
       m_curr_move_range({ m_moves, m_moves }), m_moves_end(m_moves),
-      m_moves_it(m_moves_end) {
+      m_moves_it(m_moves) {
 }
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::advance_stage() {
+    DBG();
     m_stage += 1;
 
     SearchMove* begin = m_moves_end;
 
-    if (m_board->in_check()) {
+    if (!m_board->in_check()) {
         switch (m_stage) {
             case MPS_HASH_MOVE:
+                DBG();
+                if (m_hash_move == MOVE_NULL) {
+                    advance_stage();
+                    return;
+                }
                 *begin = m_hash_move;
                 m_curr_move_range = { begin, begin + 1 };
                 break;
 
             case MPS_KILLER_MOVES: {
+                DBG();
                 int n_killers = 0;
+                auto& killers = m_mv_hist->killers(m_ply);
                 for (n_killers = 0; n_killers < 2; ++n_killers) {
-                    Move killer = m_mv_hist->killers(m_ply)[n_killers];
+                    Move killer = killers[n_killers];
                     if (!m_board->is_move_pseudo_legal(killer)) {
                         break;
                     }
@@ -298,35 +309,41 @@ void MovePicker<QUIESCE>::advance_stage() {
             }
 
             case MPS_PROMOTION_CAPTURES: {
+                DBG();
                 generate_promotion_captures();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
             }
 
             case MPS_PROMOTIONS: {
+                DBG();
                 generate_simple_promotions();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
             }
 
             case MPS_GOOD_CAPTURES: {
+                DBG();
                 generate_simple_captures();
                 m_curr_move_range = { begin, m_bad_captures_range.begin };
                 break;
             }
 
             case MPS_EP: {
+                DBG();
                 generate_en_passants();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
             }
 
             case MPS_BAD_CAPTURES: {
+                DBG();
                 m_curr_move_range = m_bad_captures_range;
                 break;
             }
 
             case MPS_QUIET: {
+                DBG();
                 generate_quiets();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
@@ -358,40 +375,50 @@ void MovePicker<QUIESCE>::advance_stage() {
     }
 
     m_moves_it = m_curr_move_range.begin;
+    DBG();
 }
 
 template <bool QUIESCE>
 inline Move MovePicker<QUIESCE>::next() {
-    Move move = MOVE_NULL;
-    
+    DBG();
+
     if (m_stage >= m_end_stage) {
         // We've finished generating moves.
         return MOVE_NULL;
     }
+    DBG();
 
-    if (m_moves_it == m_curr_move_range.end) {
+    if (m_moves_it >= m_curr_move_range.end) {
+        DBG();
         // We finished the current stage.
         advance_stage();
         return next();
     }
+    DBG();
     
-    move = *m_moves_it++;
+    Move move = Move(*m_moves_it++);
     
     // Prevent hash move revisits.
     if (move == m_hash_move && m_stage != MPS_HASH_MOVE) {
+        DBG();
         return next();
     }
+    DBG();
     // Prevent killer move revisits.
     if (m_mv_hist->is_killer(m_ply, move) && m_stage != MPS_KILLER_MOVES) {
+        DBG();
         return next();
     }
+    DBG();
 
     bool legal = m_board->in_check() // We only generate legal evasions during checks.
               || m_board->is_move_legal(move);
     if (legal && move != MOVE_NULL) {
+        DBG();
         // Move is legal, we can return it.
         return move;
     }
+    DBG();
 
     // Move wasn't legal, try getting the next one.
     return next();
