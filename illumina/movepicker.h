@@ -25,22 +25,23 @@ private:
 };
 
 enum {
-    MCS_HASH_MOVE,
+    MPS_NOT_STARTED,
+    MPS_HASH_MOVE,
 
     // For non-check positions:
-    MCS_PROMOTION_CAPTURES = MCS_HASH_MOVE + 1,
-    MCS_PROMOTIONS,
-    MCS_GOOD_CAPTURES,
-    MCS_EP,
-    MCS_KILLER_MOVES,
-    MCS_BAD_CAPTURES,
-    MCS_QUIET,
-    MCS_END_NOT_CHECK,
+    MPS_PROMOTION_CAPTURES = MPS_HASH_MOVE + 1,
+    MPS_PROMOTIONS,
+    MPS_GOOD_CAPTURES,
+    MPS_EP,
+    MPS_KILLER_MOVES,
+    MPS_BAD_CAPTURES,
+    MPS_QUIET,
+    MPS_END_NOT_CHECK,
 
     // For check positions:
-    MCS_NOISY_EVASIONS = MCS_HASH_MOVE + 1,
-    MCS_QUIET_EVASIONS,
-    MCS_END_IN_CHECK,
+    MPS_NOISY_EVASIONS = MPS_HASH_MOVE + 1,
+    MPS_QUIET_EVASIONS,
+    MPS_END_IN_CHECK,
 };
 using MovePickingStage = int;
 
@@ -64,11 +65,11 @@ private:
 
     // Move generation state
     SearchMove       m_moves[MAX_GENERATED_MOVES];
-    MovePickingStage m_stage;
+    MovePickingStage m_stage = MPS_NOT_STARTED;
     MoveRange        m_curr_move_range;
+    SearchMove*      m_moves_it;
     SearchMove*      m_moves_end;
-    MoveRange        m_bad_captures_range { nullptr, nullptr };
-    size_t           m_n_visited_killers;
+    MoveRange        m_bad_captures_range;
 
     // Context-related fields
     const Board* m_board;
@@ -265,55 +266,67 @@ inline MovePicker<QUIESCE>::MovePicker(const Board& board,
                                        Move hash_move)
     : m_board(&board), m_ply(ply),
       m_hash_move(hash_move), m_mv_hist(&move_hist),
-      m_end_stage(board.in_check() ? MCS_END_IN_CHECK : MCS_END_NOT_CHECK) {
+      m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
+      m_curr_move_range({ m_moves, m_moves }), m_moves_end(m_moves),
+      m_moves_it(m_moves_end) {
 }
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::advance_stage() {
     m_stage += 1;
 
+    SearchMove* begin = m_moves_end;
+
     if (m_board->in_check()) {
         switch (m_stage) {
-            case MCS_KILLER_MOVES: {
-                m_n_visited_killers = 0;
+            case MPS_HASH_MOVE:
+                *begin = m_hash_move;
+                m_curr_move_range = { begin, begin + 1 };
+                break;
+
+            case MPS_KILLER_MOVES: {
+                int n_killers = 0;
+                for (n_killers = 0; n_killers < 2; ++n_killers) {
+                    Move killer = m_mv_hist->killers(m_ply)[n_killers];
+                    if (!m_board->is_move_pseudo_legal(killer)) {
+                        break;
+                    }
+                    begin[n_killers] = killer;
+                }
+                m_curr_move_range = { begin, begin + n_killers};
                 break;
             }
 
-            case MCS_PROMOTION_CAPTURES: {
-                SearchMove* begin = m_moves_end;
+            case MPS_PROMOTION_CAPTURES: {
                 generate_promotion_captures();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
             }
 
-            case MCS_PROMOTIONS: {
-                SearchMove* begin = m_moves_end;
+            case MPS_PROMOTIONS: {
                 generate_simple_promotions();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
             }
 
-            case MCS_GOOD_CAPTURES: {
-                SearchMove* begin = m_moves_end;
+            case MPS_GOOD_CAPTURES: {
                 generate_simple_captures();
                 m_curr_move_range = { begin, m_bad_captures_range.begin };
                 break;
             }
 
-            case MCS_EP: {
-                SearchMove* begin = m_moves_end;
+            case MPS_EP: {
                 generate_en_passants();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
             }
 
-            case MCS_BAD_CAPTURES: {
+            case MPS_BAD_CAPTURES: {
                 m_curr_move_range = m_bad_captures_range;
                 break;
             }
 
-            case MCS_QUIET: {
-                SearchMove* begin = m_moves_end;
+            case MPS_QUIET: {
                 generate_quiets();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
@@ -325,16 +338,16 @@ void MovePicker<QUIESCE>::advance_stage() {
     }
     else {
         switch (m_stage) {
-            case MCS_NOISY_EVASIONS: {
+            case MPS_NOISY_EVASIONS: {
                 SearchMove* begin = m_moves_end;
-                generate_noisy_evasions(begin);
+                generate_noisy_evasions();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
             }
 
-            case MCS_QUIET_EVASIONS: {
+            case MPS_QUIET_EVASIONS: {
                 SearchMove* begin = m_moves_end;
-                generate_quiet_evasions(begin);
+                generate_quiet_evasions();
                 m_curr_move_range = { begin, m_moves_end };
                 break;
             }
@@ -343,34 +356,45 @@ void MovePicker<QUIESCE>::advance_stage() {
                 break;
         }
     }
+
+    m_moves_it = m_curr_move_range.begin;
 }
 
 template <bool QUIESCE>
 inline Move MovePicker<QUIESCE>::next() {
     Move move = MOVE_NULL;
+    
+    if (m_stage >= m_end_stage) {
+        // We've finished generating moves.
+        return MOVE_NULL;
+    }
 
-    while (move == MOVE_NULL) {
-        switch (m_stage) {
-            case MCS_KILLER_MOVES:
-
-        }
+    if (m_moves_it == m_curr_move_range.end) {
+        // We finished the current stage.
         advance_stage();
-        if (m_stage >= m_end_stage) {
-            // We've finished generating moves.
-            return MOVE_NULL;
-        }
+        return next();
+    }
+    
+    move = *m_moves_it++;
+    
+    // Prevent hash move revisits.
+    if (move == m_hash_move && m_stage != MPS_HASH_MOVE) {
+        return next();
+    }
+    // Prevent killer move revisits.
+    if (m_mv_hist->is_killer(m_ply, move) && m_stage != MPS_KILLER_MOVES) {
+        return next();
     }
 
     bool legal = m_board->in_check() // We only generate legal evasions during checks.
               || m_board->is_move_legal(move);
-    if (legal) {
+    if (legal && move != MOVE_NULL) {
         // Move is legal, we can return it.
         return move;
     }
 
     // Move wasn't legal, try getting the next one.
     return next();
-
 }
 
 template<bool QUIESCE>
@@ -399,8 +423,6 @@ template <bool QUIESCE>
 inline bool MovePicker<QUIESCE>::finished() const {
     return m_stage >= m_end_stage;
 }
-
-
 
 } // illumina
 

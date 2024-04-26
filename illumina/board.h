@@ -128,6 +128,9 @@ private:
     template <bool CHECK>
     bool is_move_legal(Move move) const;
 
+    bool is_move_movement_valid(Move move) const;
+    bool is_castles_pseudo_legal(Square king_square, Color c, Side castling_side) const;
+
     void compute_checkers();
     void compute_pins();
     void scan_pins(Bitboard attackers, Square king_square, Color pinned_color);
