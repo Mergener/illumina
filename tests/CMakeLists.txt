@@ -5,3 +5,6 @@ target_link_libraries(illumina_tests PRIVATE illumina_lib)
 target_link_libraries(illumina_tests PRIVATE litetest)
 target_include_directories(illumina_tests PRIVATE ${ILLUMINA_LIBRARY_SOURCE_DIR})
 target_include_directories(illumina_tests PRIVATE ${ILLUMINA_EXT_DIR}/litetest/litetest)
+
+add_test(NAME tests
+         COMMAND illumina_tests)

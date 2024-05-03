@@ -10,6 +10,7 @@ struct PerftArgs {
 };
 
 ui64 perft(const Board& board, int depth, PerftArgs args = {});
+ui64 move_picker_perft(const Board& board, int depth, PerftArgs args = {});
 
 }
 

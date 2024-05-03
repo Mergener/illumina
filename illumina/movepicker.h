@@ -36,7 +36,7 @@ enum {
     MPS_PROMOTIONS,
     MPS_GOOD_CAPTURES,
     MPS_EP,
-    MPS_KILLER_MOVES = 999,
+    MPS_KILLER_MOVES,
     MPS_BAD_CAPTURES,
     MPS_QUIET,
     MPS_END_NOT_CHECK,
@@ -291,11 +291,12 @@ void MovePicker<QUIESCE>::advance_stage() {
                 }
                 *begin = m_hash_move;
                 m_curr_move_range = { begin, begin + 1 };
+                m_moves_end++;
                 break;
 
             case MPS_KILLER_MOVES: {
                 DBG();
-                int n_killers = 0;
+                int n_killers;
                 auto& killers = m_mv_hist->killers(m_ply);
                 for (n_killers = 0; n_killers < 2; ++n_killers) {
                     Move killer = killers[n_killers];
@@ -305,6 +306,7 @@ void MovePicker<QUIESCE>::advance_stage() {
                     begin[n_killers] = killer;
                 }
                 m_curr_move_range = { begin, begin + n_killers};
+                m_moves_end += n_killers;
                 break;
             }
 
@@ -413,15 +415,16 @@ inline Move MovePicker<QUIESCE>::next() {
 
     bool legal = m_board->in_check() // We only generate legal evasions during checks.
               || m_board->is_move_legal(move);
-    if (legal && move != MOVE_NULL) {
+    if (!legal || move == MOVE_NULL) {
         DBG();
-        // Move is legal, we can return it.
-        return move;
+
+        // Move isn't legal, try getting the next one.
+        return next();
     }
     DBG();
 
-    // Move wasn't legal, try getting the next one.
-    return next();
+    // Move is legal, we can return it.
+    return move;
 }
 
 template<bool QUIESCE>

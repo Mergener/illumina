@@ -55,6 +55,10 @@ void State::perft(int depth) const {
     illumina::perft(m_board, depth, { true });
 }
 
+void State::mperft(int depth) const {
+    illumina::move_picker_perft(m_board, depth, { true });
+}
+
 void State::uci() {
     std::cout << "id name Illumina v1.0 " << std::endl;
     std::cout << "id author Thomas Mergener" << std::endl;
