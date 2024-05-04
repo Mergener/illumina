@@ -16,8 +16,10 @@ static void log_move(Move move, ui64 nodes) {
     s_logs.push_back(move.to_uci() + ": " + std::to_string(nodes));
 }
 
-static void flush_logs() {
-    std::sort(s_logs.begin(), s_logs.end());
+static void flush_logs(bool sort) {
+    if (sort) {
+        std::sort(s_logs.begin(), s_logs.end());
+    }
     for (const auto& l: s_logs) {
         std::cout << l << std::endl;
     }
@@ -67,7 +69,7 @@ ui64 perft(const Board& board, int depth, PerftArgs args) {
         TimePoint after = now();
         ui64 time_delta = delta_ms(after, before);
 
-        flush_logs();
+        flush_logs(args.sort_output);
         std::cout << "\nResult: " << res << std::endl;
         std::cout << "Time: " << time_delta << "ms" << std::endl;
         std::cout << "NPS: " << ui64(res / double(time_delta / 1000.0)) << std::endl;
@@ -113,7 +115,7 @@ ui64 move_picker_perft(const Board& board, int depth, PerftArgs args) {
         ui64 res = move_picker_perft_internal<true, true>(mv_hist, replica, depth);
         TimePoint after = now();
         ui64 time_delta = delta_ms(after, before);
-        flush_logs();
+        flush_logs(args.sort_output);
 
         std::cout << "\nResult: " << res << std::endl;
         std::cout << "Time: " << time_delta << "ms" << std::endl;

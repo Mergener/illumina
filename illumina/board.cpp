@@ -578,6 +578,10 @@ bool Board::is_castles_pseudo_legal(Square king_square, Color c, Side castling_s
         return false;
     }
 
+    if (in_check()) {
+        return false;
+    }
+
     Square rook_square = castle_rook_square(c, castling_side);
     if (piece_at(rook_square) != Piece(c, PT_ROOK)) {
         return false;
@@ -588,6 +592,15 @@ bool Board::is_castles_pseudo_legal(Square king_square, Color c, Side castling_s
     if (inner_castle_path & occ) {
         // There cannot be any pieces between the king and the rook.
         return false;
+    }
+
+    Bitboard king_path = unset_bit(between_bb_inclusive(king_square, rook_square), king_square);
+    while (king_path) {
+        Square s = lsb(king_path);
+        if (is_attacked_by(opposite_color(c), s)) {
+            return false;
+        }
+        king_path = unset_lsb(king_path);
     }
 
     return true;
@@ -605,7 +618,7 @@ bool Board::is_move_movement_valid(Move move) const {
     }
     else {
         piece_movements = (pawn_attacks(src, src_piece.color()) & (occ | ep_square()))
-                        | pawn_pushes(move.source(), occ);
+                        | pawn_pushes(move.source(), src_piece.color(), occ);
     }
 
     return bit_is_set(piece_movements, dest);

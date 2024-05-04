@@ -1047,6 +1047,7 @@ TEST_CASE(PawnPushes) {
         { SQ_G5, 0x81a095760e776f8ULL, 0x400000000000ULL, 0x0ULL,  },
         { SQ_D2, 0x85597cfc5f66f320ULL, 0x80000ULL, 0x8ULL,  },
         { SQ_F6, 0xd5ee55b49bcbd7c6ULL, 0x0ULL, 0x0ULL,  },
+        { SQ_E7, 0x61f37a421cc86369ULL, 0x1000000000000000ULL, 0x0ULL,  },
     };
 
     for (auto& test: tests) {

@@ -7,6 +7,7 @@ namespace illumina {
 
 struct PerftArgs {
     bool log = false;
+    bool sort_output = false;
 };
 
 ui64 perft(const Board& board, int depth, PerftArgs args = {});
