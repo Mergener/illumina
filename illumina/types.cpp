@@ -98,10 +98,10 @@ static void initialize_adjacent() {
         BoardFile f = square_file(s);
 
         if (f > FL_A) {
-            bb = set_bit(bb, s + DIR_EAST);
+            bb = set_bit(bb, s + DIR_WEST);
         }
         if (f < FL_H) {
-            bb = set_bit(bb, s + DIR_WEST);
+            bb = set_bit(bb, s + DIR_EAST);
         }
 
         g_adjacent[s] = bb;

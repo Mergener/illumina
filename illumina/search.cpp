@@ -222,7 +222,6 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     ui64  board_key        = m_board.hash_key();
     bool in_check          = m_board.in_check();
     Color us               = m_board.color_to_move();
-    Color them             = opposite_color(us);
 
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions
@@ -318,7 +317,7 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
             alpha     = beta;
             best_move = move;
 
-            if (!move.is_capture() && !move.is_promotion()) {
+            if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);
                 m_hist.increment_history_score(move, depth);
             }

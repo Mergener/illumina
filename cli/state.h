@@ -19,6 +19,7 @@ public:
 
     // Debug
     void perft(int depth) const;
+    void mperft(int depth) const;
 
     // Evaluation
     void evaluate() const;

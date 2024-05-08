@@ -572,6 +572,172 @@ bool Board::legal() const {
     return !is_attacked_by(color_to_move(), king_square(opposite_color(color_to_move())));
 }
 
+bool Board::is_castles_pseudo_legal(Square king_square, Color c, Side castling_side) const {
+    if (!has_castling_rights(c, castling_side)) {
+        // No castling rights
+        return false;
+    }
+
+    if (in_check()) {
+        return false;
+    }
+
+    Square rook_square = castle_rook_square(c, castling_side);
+    if (piece_at(rook_square) != Piece(c, PT_ROOK)) {
+        return false;
+    }
+
+    Bitboard occ = occupancy();
+    Bitboard inner_castle_path = between_bb(king_square, rook_square);
+    if (inner_castle_path & occ) {
+        // There cannot be any pieces between the king and the rook.
+        return false;
+    }
+
+    Bitboard king_path = unset_bit(between_bb_inclusive(king_square, castled_king_square(c, castling_side)), king_square);
+    while (king_path) {
+        Square s = lsb(king_path);
+        if (is_attacked_by(opposite_color(c), s)) {
+            return false;
+        }
+        king_path = unset_lsb(king_path);
+    }
+
+    return true;
+}
+
+bool Board::is_move_movement_valid(Move move) const {
+    Bitboard occ    = occupancy();
+    Square src      = move.source();
+    Square dest     = move.destination();
+    Piece src_piece = move.source_piece();
+
+    Bitboard piece_movements;
+    if (src_piece.type() != PT_PAWN) {
+        piece_movements = piece_attacks(src_piece, src, occ);
+    }
+    else {
+        piece_movements = (pawn_attacks(src, src_piece.color()) & (occ | ep_square()))
+                        | pawn_pushes(move.source(), src_piece.color(), occ);
+    }
+
+    return bit_is_set(piece_movements, dest);
+}
+
+bool Board::is_move_pseudo_legal(Move move) const {
+    Square src               = move.source();
+    Square dest              = move.destination();
+    Piece src_piece          = move.source_piece();
+    Piece dst_piece          = move.captured_piece();
+    Color src_piece_color    = src_piece.color();
+    Color dst_piece_color    = dst_piece.color();
+    PieceType src_piece_type = src_piece.type();
+
+    if (src == dest) {
+        // Destination can't be equal to source.
+        return false;
+    }
+
+    if (src_piece != piece_at(src)) {
+        // Source piece must match the piece at the source square.
+        return false;
+    }
+    if (src_piece_color != color_to_move()) {
+        // Source piece must have the color of the current player to move.
+        return false;
+    }
+    if (dst_piece != piece_at(dest)) {
+        return false;
+    }
+
+    // Check if move is a capture that isn't en passant.
+    if (move.is_capture() && move.type() != MT_EN_PASSANT) {
+        if (dst_piece == PIECE_NULL) {
+            // Non en passant captures must have a dst_piece.
+            return false;
+        }
+        if (dst_piece_color == src_piece_color) {
+            // We can only capture opposing pieces.
+            return false;
+        }
+    }
+    else {
+        if (dst_piece != PIECE_NULL) {
+            // Non-captures (or en passants) cannot have 'dest' pieces.
+            return false;
+        }
+    }
+
+    // Do specific logic for special moves.
+    switch (move.type()) {
+        case MT_CASTLES:
+            if (src_piece_type != PT_KING) {
+                // Castling can only be performed by a king.
+                return false;
+            }
+            return is_castles_pseudo_legal(src, src_piece_color, move.castles_side());
+
+        case MT_PROMOTION_CAPTURE:
+        case MT_SIMPLE_PROMOTION:
+            if (src_piece_type != PT_PAWN) {
+                // Promotions can only be performed by a pawn.
+                return false;
+            }
+            if (square_rank(dest) != promotion_rank(src_piece_color)) {
+                // Destination rank must be the pawn's promotion rank.
+                // Note that after this condition, 'isNormalMovePseudoLegal' is already going to cover
+                // the requirement for 'src' to be located on the 7th rank.
+                return false;
+            }
+
+            return is_move_movement_valid(move);
+
+        case MT_EN_PASSANT:
+            if (src_piece_type != PT_PAWN) {
+                // En passant can only be performed by a pawn.
+                return false;
+            }
+            if (dest != ep_square()) {
+                // Destination square must be the en passant square.
+                return false;
+            }
+            if (piece_at(dest - pawn_push_direction(src_piece_color)) != Piece(opposite_color(src_piece_color), PT_PAWN)) {
+                // There must be an enemy pawn to be captured in en passant.
+                return false;
+            }
+            return is_move_movement_valid(move);
+
+        case MT_DOUBLE_PUSH:
+            if (src_piece_type != PT_PAWN) {
+                // Double pushes can only be performed by a pawn.
+                return false;
+            }
+            if (dst_piece != PIECE_NULL) {
+                // Pawn pushes cannot capture pieces
+                return false;
+            }
+
+            if (std::abs(square_rank(src) - square_rank(dest)) != 2) {
+                // Pawn didn't move two squares.
+                return false;
+            }
+
+            return is_move_movement_valid(move);
+
+        case MT_NORMAL:
+            if (src_piece_type == PT_PAWN && dst_piece != PIECE_NULL) {
+                return false;
+            }
+            return is_move_movement_valid(move);
+
+        case MT_SIMPLE_CAPTURE:
+            return is_move_movement_valid(move);
+
+        default:
+            return false;
+    }
+}
+
 void Board::compute_checkers() {
     Color us           = color_to_move();
     Color them         = opposite_color(us);

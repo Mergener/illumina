@@ -88,6 +88,10 @@ void register_commands(UCIServer& server) {
         global_state().perft(int(ctx.int_after("")));
     });
 
+    server.register_command("mperft", [](const UCICommandContext& ctx) {
+        global_state().mperft(int(ctx.int_after("")));
+    });
+
     server.register_command("isready", [](const UCICommandContext& ctx) {
         global_state().check_if_ready();
     });

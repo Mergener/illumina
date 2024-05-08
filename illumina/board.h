@@ -53,7 +53,7 @@ public:
     void undo_move();
     void make_null_move();
     void undo_null_move();
-    bool is_move_pseudo_legal(Move move) const; // TODO
+    bool is_move_pseudo_legal(Move move) const;
     bool is_move_legal(Move move) const;
 
     template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
@@ -127,6 +127,9 @@ private:
 
     template <bool CHECK>
     bool is_move_legal(Move move) const;
+
+    bool is_move_movement_valid(Move move) const;
+    bool is_castles_pseudo_legal(Square king_square, Color c, Side castling_side) const;
 
     void compute_checkers();
     void compute_pins();
