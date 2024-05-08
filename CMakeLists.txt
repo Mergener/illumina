@@ -21,4 +21,5 @@ add_subdirectory(ext)
 add_subdirectory(illumina)
 add_subdirectory(cli)
 add_subdirectory(tests)
+add_subdirectory(datagen)
 
