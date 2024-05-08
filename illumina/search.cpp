@@ -209,7 +209,7 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         return alpha;
     }
 
-    if (!ROOT && (m_board.is_repetition_draw(2) || m_board.rule50() >= 100)) {
+    if (!ROOT && (m_board.is_repetition_draw(2) || (m_board.rule50() >= 100) || m_board.is_insufficient_material_draw())) {
         return 0;
     }
 
