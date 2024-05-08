@@ -42,6 +42,8 @@ public:
     std::string    fen() const;
     std::string    pretty() const;
     bool           is_repetition_draw(int max_appearances = 3) const;
+    bool           is_insufficient_material_draw() const;
+    bool           color_has_sufficient_material(Color color) const;
 
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
@@ -362,6 +364,45 @@ inline bool Board::is_repetition_draw(int max_appearances) const {
     }
 
     return false;
+}
+
+inline bool Board::color_has_sufficient_material(Color color) const {
+    Bitboard pawns = piece_bb(Piece(color, PT_PAWN));
+    if (pawns) {
+        return true;
+    }
+
+    Bitboard heavy_pieces = piece_bb(Piece(color, PT_ROOK)) | piece_bb(Piece(color, PT_QUEEN));
+    if (heavy_pieces) {
+        return true;
+    }
+
+    Bitboard minor_pieces_and_king = color_bb(color);
+    ui64 n_minor_pieces = popcount(minor_pieces_and_king) - 1;
+    if (n_minor_pieces > 2) {
+        return true;
+    }
+
+    if (n_minor_pieces == 2) {
+        // We have two minor pieces. We can deliver mate with either knight + bishop
+        // or two opposite colored bishops.
+        Bitboard knight_bb = piece_bb(Piece(color, PT_KNIGHT));
+        Bitboard bishop_bb = piece_bb(Piece(color, PT_BISHOP));
+
+        if (bishop_bb && knight_bb) {
+            return true;
+        }
+
+        if (bishop_bb) {
+            return (bishop_bb & LIGHT_SQUARES) && (bishop_bb & DARK_SQUARES);
+        }
+    }
+
+    return false;
+}
+
+inline bool Board::is_insufficient_material_draw() const {
+    return !color_has_sufficient_material(CL_WHITE) && !color_has_sufficient_material(CL_BLACK);
 }
 
 template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>

@@ -164,6 +164,9 @@ constexpr ui64 unset_lsb(ui64 x) {
     return x & (x - 1);
 }
 
+inline constexpr Bitboard DARK_SQUARES  = 0xaa55aa55aa55aa55ULL;
+inline constexpr Bitboard LIGHT_SQUARES = ~DARK_SQUARES;
+
 //
 // Colors
 //
