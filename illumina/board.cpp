@@ -594,7 +594,7 @@ bool Board::is_castles_pseudo_legal(Square king_square, Color c, Side castling_s
         return false;
     }
 
-    Bitboard king_path = unset_bit(between_bb_inclusive(king_square, rook_square), king_square);
+    Bitboard king_path = unset_bit(between_bb_inclusive(king_square, castled_king_square(c, castling_side)), king_square);
     while (king_path) {
         Square s = lsb(king_path);
         if (is_attacked_by(opposite_color(c), s)) {

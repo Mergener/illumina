@@ -1,45 +1,90 @@
 #include "../litetest/litetest.h"
 
 #include "movepicker.h"
+#include "utils.h"
 
 using namespace litetest;
 using namespace illumina;
 
 TEST_SUITE(MovePicker);
 
+template <bool QUIESCE>
+static void score_move(MovePicker<QUIESCE>& mp, SearchMove& move, bool check) {
+    ui64 mask = !check
+        ? BIT(MPS_GOOD_CAPTURES) | BIT(MPS_BAD_CAPTURES) | BIT(MPS_QUIET)
+        : BIT(MPS_QUIET_EVASIONS) | BIT(MPS_NOISY_EVASIONS);
+
+    if (!bit_is_set(mask, mp.stage())) {
+        move.set_value(0);
+    }
+    else {
+        mp.score_move(move);
+    }
+}
+
 static MovePickingStage classify_move_stage(Move move,
                                             const Board& board,
                                             Move hash_move,
                                             MoveHistory mv_hist,
-                                            Depth ply) {
+                                            Depth ply,
+                                            bool quiesce) {
     if (move == hash_move) {
         return MPS_HASH_MOVE;
     }
     if (!board.in_check()) {
+        MovePickingStage expected_stage;
+
         switch (move.type()) {
-            case MT_PROMOTION_CAPTURE: return MPS_PROMOTION_CAPTURES;
-            case MT_SIMPLE_PROMOTION:  return MPS_PROMOTIONS;
-            case MT_SIMPLE_CAPTURE:    return has_good_see(board, move.source(), move.destination()) ? MPS_GOOD_CAPTURES : MPS_BAD_CAPTURES;
-            case MT_EN_PASSANT:        return MPS_EP;
+            case MT_PROMOTION_CAPTURE:
+                expected_stage = MPS_PROMOTION_CAPTURES;
+                break;
+
+            case MT_SIMPLE_PROMOTION:
+                expected_stage = MPS_PROMOTIONS;
+                break;
+
+            case MT_SIMPLE_CAPTURE:
+                expected_stage = has_good_see(board, move.source(), move.destination()) ? MPS_GOOD_CAPTURES : MPS_BAD_CAPTURES;
+                break;
+
+            case MT_EN_PASSANT:
+                expected_stage = MPS_EP;
+                break;
+
             case MT_NORMAL:
             case MT_DOUBLE_PUSH:
-            case MT_CASTLES:           return mv_hist.is_killer(ply, move) ? MPS_KILLER_MOVES : MPS_QUIET;
+            case MT_CASTLES:
+                expected_stage = MPS_QUIET;
+                break;
         }
+
+        if (!quiesce && mv_hist.is_killer(ply, move)) {
+            return std::min(MovePickingStage(MPS_KILLER_MOVES), expected_stage);
+        }
+        return expected_stage;
     }
+    MovePickingStage expected_stage;
     switch (move.type()) {
         case MT_PROMOTION_CAPTURE:
         case MT_SIMPLE_PROMOTION:
         case MT_SIMPLE_CAPTURE:
-        case MT_EN_PASSANT: return MPS_NOISY_EVASIONS;
+        case MT_EN_PASSANT:
+            expected_stage = MPS_NOISY_EVASIONS;
+            break;
         case MT_NORMAL:
         case MT_DOUBLE_PUSH:
-        case MT_CASTLES:    return mv_hist.is_killer(ply, move) ? MPS_KILLER_MOVES : MPS_QUIET;
+        case MT_CASTLES:
+            expected_stage = MPS_QUIET_EVASIONS;
+            break;
     }
 
-    throw std::runtime_error("Expected move " + move.to_uci() + " to match a picking stage.");
+    if (!quiesce && mv_hist.is_killer(ply, move)) {
+        return std::min(MovePickingStage(MPS_KILLER_EVASIONS), expected_stage);
+    }
+    return expected_stage;
 }
 
-template <bool QUIESCE>
+template <bool QUIESCE, bool METAMORPHIC>
 void test_move_picker() {
     constexpr ui64 MOVE_TYPE_MASK = QUIESCE
                                     ? ui64(BIT(MT_SIMPLE_CAPTURE) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION) | BIT(MT_EN_PASSANT))
@@ -53,23 +98,6 @@ void test_move_picker() {
 
         void run() {
             Board board(fen);
-            Move hash_move = !QUIESCE ? Move::parse_uci(board, hash_move_str) : MOVE_NULL;
-
-            MoveHistory mv_hist;
-
-            // Save killer moves.
-            for (auto& k: all_killer_moves) {
-                Move move = Move::parse_uci(board, k.second);
-                if (move != MOVE_NULL) {
-                    mv_hist.set_killer(k.first, move);
-                }
-            }
-
-            // Save all history.
-            for (auto& h: history) {
-                auto [depth, src, dest] = h;
-                mv_hist.increment_history_score(Move::new_normal(src, dest, WHITE_QUEEN), depth);
-            }
 
             // Generate all moves without the move picker. Use the number of generated
             // moves to afterwards validate if the move picker generated the exact number
@@ -78,14 +106,78 @@ void test_move_picker() {
             Move* validation_moves_end = generate_moves<MOVE_TYPE_MASK>(board, validation_moves);
             size_t n_expected_moves = validation_moves_end - validation_moves;
 
+            Move hash_move;
+            MoveHistory mv_hist;
+
+            if constexpr (!METAMORPHIC) {
+                if (n_expected_moves > 0) {
+                    hash_move = !QUIESCE ? Move::parse_uci(board, hash_move_str) : MOVE_NULL;
+
+                    // Save killer moves.
+                    for (auto& k: all_killer_moves) {
+                        Move move = Move::parse_uci(board, k.second);
+                        if (move != MOVE_NULL) {
+                            mv_hist.set_killer(k.first, move);
+                        }
+                    }
+
+                    // Save all history.
+                    for (auto& h: history) {
+                        auto [depth, src, dest] = h;
+                        mv_hist.increment_history_score(Move::new_normal(src, dest, WHITE_QUEEN), depth);
+                    }
+                }
+            }
+            else {
+                if (n_expected_moves > 0) {
+                    // Choose random hash move.
+                    hash_move = random_bool()
+                                ? validation_moves[random(size_t(0), n_expected_moves)]
+                                : MOVE_NULL;
+
+                    // For killer moves, use two branches: one with valid and legal killer moves,
+                    // another with completely random ones.
+                    if (random_bool()) {
+                        // Valid and legal killer moves.
+                        for (int i = 0; i < 2; ++i) {
+                            Move move = validation_moves[random(size_t(0), n_expected_moves)];
+                            if (move.is_quiet()) {
+                                mv_hist.set_killer(ply, move);
+                            }
+                        }
+                    }
+                    else {
+                        // Completely random moves.
+                        Square src = random_square();
+                        Square dst = random_square();
+                        Move move = Move(board, src, dst);
+                        if (move.is_quiet()) {
+                            mv_hist.set_killer(ply, move);
+                        }
+                    }
+
+                    // Fill history values with random depths [1,15) (arbitrary range) for each move.
+                    // Arbitrarily do 100 random steps.
+                    for (int i = 0; i < 100; ++i) {
+                        // Pick a move.
+                        Move move = validation_moves[random(size_t(0), n_expected_moves)];
+                        mv_hist.increment_history_score(move, random(1, 15));
+                    }
+                }
+                else {
+                    hash_move = MOVE_NULL;
+                }
+            }
+
             MovePicker<QUIESCE> move_picker(board, ply, mv_hist, hash_move);
             SearchMove move {};
             std::vector<SearchMove> mp_moves;
             MovePickingStage highest_stage = MPS_NOT_STARTED;
             int prev_score = INT32_MAX;
+            bool check = board.in_check();
             while ((move = move_picker.next()) != MOVE_NULL) {
                 mp_moves.push_back(move);
-                MovePickingStage move_stage = classify_move_stage(move, board, hash_move, mv_hist, ply);
+                MovePickingStage move_stage = classify_move_stage(move, board, hash_move, mv_hist, ply, QUIESCE);
                 EXPECT(move_stage).to_be_greater_than_or_equal_to(highest_stage);
 
                 if (move_stage > highest_stage) {
@@ -93,17 +185,18 @@ void test_move_picker() {
                     prev_score = INT32_MAX;
                 }
 
+                score_move(move_picker, move, check);
+
                 // Make sure that every new move on a stage has a lower value than
                 // the previous one (in other words: are being selected in a sorted
                 // fashion).
-                move_picker.score_move(move);
                 EXPECT(move.value()).to_be_less_than_or_equal_to(prev_score);
                 prev_score = move.value();
             }
 
             // We validated whether the moves are being generated in order or not. Now, we need to validate whether
             // all moves have been generated correctly and no illegal moves have been generated.
-            EXPECT(mp_moves.size()).to_be(n_expected_moves);
+            EXPECT(int(mp_moves.size())).to_be(int(n_expected_moves));
             for (SearchMove mp_move: mp_moves) {
                 EXPECT(mp_move).to_not_be(MOVE_NULL);
 
@@ -252,6 +345,8 @@ void test_move_picker() {
         { "8/PPPk4/8/8/8/8/4Kppp/8 b - - 0 1", {}, 0, {}, {}},
         { "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1", {}, 0, {}, {}},
         { "7r/6p1/3p2pp/pn4k1/3P3P/P2BP3/1r3PP1/3RK2R b K h3 0 19", {}, 0, {}, {}},
+        { "r3k2r/8/8/8/8/8/8/2R1K2R b Kkq - 0 1", "", 0, { { 0, "e8g8" }, { 0, "a8b8" } }, {} },
+        { "7k/3p4/8/8/3P4/8/8/K7 b - - 0 1", "h8g8", 0, { { 0, "d7d5" }, { 0, "h8g8" } }, {} },
     };
 
     for (auto& test: tests) {
@@ -260,6 +355,17 @@ void test_move_picker() {
 }
 
 TEST_CASE(MovePickerTests) {
-    test_move_picker<true>();
-    test_move_picker<false>();
+    test_move_picker<false, false>();
+}
+
+TEST_CASE(MovePickerQuiesceTests) {
+    test_move_picker<true, false>();
+}
+
+TEST_CASE(MovePickerTestsMetamorphic) {
+    test_move_picker<false, true>();
+}
+
+TEST_CASE(MovePickerQuiesceTestsMetamorphic) {
+    test_move_picker<true, true>();
 }

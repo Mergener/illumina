@@ -51,6 +51,7 @@ using MovePickingStage = int;
 template <bool QUIESCE = false>
 class MovePicker {
 public:
+    MovePickingStage stage() const;
     bool finished() const;
     Move next();
     void score_move(SearchMove& move);
@@ -290,6 +291,9 @@ inline bool MoveHistory::is_killer(Depth ply, Move move) const {
 
 inline void MoveHistory::set_killer(Depth ply, Move killer) {
     std::array<Move, 2>& arr = m_killers[ply];
+    if (killer == arr[0]) {
+        return;
+    }
     arr[1] = arr[0];
     arr[0] = killer;
 }
@@ -434,9 +438,12 @@ inline Move MovePicker<QUIESCE>::next() {
     }
     
     Move move = Move(*m_moves_it++);
-    
+
     // Prevent hash move revisits.
-    if (move == m_hash_move && m_stage != MPS_HASH_MOVE) {
+    if (move == m_hash_move) {
+        if (m_stage == MPS_HASH_MOVE) {
+            return move;
+        }
         return next();
     }
     // Prevent killer move revisits.
@@ -460,6 +467,7 @@ inline Move MovePicker<QUIESCE>::next() {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::score_move(SearchMove& move) {
+    move.set_value(0);
     if (move.is_capture()) {
         // Perform MMV-LVA: Most valuable victims -> Least valuable attackers
         constexpr i32 MVV_LVA[PT_COUNT][PT_COUNT] {
@@ -483,6 +491,11 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
 template <bool QUIESCE>
 inline bool MovePicker<QUIESCE>::finished() const {
     return m_stage >= m_end_stage;
+}
+
+template <bool QUIESCE>
+inline MovePickingStage MovePicker<QUIESCE>::stage() const {
+    return m_stage;
 }
 
 } // illumina
