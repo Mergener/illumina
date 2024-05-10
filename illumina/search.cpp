@@ -28,6 +28,7 @@ public:
     TranspositionTable&        tt() const;
     const Searcher::Listeners& listeners() const;
 
+    ui64 max_nodes() const;
     ui64 elapsed() const;
 
     void stop_search() const;
@@ -36,7 +37,8 @@ public:
     SearchContext(TranspositionTable* tt,
                   bool* should_stop,
                   const Searcher::Listeners* listeners,
-                  TimeManager* time_manager);
+                  TimeManager* time_manager,
+                  ui64 max_nodes = UINT64_MAX);
 
 private:
     TranspositionTable*        m_tt;
@@ -44,6 +46,7 @@ private:
     bool*                      m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
+    ui64                       m_max_nodes;
 };
 
 inline TranspositionTable& SearchContext::tt() const {
@@ -65,11 +68,13 @@ inline const Searcher::Listeners& SearchContext::listeners() const {
 SearchContext::SearchContext(TranspositionTable* tt,
                              bool* should_stop,
                              const Searcher::Listeners* listeners,
-                             TimeManager* time_manager)
+                             TimeManager* time_manager,
+                             ui64 max_nodes)
     : m_stop(should_stop),
       m_tt(tt), m_listeners(listeners),
       m_time_manager(time_manager),
-      m_search_start(now()) { }
+      m_search_start(now()),
+      m_max_nodes(max_nodes) { }
 
 void SearchContext::stop_search() const {
     *m_stop = true;
@@ -77,6 +82,10 @@ void SearchContext::stop_search() const {
 
 TimeManager& SearchContext::time_manager() const {
     return *m_time_manager;
+}
+
+ui64 SearchContext::max_nodes() const {
+    return m_max_nodes;
 }
 
 struct WorkerResults {
@@ -90,7 +99,7 @@ class SearchWorker {
 public:
     void iterative_deepening();
     bool should_stop() const;
-    void check_time_bounds();
+    void check_limits();
 
     const WorkerResults& results() const;
 
@@ -177,7 +186,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         alpha = stand_pat;
     }
 
-    check_time_bounds();
+    check_limits();
     if (should_stop()) {
         return alpha;
     }
@@ -209,7 +218,9 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         return alpha;
     }
 
-    if (!ROOT && (m_board.is_repetition_draw(2) || (m_board.rule50() >= 100) || m_board.is_insufficient_material_draw())) {
+    if (!ROOT && (m_board.is_repetition_draw(2)  ||
+                  m_board.is_50_move_rule_draw() ||
+                  m_board.is_insufficient_material_draw())) {
         return 0;
     }
 
@@ -405,7 +416,7 @@ void SearchWorker::aspiration_windows() {
             update_results();
         }
 
-        check_time_bounds();
+        check_limits();
 
         window += window / 2;
     }
@@ -460,7 +471,7 @@ void SearchWorker::iterative_deepening() {
 
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        check_time_bounds();
+        check_limits();
         aspiration_windows();
         if (should_stop() || m_context->time_manager().finished_soft()) {
             // If we finished soft, we don't want to start a new iteration.
@@ -469,8 +480,13 @@ void SearchWorker::iterative_deepening() {
     }
 }
 
-void SearchWorker::check_time_bounds() {
+void SearchWorker::check_limits() {
     if (!m_main) {
+        return;
+    }
+
+    if (m_results.nodes >= m_context->max_nodes()) {
+        m_context->stop_search();
         return;
     }
 
@@ -488,7 +504,7 @@ SearchResults Searcher::search(const Board& board,
     // Create search context.
     m_stop = false;
     m_tt.new_search();
-    SearchContext context(&m_tt, &m_stop, &m_listeners, &m_tm);
+    SearchContext context(&m_tt, &m_stop, &m_listeners, &m_tm, settings.max_nodes.value_or(UINT64_MAX));
 
     SearchWorker worker(true, board, &context, &settings);
 

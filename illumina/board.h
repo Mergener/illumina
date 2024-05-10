@@ -4,6 +4,7 @@
 #include <array>
 #include <string_view>
 #include <vector>
+#include <optional>
 
 #include "attacks.h"
 #include "types.h"
@@ -12,6 +13,23 @@
 namespace illumina {
 
 constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
+
+enum class BoardOutcome {
+    UNFINISHED,
+    STALEMATE,
+    CHECKMATE,
+    DRAW_BY_REPETITION,
+    DRAW_BY_50_MOVES_RULE,
+    DRAW_BY_INSUFFICIENT_MATERIAL
+};
+
+struct BoardResult {
+    std::optional<Color> winner  = std::nullopt;
+    BoardOutcome         outcome = BoardOutcome::UNFINISHED;
+
+    bool is_draw() const;
+    bool is_finished() const;
+};
 
 class Board {
 public:
@@ -43,7 +61,9 @@ public:
     std::string    pretty() const;
     bool           is_repetition_draw(int max_appearances = 3) const;
     bool           is_insufficient_material_draw() const;
+    bool           is_50_move_rule_draw() const;
     bool           color_has_sufficient_material(Color color) const;
+    BoardResult    result() const;
 
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
@@ -405,6 +425,10 @@ inline bool Board::is_insufficient_material_draw() const {
     return !color_has_sufficient_material(CL_WHITE) && !color_has_sufficient_material(CL_BLACK);
 }
 
+inline bool Board::is_50_move_rule_draw() const {
+    return rule50() >= 100;
+}
+
 template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>
 inline Square Board::first_attacker_of(Color c, Square s) const {
     return first_attacker_of(c, s, occupancy());
@@ -612,6 +636,17 @@ inline bool Board::is_move_legal(Move move) const {
         }
     }
     return true;
+}
+
+inline bool BoardResult::is_draw() const {
+    return outcome == BoardOutcome::DRAW_BY_50_MOVES_RULE ||
+           outcome == BoardOutcome::DRAW_BY_INSUFFICIENT_MATERIAL ||
+           outcome == BoardOutcome::DRAW_BY_REPETITION ||
+           outcome == BoardOutcome::STALEMATE;
+}
+
+inline bool BoardResult::is_finished() const {
+    return outcome != BoardOutcome::UNFINISHED;
 }
 
 } // illumina
