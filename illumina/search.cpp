@@ -9,17 +9,36 @@
 namespace illumina {
 
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
+static std::array<int, MAX_DEPTH> s_lmp_count_table;
 
-static void init_lmr_table() {
+static void init_search_constants() {
     for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
         for (Depth d = 0; d < MAX_DEPTH; ++d) {
             s_lmr_table[m][d] = Depth(1.25 + std::log(d) * std::log(m) * 100.0 / 267.0);
+
         }
+    }
+    for (Depth d = 0; d < MAX_DEPTH; ++d) {
+        s_lmp_count_table[d] = int(3.9 + 0.8 * d * d);
     }
 }
 
 void init_search() {
-    init_lmr_table();
+    init_search_constants();
+}
+
+struct SearchNode {
+    SearchNode* const parent = nullptr;
+    const Depth ply = 0;
+
+    Score static_eval;
+
+    SearchNode() = default;
+    explicit SearchNode(SearchNode* parent);
+};
+
+inline SearchNode::SearchNode(SearchNode* parent)
+    : parent(parent), ply(parent->ply + 1) {
 }
 
 class SearchContext {
@@ -114,9 +133,9 @@ private:
 
     template <bool PV, bool SKIP_NULL = false, bool ROOT = false>
     Score pvs(Depth depth,
-              Depth ply,
               Score alpha,
-              Score beta);
+              Score beta,
+              SearchNode* parent = nullptr);
 
     void aspiration_windows();
 
@@ -202,7 +221,8 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 }
 
 template<bool PV, bool SKIP_NULL, bool ROOT>
-Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
+Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* parent) {
+    SearchNode node = ROOT ? SearchNode() : SearchNode(parent);
     m_results.nodes++;
 
     if (should_stop()) {
@@ -248,10 +268,10 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     }
 
     if (depth <= 0) {
-        return quiescence_search(ply, alpha, beta);
+        return quiescence_search(node.ply, alpha, beta);
     }
 
-    Score static_eval = m_eval.get();
+    node.static_eval = m_eval.get();
 
     // Reverse futility pruning.
     Score rfp_margin = 50 + 70 * depth;
@@ -259,8 +279,8 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         !in_check  &&
         depth <= 7 &&
         alpha < MATE_THRESHOLD &&
-        static_eval - rfp_margin > beta) {
-        return static_eval - rfp_margin;
+        node.static_eval - rfp_margin > beta) {
+        return node.static_eval - rfp_margin;
     }
 
     // Null move pruning.
@@ -268,12 +288,12 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         !SKIP_NULL &&
         !in_check  &&
         popcount(m_board.color_bb(us)) >= 4 &&
-        static_eval >= beta &&
+        node.static_eval >= beta &&
         depth >= 3) {
-        Depth reduction = std::max(depth, std::min(2, 2 + (static_eval - beta) / 200));
+        Depth reduction = std::max(depth, std::min(2, 2 + (node.static_eval - beta) / 200));
 
         make_null_move();
-        Score score = -pvs<false, true>(depth - 1 - reduction, ply + 1, -beta, -beta + 1);
+        Score score = -pvs<false, true>(depth - 1 - reduction, -beta, -beta + 1, &node);
         undo_null_move();
 
         if (score >= beta) {
@@ -281,9 +301,12 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         }
     }
 
-    MovePicker move_picker(m_board, ply, m_hist, hash_move);
+    MovePicker move_picker(m_board, node.ply, m_hist, hash_move);
     Move move {};
+    bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
+        has_legal_moves = true;
+
         // SEE pruning.
         if (depth <= 8          &&
             !m_board.in_check() &&
@@ -306,15 +329,15 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
-            score = -pvs<true>(depth - 1, ply + 1, -beta, -alpha);
+            score = -pvs<true>(depth - 1, -beta, -alpha, &node);
         }
         else {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -pvs<false>(depth - 1 - reductions, ply + 1, -alpha - 1, -alpha);
+            score = -pvs<false>(depth - 1 - reductions, -alpha - 1, -alpha, &node);
             if (score > alpha && score < beta) {
-                score = -pvs<true>(depth - 1, ply + 1, -beta, -alpha);
+                score = -pvs<true>(depth - 1, -beta, -alpha, &node);
             }
         }
         undo_move();
@@ -326,7 +349,7 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
             best_move = move;
 
             if (move.is_quiet()) {
-                m_hist.set_killer(ply, move);
+                m_hist.set_killer(node.ply, move);
                 m_hist.increment_history_score(move, depth);
             }
 
@@ -348,8 +371,8 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     }
 
     // Check if we have a checkmate or stalemate.
-    if (n_searched_moves == 0) {
-        return m_board.in_check() ? (-MATE_SCORE + ply) : 0;
+    if (!has_legal_moves) {
+        return m_board.in_check() ? (-MATE_SCORE + node.ply) : 0;
     }
 
     if (should_stop()) {
@@ -388,7 +411,7 @@ void SearchWorker::aspiration_windows() {
     Move best_move = m_results.best_move;
 
     while (!should_stop()) {
-        Score score = pvs<true, false, true>(depth, 0, alpha, beta);
+        Score score = pvs<true, false, true>(depth, alpha, beta);
 
         if (score > alpha && score < beta) {
             m_results.bound_type = BT_EXACT;
