@@ -9,17 +9,17 @@
 namespace illumina {
 
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
-static std::array<int, MAX_DEPTH> s_lmp_count_table;
+static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 static void init_search_constants() {
     for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
         for (Depth d = 0; d < MAX_DEPTH; ++d) {
             s_lmr_table[m][d] = Depth(1.25 + std::log(d) * std::log(m) * 100.0 / 267.0);
-
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {
-        s_lmp_count_table[d] = int(3.9 + 0.8 * d * d);
+        s_lmp_count_table[false][d] = int(2.0767 + 0.3743 * d * d);
+        s_lmp_count_table[true][d]  = int(3.8733 + 0.7124 * d * d);
     }
 }
 
@@ -242,6 +242,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* parent
     ui64  board_key        = m_board.hash_key();
     bool in_check          = m_board.in_check();
     Color us               = m_board.color_to_move();
+    bool improving         = !in_check && (ROOT || node.static_eval > parent->static_eval);
 
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions
@@ -306,6 +307,16 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* parent
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
+
+        // Late move pruning.
+        if (alpha > -MATE_THRESHOLD &&
+            depth <= 8 &&
+            n_searched_moves >= s_lmp_count_table[improving][depth] &&
+            move_picker.stage() > MPS_KILLER_MOVES &&
+            !in_check &&
+            move.is_quiet()) {
+            continue;
+        }
 
         // SEE pruning.
         if (depth <= 8          &&
