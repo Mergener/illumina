@@ -284,6 +284,14 @@ Score SearchWorker::pvs(Depth depth, Depth ply, Score alpha, Score beta) {
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     while ((move = move_picker.next()) != MOVE_NULL) {
+        // SEE pruning.
+        if (depth <= 8          &&
+            !m_board.in_check() &&
+            move_picker.stage() > MPS_GOOD_CAPTURES &&
+            !has_good_see(m_board, move.source(), move.destination(), -2)) {
+            continue;
+        }
+
         make_move(move);
 
         // Late move reductions.
