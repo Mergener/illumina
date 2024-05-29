@@ -124,6 +124,22 @@ void register_commands(CLIApplication& server) {
             settings.move_time = ctx.int_after("movetime");
         }
 
+        if (ctx.has_arg("searchmoves")) {
+            // Parse all searchmoves.
+            std::vector<Move> search_moves;
+            std::string search_moves_str = ctx.all_after("searchmoves");
+            ParseHelper parser(search_moves_str);
+            const Board& board = global_state().board();
+            while (!parser.finished()) {
+                Move move = Move::parse_uci(board, parser.read_chunk());
+                if (move == MOVE_NULL) {
+                    break;
+                }
+                search_moves.push_back(move);
+            }
+            settings.search_moves = search_moves;
+        }
+
         global_state().search(settings);
     });
 
