@@ -1,7 +1,7 @@
 #include "state.h"
 
 #include "movepicker.h"
-#include "uciserver.h"
+#include "cliapplication.h"
 #include "evaluation.h"
 #include "transpositiontable.h"
 

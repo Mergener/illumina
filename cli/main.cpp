@@ -1,7 +1,7 @@
 #include "illumina.h"
 
 #include "commands.h"
-#include "uciserver.h"
+#include "cliapplication.h"
 #include "state.h"
 
 using namespace illumina;
@@ -16,10 +16,10 @@ int main(int argc, char* argv[]) {
         illumina::init();
 
         // Perform UCI setup.
-        UCIServer server;
+        CLIApplication server;
         register_commands(server);
 
-        server.set_error_handler([](UCIServer& server, const std::exception& err) {
+        server.set_error_handler([](CLIApplication& server, const std::exception& err) {
             std::cerr << "Error:\n" << err.what() << std::endl;
         });
 
@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
         // Finally, run.
         std::cout << "Illumina v1.0" << std::endl;
-        server.serve();
+        server.listen();
 
         return EXIT_SUCCESS;
     }
