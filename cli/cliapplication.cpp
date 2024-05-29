@@ -1,4 +1,4 @@
-#include "uciserver.h"
+#include "cliapplication.h"
 
 #include <sstream>
 
@@ -32,15 +32,15 @@ static std::string generate_missing_arg_error_string(std::string_view command_na
     return stream.str();
 }
 
-UCIBadCommandArgument::UCIBadCommandArgument(std::string_view command_name,
-                                             std::string_view missing_arg,
-                                             std::string_view expected_arg_type_name)
+BadCommandArgument::BadCommandArgument(std::string_view command_name,
+                                       std::string_view missing_arg,
+                                       std::string_view expected_arg_type_name)
                                                      : std::runtime_error(generate_missing_arg_error_string(
                                                          command_name, missing_arg, expected_arg_type_name
                                                          )) {}
 
 //
-// UCICommandContext
+// CommandContext
 //
 
 static bool goto_arg(ParseHelper& parser, std::string_view arg_name) {
@@ -57,13 +57,13 @@ static bool goto_arg(ParseHelper& parser, std::string_view arg_name) {
     return false;
 }
 
-bool UCICommandContext::has_arg(std::string_view arg_name) const {
+bool CommandContext::has_arg(std::string_view arg_name) const {
     ParseHelper parser(m_arg);
     return goto_arg(parser, arg_name);
 }
 
-std::string UCICommandContext::word_after(std::string_view arg_name,
-                                          std::optional<std::string> default_val) const {
+std::string CommandContext::word_after(std::string_view arg_name,
+                                       std::optional<std::string> default_val) const {
     ParseHelper parser(m_arg);
     if (!goto_arg(parser, arg_name)) {
         // Argument not found, try to use default value.
@@ -72,14 +72,14 @@ std::string UCICommandContext::word_after(std::string_view arg_name,
         }
 
         // No argument and no default value, throw.
-        throw UCIBadCommandArgument(m_cmd_name, arg_name, "string");
+        throw BadCommandArgument(m_cmd_name, arg_name, "string");
     }
     // Argument found, return it.
     return std::string(parser.read_chunk());
 }
 
-i64 UCICommandContext::int_after(std::string_view arg_name,
-                                 std::optional<i64> default_val) const {
+i64 CommandContext::int_after(std::string_view arg_name,
+                              std::optional<i64> default_val) const {
     ParseHelper parser(m_arg);
     if (!goto_arg(parser, arg_name)) {
         // Argument not found, try to use default value.
@@ -88,7 +88,7 @@ i64 UCICommandContext::int_after(std::string_view arg_name,
         }
 
         // No argument and no default value, throw.
-        throw UCIBadCommandArgument(m_cmd_name, arg_name, "integer");
+        throw BadCommandArgument(m_cmd_name, arg_name, "integer");
     }
     // Argument found, try to parse it.
     std::string_view arg_word = parser.read_chunk();
@@ -99,11 +99,11 @@ i64 UCICommandContext::int_after(std::string_view arg_name,
         return value;
     }
     // Couldn't properly parse value.
-    throw UCIBadCommandArgument(m_cmd_name, arg_name, "integer");
+    throw BadCommandArgument(m_cmd_name, arg_name, "integer");
 }
 
-std::string UCICommandContext::all_after(std::string_view arg_name,
-                                         std::optional<std::string> default_val) const {
+std::string CommandContext::all_after(std::string_view arg_name,
+                                      std::optional<std::string> default_val) const {
     ParseHelper parser(m_arg);
     if (!goto_arg(parser, arg_name)) {
         // Argument not found, try to use default value.
@@ -112,23 +112,23 @@ std::string UCICommandContext::all_after(std::string_view arg_name,
         }
 
         // No argument and no default value, throw.
-        throw UCIBadCommandArgument(m_cmd_name, arg_name, "string");
+        throw BadCommandArgument(m_cmd_name, arg_name, "string");
     }
     // Argument found, return it.
     return std::string(parser.remainder());
 }
 
-UCICommandContext::UCICommandContext(UCIServer* server,
-                                     std::string_view command_name,
-                                     std::string_view arg)
+CommandContext::CommandContext(CLIApplication* server,
+                               std::string_view command_name,
+                               std::string_view arg)
     : m_cmd_name(std::string(command_name)), m_arg(std::string(arg)) { }
 
 
 //
-// UCIServer
+// CLIApplication
 //
 
-void UCIServer::handle(std::string_view command) {
+void CLIApplication::handle(std::string_view command) {
     try {
         // Try to find command handler.
         ParseHelper parser(command);
@@ -141,11 +141,11 @@ void UCIServer::handle(std::string_view command) {
         }
 
         // Command handler found, try to handle the command.
-        UCICommandHandler& handler = command_handler_it->second;
-        UCICommandContext context(this, command_name, parser.remainder());
+        CommandHandler& handler = command_handler_it->second;
+        CommandContext context(this, command_name, parser.remainder());
         handler(context);
     }
-    catch (const UCIBadCommandArgument& bad_arg) {
+    catch (const BadCommandArgument& bad_arg) {
         std::cerr << bad_arg.what() << std::endl;
     }
     catch (const std::exception& e) {
@@ -158,16 +158,16 @@ void UCIServer::handle(std::string_view command) {
     }
 }
 
-void UCIServer::register_command(const std::string& command,
-                                 const UCICommandHandler& handler) {
+void CLIApplication::register_command(const std::string& command,
+                                      const CommandHandler& handler) {
     m_cmd_handlers[command] = handler;
 }
 
-void UCIServer::set_error_handler(const UCIErrorHandler& error_handler) {
+void CLIApplication::set_error_handler(const ErrorHandler& error_handler) {
     m_err_handler = error_handler;
 }
 
-void UCIServer::serve(std::istream& in, std::ostream& out) {
+void CLIApplication::listen(std::istream& in, std::ostream& out) {
     while (!m_should_stop_serving || in.eof()) {
         std::string line;
         std::getline(in, line);
@@ -175,7 +175,7 @@ void UCIServer::serve(std::istream& in, std::ostream& out) {
     }
 }
 
-void UCIServer::stop_serving() {
+void CLIApplication::stop_listening() {
     m_should_stop_serving = true;
 }
 

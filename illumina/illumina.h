@@ -9,7 +9,6 @@
 #include "parsehelper.h"
 #include "perft.h"
 #include "search.h"
-#include "searchtree.h"
 #include "searchdefs.h"
 #include "staticlist.h"
 #include "types.h"
