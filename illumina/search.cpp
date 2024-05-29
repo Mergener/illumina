@@ -27,6 +27,11 @@ void init_search() {
     init_search_constants();
 }
 
+struct RootInfo {
+    std::vector<Move> moves;
+    Color color;
+};
+
 struct SearchNode {
     SearchNode* const parent = nullptr;
     const Depth ply = 0;
@@ -46,6 +51,7 @@ public:
     TimeManager&               time_manager() const;
     TranspositionTable&        tt() const;
     const Searcher::Listeners& listeners() const;
+    const RootInfo&            root_info() const;
 
     ui64 elapsed() const;
 
@@ -55,11 +61,13 @@ public:
     SearchContext(TranspositionTable* tt,
                   bool* should_stop,
                   const Searcher::Listeners* listeners,
+                  const RootInfo* root_info,
                   TimeManager* time_manager);
 
 private:
     TranspositionTable*        m_tt;
     const Searcher::Listeners* m_listeners;
+    const RootInfo*            m_root_info;
     bool*                      m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
@@ -84,10 +92,12 @@ inline const Searcher::Listeners& SearchContext::listeners() const {
 SearchContext::SearchContext(TranspositionTable* tt,
                              bool* should_stop,
                              const Searcher::Listeners* listeners,
+                             const RootInfo* root_info,
                              TimeManager* time_manager)
     : m_stop(should_stop),
       m_tt(tt), m_listeners(listeners),
       m_time_manager(time_manager),
+      m_root_info(root_info),
       m_search_start(now()) { }
 
 void SearchContext::stop_search() const {
@@ -96,6 +106,10 @@ void SearchContext::stop_search() const {
 
 TimeManager& SearchContext::time_manager() const {
     return *m_time_manager;
+}
+
+const RootInfo& SearchContext::root_info() const {
+    return *m_root_info;
 }
 
 struct WorkerResults {
@@ -234,6 +248,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* parent
     }
 
     // Setup some important values.
+    const RootInfo& root_info = m_context->root_info();
     TranspositionTable& tt = m_context->tt();
     Score original_alpha   = alpha;
     int n_searched_moves   = 0;
@@ -248,11 +263,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* parent
     // to use information gathered in other searches (or transpositions
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry);
+    bool found_in_tt = tt.probe(board_key, tt_entry, node.ply);
     if (found_in_tt) {
         hash_move = tt_entry.move();
 
-        if (tt_entry.depth() >= depth) {
+        if (!PV && tt_entry.depth() >= depth) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff. We found a TT entry that was searched in a depth higher or
                 // equal to ours, so we have an accurate score of this position and don't
@@ -307,6 +322,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* parent
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
+        if (ROOT &&
+            std::find(root_info.moves.begin(), root_info.moves.end(), move) == root_info.moves.end()) {
+            // Move not included in searchmoves, skip.
+            continue;
+        }
 
         // Late move pruning.
         if (alpha > -MATE_THRESHOLD &&
@@ -393,15 +413,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* parent
     // Store in transposition table.
     if (alpha >= beta) {
         // Beta-Cutoff, lowerbound score.
-        tt.try_store(board_key, best_move, alpha, depth, BT_LOWERBOUND);
+        tt.try_store(board_key, node.ply, best_move, alpha, depth, BT_LOWERBOUND);
     }
     else if (alpha <= original_alpha) {
         // Couldn't raise alpha, score is an upperbound.
-        tt.try_store(board_key, best_move, alpha, depth, BT_UPPERBOUND);
+        tt.try_store(board_key, node.ply, best_move, alpha, depth, BT_UPPERBOUND);
     }
     else {
         // We have an exact score.
-        tt.try_store(board_key, best_move, alpha, depth, BT_EXACT);
+        tt.try_store(board_key, node.ply, best_move, alpha, depth, BT_EXACT);
     }
 
     return alpha;
@@ -527,10 +547,28 @@ void SearchWorker::check_time_bounds() {
 
 SearchResults Searcher::search(const Board& board,
                                const SearchSettings& settings) {
+    // Create root info data.
+    RootInfo root_info;
+    root_info.color = board.color_to_move();
+
+    Move legal_moves[MAX_GENERATED_MOVES];
+    Move* end = generate_moves(board, &legal_moves[0]);
+    for (Move* it = &legal_moves[0]; it != end; ++it) {
+        Move move = *it;
+        if (settings.search_moves.has_value()) {
+            const std::vector<Move>& search_moves = settings.search_moves.value();
+            // Skip move if not included in search moves.
+            if (std::find(search_moves.begin(), search_moves.end(), move) == search_moves.end()) {
+                continue;
+            }
+        }
+        root_info.moves.push_back(move);
+    }
+
     // Create search context.
     m_stop = false;
     m_tt.new_search();
-    SearchContext context(&m_tt, &m_stop, &m_listeners, &m_tm);
+    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &m_tm);
 
     SearchWorker worker(true, board, &context, &settings);
 
