@@ -44,8 +44,8 @@ public:
     void clear();
     void resize(size_t new_size_bytes);
     void new_search();
-    bool probe(ui64 key, TranspositionTableEntry& entry);
-    void try_store(ui64 key, Move move, Score score, Depth depth, BoundType bound_type);
+    bool probe(ui64 key, TranspositionTableEntry& entry, Depth ply = 0);
+    void try_store(ui64 key, Depth ply, Move move, Score score, Depth depth, BoundType bound_type);
 
     explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
     ~TranspositionTable() = default;
