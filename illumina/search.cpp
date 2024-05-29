@@ -15,7 +15,6 @@ static void init_search_constants() {
     for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
         for (Depth d = 0; d < MAX_DEPTH; ++d) {
             s_lmr_table[m][d] = Depth(1.25 + std::log(d) * std::log(m) * 100.0 / 267.0);
-
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {
@@ -251,7 +250,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* parent
     if (found_in_tt) {
         hash_move = tt_entry.move();
 
-        if (tt_entry.depth() >= depth) {
+        if (!PV && tt_entry.depth() >= depth) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff. We found a TT entry that was searched in a depth higher or
                 // equal to ours, so we have an accurate score of this position and don't
