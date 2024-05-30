@@ -6,6 +6,7 @@
 #include "staticlist.h"
 #include "searchdefs.h"
 #include "movegen.h"
+#include "evaluation.h"
 
 #include <iostream>
 
@@ -81,6 +82,7 @@ private:
     const MovePickingStage m_end_stage;
     const Move  m_hash_move;
     const Depth m_ply;
+    const ui32  m_phase;
 
     void advance_stage();
 
@@ -319,7 +321,7 @@ inline MovePicker<QUIESCE>::MovePicker(const Board& board,
       m_hash_move(hash_move), m_mv_hist(&move_hist),
       m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
       m_curr_move_range({ &m_moves[0], &m_moves[0] }), m_moves_end(&m_moves[0]),
-      m_moves_it(&m_moves[0]) {
+      m_moves_it(&m_moves[0]), m_phase(evaluation_phase(board)) {
 }
 
 template<bool QUIESCE>
@@ -484,7 +486,21 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
     }
     else {
-        move.add_value(m_mv_hist->get_history_score(move));
+        Square source      = move.source();
+        Square destination = move.destination();
+        Piece source_piece = move.source_piece();
+
+        Score prev_sq_score = transition_eval_score(m_phase,
+                                                    mg_psqt_score(source_piece, source),
+                                                    eg_psqt_score(source_piece, source));
+
+        Score new_sq_score = transition_eval_score(m_phase,
+                                                   mg_psqt_score(source_piece, destination),
+                                                   eg_psqt_score(source_piece, destination));
+
+        move.add_value(new_sq_score - prev_sq_score);
+
+        move.add_value(m_mv_hist->get_history_score(move) * 8);
     }
 }
 

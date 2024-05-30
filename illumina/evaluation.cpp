@@ -2,39 +2,13 @@
 
 namespace illumina {
 
-constexpr int START_PHASE = 9 * 2  +
-                            5 * 4 +
-                            3 * 4 +
-                            3 * 4 +
-                            1 * 16;
-
-static int compute_phase(const Board& board) {
-
-    int phase_pawns   = int(popcount(board.piece_type_bb(PT_PAWN)) * 1);
-    int phase_knights = int(popcount(board.piece_type_bb(PT_KNIGHT)) * 3);
-    int phase_bishops = int(popcount(board.piece_type_bb(PT_BISHOP)) * 3);
-    int phase_rooks   = int(popcount(board.piece_type_bb(PT_ROOK)) * 5);
-    int phase_queens  = int(popcount(board.piece_type_bb(PT_QUEEN)) * 9);
-
-    return phase_pawns  + phase_knights
-           + phase_bishops + phase_rooks
-           + phase_queens;
-}
-
-static Score transition_score(int phase, Score mg, Score eg) {
-    int mg_phase = phase;
-    int eg_phase = START_PHASE - phase;
-
-    return (mg * mg_phase + eg * eg_phase) / START_PHASE;
-}
-
 template <Color C>
 static Score count_material(const Board& board, int phase) {
-    Score pawn_value   = transition_score(phase, 82, 94);
-    Score knight_value = transition_score(phase, 281, 337);
-    Score bishop_value = transition_score(phase, 297, 365);
-    Score rook_value   = transition_score(phase, 477, 552);
-    Score queen_value  = transition_score(phase, 936, 1025);
+    Score pawn_value   = transition_eval_score(phase, 82, 94);
+    Score knight_value = transition_eval_score(phase, 281, 337);
+    Score bishop_value = transition_eval_score(phase, 297, 365);
+    Score rook_value   = transition_eval_score(phase, 477, 552);
+    Score queen_value  = transition_eval_score(phase, 936, 1025);
 
     return Score(popcount(board.piece_bb(Piece(C, PT_PAWN))) * pawn_value)
          + Score(popcount(board.piece_bb(Piece(C, PT_KNIGHT))) * knight_value)
@@ -195,6 +169,22 @@ static const Score* psts_eg[] = {
     king_pst_eg
 };
 
+Score mg_psqt_score(Piece p, Square square) {
+    if (p.color() == CL_WHITE) {
+        square = mirror_vertical(square);
+    }
+
+    return psts_mg[p.type()][square];
+}
+
+Score eg_psqt_score(Piece p, Square square) {
+    if (p.color() == CL_WHITE) {
+        square = mirror_vertical(square);
+    }
+
+    return psts_eg[p.type()][square];
+}
+
 template <Color C, PieceType PT>
 static Score count_positional(const Board& board, int phase) {
     Bitboard bb = board.piece_bb(Piece(C, PT));
@@ -210,7 +200,7 @@ static Score count_positional(const Board& board, int phase) {
         Score mg = psts_mg[PT][s];
         Score eg = psts_eg[PT][s];
 
-        total += transition_score(phase, mg, eg);
+        total += transition_eval_score(phase, mg, eg);
 
         bb = unset_lsb(bb);
     }
@@ -221,7 +211,7 @@ static Score count_positional(const Board& board, int phase) {
 void Evaluation::on_new_board(const Board& board) {
     m_ctm = board.color_to_move();
     Score white_eval = 0;
-    int phase = compute_phase(board);
+    int phase = evaluation_phase(board);
 
     white_eval += count_material<CL_WHITE>(board, phase) - count_material<CL_BLACK>(board, phase);
 
