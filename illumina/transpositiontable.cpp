@@ -31,7 +31,8 @@ void TranspositionTableEntry::replace(ui64 key,
                                       Depth depth,
                                       BoundType bound_type,
                                       ui8 generation) {
-    m_key   = key;
+    m_key_low = key & 0xFFFFFFFF;
+    m_key_hi  = key >> 32;
     m_move  = move;
     m_score = score;
 
