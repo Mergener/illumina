@@ -19,7 +19,8 @@ public:
     Depth     depth() const;
 
 private:
-    ui64 m_key;
+    ui32 m_key_low;
+    ui32 m_key_hi;
     Move m_move;
 
     // m_info  encoding:
@@ -29,7 +30,7 @@ private:
     //  11-18: depth
     ui32 m_info;
 
-    Score m_score;
+    i16 m_score;
 
     void replace(ui64 key, Move move,
                  Score score, Depth depth,
@@ -63,7 +64,7 @@ private:
 };
 
 inline ui64 TranspositionTableEntry::key() const {
-    return m_key;
+    return ui64(m_key_low) | (ui64(m_key_hi) << 32);
 }
 
 inline Move TranspositionTableEntry::move() const {
