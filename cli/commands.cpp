@@ -7,29 +7,29 @@
 
 namespace illumina {
 
-void register_commands(UCIServer& server) {
-    server.register_command("uci", [](const UCICommandContext& ctx) {
+void register_commands(CLIApplication& server) {
+    server.register_command("uci", [](const CommandContext& ctx) {
         global_state().uci();
     });
 
-    server.register_command("setoption", [](const UCICommandContext& ctx) {
+    server.register_command("setoption", [](const CommandContext& ctx) {
         std::string opt_name  = ctx.word_after("name");
         std::string value_str = ctx.word_after("value");
 
         global_state().set_option(opt_name, value_str);
     });
 
-    server.register_command("option", [](const UCICommandContext& ctx) {
+    server.register_command("option", [](const CommandContext& ctx) {
         std::string opt_name  = ctx.word_after("");
 
         global_state().display_option_value(opt_name);
     });
 
-    server.register_command("ucinewgame", [](const UCICommandContext& ctx) {
+    server.register_command("ucinewgame", [](const CommandContext& ctx) {
         global_state().new_game();
     });
 
-    server.register_command("position", [](const UCICommandContext& ctx) {
+    server.register_command("position", [](const CommandContext& ctx) {
         bool read_only = true;
         Board board;
         if (ctx.has_arg("startpos")) {
@@ -69,7 +69,7 @@ void register_commands(UCIServer& server) {
         global_state().set_board(board);
     });
 
-    server.register_command("domoves", [](const UCICommandContext& ctx) {
+    server.register_command("domoves", [](const CommandContext& ctx) {
         Board board = global_state().board();
         std::vector<Move> moves;
         std::string move_list_str = ctx.all_after("");
@@ -84,19 +84,23 @@ void register_commands(UCIServer& server) {
         global_state().set_board(board);
     });
 
-    server.register_command("perft", [](const UCICommandContext& ctx) {
+    server.register_command("perft", [](const CommandContext& ctx) {
         global_state().perft(int(ctx.int_after("")));
     });
 
-    server.register_command("isready", [](const UCICommandContext& ctx) {
+    server.register_command("mperft", [](const CommandContext& ctx) {
+        global_state().mperft(int(ctx.int_after("")));
+    });
+
+    server.register_command("isready", [](const CommandContext& ctx) {
         global_state().check_if_ready();
     });
 
-    server.register_command("evaluate", [](const UCICommandContext& ctx) {
+    server.register_command("evaluate", [](const CommandContext& ctx) {
         global_state().evaluate();
     });
 
-    server.register_command("go", [](const UCICommandContext& ctx) {
+    server.register_command("go", [](const CommandContext& ctx) {
         SearchSettings settings;
         settings.max_depth = ctx.int_after("depth", MAX_DEPTH);
 
@@ -120,14 +124,30 @@ void register_commands(UCIServer& server) {
             settings.move_time = ctx.int_after("movetime");
         }
 
+        if (ctx.has_arg("searchmoves")) {
+            // Parse all searchmoves.
+            std::vector<Move> search_moves;
+            std::string search_moves_str = ctx.all_after("searchmoves");
+            ParseHelper parser(search_moves_str);
+            const Board& board = global_state().board();
+            while (!parser.finished()) {
+                Move move = Move::parse_uci(board, parser.read_chunk());
+                if (move == MOVE_NULL) {
+                    break;
+                }
+                search_moves.push_back(move);
+            }
+            settings.search_moves = search_moves;
+        }
+
         global_state().search(settings);
     });
 
-    server.register_command("stop", [](const UCICommandContext& ctx) {
+    server.register_command("stop", [](const CommandContext& ctx) {
         global_state().stop_search();
     });
 
-    server.register_command("quit", [](const UCICommandContext& ctx) {
+    server.register_command("quit", [](const CommandContext& ctx) {
         global_state().quit();
     });
 

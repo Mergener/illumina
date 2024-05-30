@@ -1,7 +1,7 @@
 #include "state.h"
 
 #include "movepicker.h"
-#include "uciserver.h"
+#include "cliapplication.h"
 #include "evaluation.h"
 #include "transpositiontable.h"
 
@@ -53,6 +53,10 @@ void State::set_board(const Board& board) {
 
 void State::perft(int depth) const {
     illumina::perft(m_board, depth, { true });
+}
+
+void State::mperft(int depth) const {
+    illumina::move_picker_perft(m_board, depth, { true });
 }
 
 void State::uci() {

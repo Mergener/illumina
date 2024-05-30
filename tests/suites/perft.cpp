@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "movepicker.h"
 #include "perft.h"
 
 using namespace litetest;
@@ -17,9 +18,13 @@ TEST_CASE(Perft) {
         void run() {
             Board board(fen);
 
-            for (int depth = 1; depth <= std::min(expected_result.size(), size_t(3)); ++depth) {
+            for (int depth = 1; depth <= std::min(expected_result.size(), size_t(5)); ++depth) {
                 ui64 res = perft(board, depth, { false });
                 EXPECT(int(res)).to_be(int(expected_result[depth - 1]));
+
+                if (depth <= 3) {
+                    EXPECT(int(move_picker_perft(board, depth))).to_be(expected_result[depth - 1]);
+                }
             }
         }
     } tests[] = {
@@ -149,6 +154,7 @@ TEST_CASE(Perft) {
         { "n1n5/1Pk5/8/8/8/8/5Kp1/5N1N b - - 0 1", { 24, 421, 7421, 124608, 2193768, 37665329} }, 
         { "8/PPPk4/8/8/8/8/4Kppp/8 b - - 0 1", { 18, 270, 4699, 79355, 1533145, 28859283} }, 
         { "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1", { 24, 496, 9483, 182838, 3605103, 71179139 ,} },
+        { "7r/6p1/3p2pp/pn4k1/3P3P/P2BP3/1r3PP1/3RK2R b K h3 0 19", { 3, 79, 1923, 47727, 1220714, 29831371,} },
     };
 
     for (auto& test: tests) {

@@ -43,10 +43,10 @@ using Bitboard       = ui64;
 using Color          = ui8;
 using Side           = ui8;
 using CastlingRights = ui8;
-using BoardRank      = ui8;
-using BoardFile      = ui8;
-using Direction      = i8;
-using Square         = ui8;
+using BoardRank      = int;
+using BoardFile      = int;
+using Direction      = int;
+using Square         = int;
 using PieceType      = ui8;
 using MoveType       = ui8;
 
@@ -163,6 +163,9 @@ inline ui8 msb(ui64 n) {
 constexpr ui64 unset_lsb(ui64 x) {
     return x & (x - 1);
 }
+
+inline constexpr Bitboard DARK_SQUARES  = 0xaa55aa55aa55aa55ULL;
+inline constexpr Bitboard LIGHT_SQUARES = ~DARK_SQUARES;
 
 //
 // Colors
@@ -578,8 +581,8 @@ constexpr PieceType PIECE_TYPES[] = {
 };
 
 constexpr PieceType PROMOTION_PIECE_TYPES[] = {
-    PT_KNIGHT, PT_BISHOP,
-    PT_ROOK,   PT_QUEEN
+    PT_QUEEN,  PT_ROOK,
+    PT_BISHOP, PT_KNIGHT,
 };
 
 constexpr char piece_type_to_char(PieceType pt) {
@@ -800,7 +803,7 @@ constexpr Square Move::castles_rook_src_square() const {
     return make_square(castles_rook_src_file(), square_rank(source()));
 }
 
-constexpr Square Move::castles_side() const     {
+constexpr Side Move::castles_side() const     {
     return (m_data >> 29) & BITMASK(1);
 }
 

@@ -5,6 +5,8 @@
 #include <string_view>
 #include <stdexcept>
 
+#include "types.h"
+
 namespace illumina {
 
 template <typename T = int, typename T_BASE = T>
@@ -68,6 +70,29 @@ T parse_int(std::string_view sv, T_BASE base = 10) {
 
     return ret;
 }
+
+i64    random(i64 min_inclusive, i64 max_exclusive);
+ui64   random(ui64 min_inclusive, ui64 max_exclusive);
+i32    random(i32 min_inclusive, i32 max_exclusive);
+ui32   random(ui32 min_inclusive, ui32 max_exclusive);
+float  random(float min, float max);
+double random(double min, double max);
+
+inline float  random_float_01() { return random(0.0f, 1.0f); }
+inline double random_double_01() { return random(0.0, 1.0); }
+
+inline bool random_bool() {
+    return random(0, 2);
+}
+
+inline Square random_square() {
+    return random(0, SQ_COUNT);
+}
+
+inline Color random_color() {
+    return random(0, CL_COUNT);
+}
+
 
 } // illumina
 

@@ -22,13 +22,11 @@ constexpr Depth MAX_DEPTH        = 128;
  * Limited by the number of bits dedicated to store the score
  * in a TT entry (currently 22).
  */
-constexpr Score SCORE_UPPERBOUND = BITMASK(20);
 constexpr Score MAX_SCORE        = 32005;
 constexpr Score MATE_SCORE       = MAX_SCORE - 1;
 constexpr Score MATE_THRESHOLD   = MATE_SCORE - 1024;
 
-static_assert(SCORE_UPPERBOUND < BITMASK(sizeof(Score) * 8));
-static_assert(MAX_SCORE        <= SCORE_UPPERBOUND);
+static_assert(MAX_SCORE        <= INT16_MAX);
 static_assert(MATE_SCORE       < MAX_SCORE);
 static_assert(MATE_THRESHOLD   < MATE_SCORE);
 

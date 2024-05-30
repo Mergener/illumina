@@ -98,10 +98,10 @@ static void initialize_adjacent() {
         BoardFile f = square_file(s);
 
         if (f > FL_A) {
-            bb = set_bit(bb, s + DIR_EAST);
+            bb = set_bit(bb, s + DIR_WEST);
         }
         if (f < FL_H) {
-            bb = set_bit(bb, s + DIR_WEST);
+            bb = set_bit(bb, s + DIR_EAST);
         }
 
         g_adjacent[s] = bb;
@@ -213,7 +213,7 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
     }
     else if (src_piece.type() == PT_KING) {
         // For king moves, we must differentiate between regular moves
-        // or castles. Also, we have two supported encondings for castling:
+        // or castles. Also, we have two supported encodings for castling:
         //
         //  Encoding a: dst square is destination. Used for standard chess castling (e1g1, e1c1, e8c8, e8g8).
         //  Encoding b: dst square is castle rook source square. Used for FRC or standard.

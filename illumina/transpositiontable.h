@@ -19,7 +19,8 @@ public:
     Depth     depth() const;
 
 private:
-    ui64 m_key;
+    ui32 m_key_low;
+    ui32 m_key_hi;
     Move m_move;
 
     // m_info  encoding:
@@ -29,7 +30,7 @@ private:
     //  11-18: depth
     ui32 m_info;
 
-    Score m_score;
+    i16 m_score;
 
     void replace(ui64 key, Move move,
                  Score score, Depth depth,
@@ -44,8 +45,8 @@ public:
     void clear();
     void resize(size_t new_size_bytes);
     void new_search();
-    bool probe(ui64 key, TranspositionTableEntry& entry);
-    void try_store(ui64 key, Move move, Score score, Depth depth, BoundType bound_type);
+    bool probe(ui64 key, TranspositionTableEntry& entry, Depth ply = 0);
+    void try_store(ui64 key, Depth ply, Move move, Score score, Depth depth, BoundType bound_type);
 
     explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
     ~TranspositionTable() = default;
@@ -63,7 +64,7 @@ private:
 };
 
 inline ui64 TranspositionTableEntry::key() const {
-    return m_key;
+    return ui64(m_key_low) | (ui64(m_key_hi) << 32);
 }
 
 inline Move TranspositionTableEntry::move() const {
