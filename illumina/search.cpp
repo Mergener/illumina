@@ -307,6 +307,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
+    // Internal iterative reductions.
+    if (depth >= 4 && !found_in_tt) {
+        depth--;
+    }
+
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     bool has_legal_moves = false;
