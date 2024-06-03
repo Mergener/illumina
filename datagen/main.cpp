@@ -12,7 +12,6 @@ constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
 constexpr Score HI_SCORE            = 6000;
 constexpr int MAX_HI_SCORE_PLIES    = 6;
 constexpr size_t POSITIONS_PER_GAME = 15;
-//constexpr size_t MAX_BYTES       = 2000;
 
 struct GamePlyData {
     Score white_pov_score;
@@ -23,6 +22,13 @@ struct Game {
     std::string outcome; // 0.5 for draw, 1.0 for white win, 0 for black win.
     Board start_pos;
     std::vector<GamePlyData> ply_data;
+};
+
+struct OutputTuple {
+    Score white_pov_score;
+    Move best_move;
+    std::string fen;
+    std::string wdl;
 };
 
 Game simulate() {
@@ -121,15 +127,10 @@ void generate_data() {
     while (bytes < MAX_BYTES) {
         Game game = simulate();
         Board board = game.start_pos;
-        std::vector<GamePlyData> ply_data_vec = game.ply_data;
-        std::shuffle(ply_data_vec.begin(), ply_data_vec.end(), g);
+        const std::vector<GamePlyData>& ply_data_vec = game.ply_data;
+        std::vector<OutputTuple> out_tuples;
 
-        size_t n = 0;
         for (const GamePlyData& ply_data: ply_data_vec) {
-            if (n >= POSITIONS_PER_GAME) {
-                break;
-            }
-
             if (board.in_check() ||
                 board.last_move().is_capture() ||
                 is_mate_score(ply_data.white_pov_score)) {
@@ -137,18 +138,24 @@ void generate_data() {
                 continue;
             }
 
+            out_tuples.push_back({ ply_data.white_pov_score, ply_data.best_move, board.fen(), game.outcome });
+
+            board.make_move(ply_data.best_move);
+        }
+
+        std::shuffle(out_tuples.begin(), out_tuples.end(), g);
+        for (size_t i = 0; i < std::min(out_tuples.size(), POSITIONS_PER_GAME); ++i) {
+            const OutputTuple& out_tuple = out_tuples[i];
+
             std::stringstream ss;
-            ss << ply_data.best_move.to_uci() << ','
-               << board.fen()              << ','
-               << ply_data.white_pov_score << ','
-               << game.outcome << std::endl;
+            ss << out_tuple.best_move.to_uci() << ','
+               << out_tuple.fen                << ','
+               << out_tuple.white_pov_score    << ','
+               << out_tuple.wdl << std::endl;
 
             std::string s = ss.str();
             bytes += s.size();
             std::cout << s;
-
-            board.make_move(ply_data.best_move);
-            n++;
         }
     }
 }
