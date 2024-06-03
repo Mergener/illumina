@@ -274,6 +274,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
+    // Check extensions.
+    if (in_check) {
+        depth++;
+    }
+
     if (depth <= 0) {
         return quiescence_search(ply, alpha, beta);
     }
@@ -415,8 +420,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
 void SearchWorker::aspiration_windows() {
     // Prepare the search stack.
-    SearchNode search_stack[MAX_DEPTH];
-    for (Depth ply = 0; ply < MAX_DEPTH; ++ply) {
+    constexpr size_t STACK_SIZE = MAX_DEPTH + 64;
+    SearchNode search_stack[STACK_SIZE];
+    for (Depth ply = 0; ply < STACK_SIZE; ++ply) {
         SearchNode& node = search_stack[ply];
         node.ply = ply;
     }
