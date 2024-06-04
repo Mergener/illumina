@@ -208,6 +208,12 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     MovePicker<true> move_picker(m_board, ply, m_hist);
     SearchMove move;
     while ((move = move_picker.next()) != MOVE_NULL) {
+        // SEE pruning.
+        if (move_picker.stage() >= MPS_BAD_CAPTURES &&
+            !has_good_see(m_board, move.source(), move.destination(), -2)) {
+            continue;
+        }
+
         make_move(move);
         Score score = -quiescence_search(ply + 1, -beta, -alpha);
         undo_move();
