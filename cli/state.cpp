@@ -90,7 +90,6 @@ void State::set_option(std::string_view opt_name,
 }
 
 void State::check_if_ready() {
-    while (m_searching);
     std::cout << "readyok" << std::endl;
 }
 
