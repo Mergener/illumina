@@ -435,7 +435,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
 void SearchWorker::aspiration_windows() {
     // Prepare the search stack.
-    constexpr size_t STACK_SIZE = MAX_DEPTH + 64;
+    constexpr size_t STACK_SIZE = 2 * MAX_DEPTH + 64;
     SearchNode search_stack[STACK_SIZE];
     for (Depth ply = 0; ply < STACK_SIZE; ++ply) {
         SearchNode& node = search_stack[ply];
