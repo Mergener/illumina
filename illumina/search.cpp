@@ -280,7 +280,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Check extensions.
-    if (in_check) {
+    if (in_check && ply < MAX_DEPTH) {
         depth++;
     }
 
