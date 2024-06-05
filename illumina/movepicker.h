@@ -238,17 +238,17 @@ void MovePicker<QUIESCE>::generate_noisy_evasions() {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_killer_moves() {
-    int n_killers;
     SearchMove* begin = m_moves_end;
 
     auto& killers = m_mv_hist->killers(m_ply);
-    for (n_killers = 0; n_killers < 2; ++n_killers) {
-        Move killer = killers[n_killers];
+    size_t n_killers = 0;
+    for (size_t i = 0; i < 2; ++i) {
+        Move killer = killers[i];
         if (!m_board->is_move_pseudo_legal(killer)
             || (m_board->in_check() && !m_board->is_move_legal(killer))) {
-            break;
+            continue;
         }
-        begin[n_killers] = killer;
+        begin[n_killers++] = killer;
     }
 
     m_moves_end += n_killers;
