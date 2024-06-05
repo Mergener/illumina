@@ -344,6 +344,16 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         make_move(move);
 
+        // Futility pruning.
+        if (depth <= 6 &&
+            !in_check  &&
+            !m_board.in_check() &&
+            move.is_quiet() &&
+            (static_eval + 80) < alpha) {
+            undo_move();
+            continue;
+        }
+
         // Late move reductions.
         Depth reductions = 0;
         if (n_searched_moves >= 1 &&
