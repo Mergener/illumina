@@ -44,6 +44,7 @@ private:
     Searcher         m_searcher;
     std::thread*     m_search_thread = nullptr;
     bool             m_searching = false;
+    TimePoint        m_search_start;
 
     void setup_searcher();
     void register_options();
