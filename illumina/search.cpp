@@ -564,6 +564,12 @@ void SearchWorker::report_pv_results() {
         m_results.ponder_move = pv_results.line[1];
     }
 
+    if (m_main) {
+        m_context->time_manager().on_new_pv(pv_results.depth,
+                                            pv_results.best_move,
+                                            pv_results.score);
+    }
+
     m_context->listeners().pv_finish(pv_results);
 }
 
