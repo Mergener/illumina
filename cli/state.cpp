@@ -1,6 +1,5 @@
 #include "state.h"
 
-#include "movepicker.h"
 #include "cliapplication.h"
 #include "evaluation.h"
 #include "transpositiontable.h"

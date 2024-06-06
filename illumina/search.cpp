@@ -387,7 +387,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);
-                m_hist.increment_history_score(move, depth);
+                m_hist.update_quiet_history(move, depth, true);
             }
 
             if (ROOT && m_main && (!should_stop() || depth <= 2)) {

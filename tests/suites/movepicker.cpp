@@ -124,7 +124,7 @@ void test_move_picker() {
                     // Save all history.
                     for (auto& h: history) {
                         auto [depth, src, dest] = h;
-                        mv_hist.increment_history_score(Move::new_normal(src, dest, WHITE_QUEEN), depth);
+                        mv_hist.update_quiet_history(Move::new_normal(src, dest, WHITE_QUEEN), depth);
                     }
                 }
             }
@@ -161,7 +161,7 @@ void test_move_picker() {
                     for (int i = 0; i < 100; ++i) {
                         // Pick a move.
                         Move move = validation_moves[random(size_t(0), n_expected_moves)];
-                        mv_hist.increment_history_score(move, random(1, 15));
+                        mv_hist.update_quiet_history(move, random(1, 15));
                     }
                 }
                 else {
