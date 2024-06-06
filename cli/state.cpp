@@ -171,6 +171,8 @@ void State::search(SearchSettings settings) {
         delete m_search_thread;
     }
 
+    settings.contempt = m_options.option<UCIOptionSpin>("Contempt").value();
+
     m_search_thread = new std::thread([this, settings]() {
         try {
             m_search_start = Clock::now();
@@ -211,6 +213,7 @@ void State::register_options() {
 
     m_options.register_option<UCIOptionSpin>("Thread", 1, 1, 1);
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, 1);
+    m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
 }
 
 State::State() {

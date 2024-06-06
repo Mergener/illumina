@@ -153,6 +153,8 @@ private:
     void undo_null_move();
 
     void report_pv_results();
+
+    Score draw_score() const;
 };
 
 inline void SearchWorker::make_move(Move move) {
@@ -239,12 +241,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     m_results.nodes++;
     m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
 
+    check_time_bounds();
     if (should_stop()) {
         return alpha;
     }
 
     if (!ROOT && (m_board.is_repetition_draw(2) || (m_board.rule50() >= 100) || m_board.is_insufficient_material_draw())) {
-        return 0;
+        return draw_score();
     }
 
     // Setup some important values.
@@ -594,6 +597,12 @@ void SearchWorker::check_time_bounds() {
     if (m_context->time_manager().finished_hard()) {
         m_context->stop_search();
     }
+}
+
+Score SearchWorker::draw_score() const {
+    return m_board.color_to_move() == m_context->root_info().color
+        ? -m_settings->contempt
+        :  m_settings->contempt;
 }
 
 SearchResults Searcher::search(const Board& board,
