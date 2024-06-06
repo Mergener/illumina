@@ -255,24 +255,6 @@ UCIOptionButton::UCIOptionButton(std::string name)
 // UCIOptionManager
 //
 
-UCIOption& UCIOptionManager::option(std::string_view name) {
-    std::string name_str = std::string(name);
-    auto it = m_options.find(name_str);
-    if (it == m_options.end()) {
-        throw std::out_of_range("Option not found: " + name_str);
-    }
-    return *it->second;
-}
-
-const UCIOption& UCIOptionManager::option(std::string_view name) const {
-    std::string name_str = std::string(name);
-    auto it = m_options.find(name_str);
-    if (it == m_options.end()) {
-        throw std::out_of_range("Option not found: " + name_str);
-    }
-    return *it->second;
-}
-
 UCIOptionManager::OptionList UCIOptionManager::list_options() const {
     OptionList list;
     for (const auto& pair: m_options) {

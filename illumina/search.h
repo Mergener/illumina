@@ -24,6 +24,7 @@ struct PVResults {
 };
 
 struct SearchSettings {
+    Score contempt = 0;
     std::optional<Depth> max_depth;
     std::optional<i64>   white_time;
     std::optional<i64>   white_inc;
