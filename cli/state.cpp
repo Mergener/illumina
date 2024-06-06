@@ -99,11 +99,17 @@ void State::evaluate() const {
 }
 
 static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& line) {
-    for (Move m: line) {
+    if (line.empty()) {
+        return stream;
+    }
+
+    std::cout << line[0].to_uci();
+    for (auto it = line.begin() + 1; it != line.end(); ++it) {
+        Move m = *it;
         if (m == MOVE_NULL) {
             break;
         }
-        stream << m.to_uci() << ' ';
+        stream << ' ' << m.to_uci();
     }
     return stream;
 }
@@ -126,15 +132,30 @@ static std::string bound_type_string(BoundType boundType) {
 }
 
 void State::setup_searcher() {
-    m_searcher.set_pv_finish_listener([](const PVResults& res) {
+    m_searcher.set_currmove_listener([this](Depth depth, Move move, int move_num) {
+        if (depth < 6 || delta_ms(Clock::now(), m_search_start) <= 3000) {
+            // Don't flood stdout on the first few seconds.
+            return;
+        }
+
         std::cout << "info"
-                  << " depth " << res.depth
-                  << " score " << score_string(res.score)
+                  << " depth "       << depth
+                  << " currmove "    << move.to_uci()
+                  << " currmovenumber " << move_num
+                  << std::endl;
+    });
+
+    m_searcher.set_pv_finish_listener([this](const PVResults& res) {
+        std::cout << "info"
+                  << " depth "    << res.depth
+                  << " seldepth " << res.sel_depth
+                  << " score "    << score_string(res.score)
                   << bound_type_string(res.bound_type)
-                  << " pv "    << res.line
-                  << "nodes "  << res.nodes
-                  << " nps "   << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
-                  << " time "  << res.time
+                  << " pv "       << res.line
+                  << " hashfull " << m_searcher.tt().hash_full()
+                  << " nodes "    << res.nodes
+                  << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
+                  << " time "     << res.time
                   << std::endl;
     });
 }
@@ -152,9 +173,16 @@ void State::search(SearchSettings settings) {
 
     m_search_thread = new std::thread([this, settings]() {
         try {
+            m_search_start = Clock::now();
             SearchResults results = m_searcher.search(m_board, settings);
 
-            std::cout << "bestmove " << results.best_move.to_uci() << std::endl;
+            std::cout << "bestmove " << results.best_move.to_uci();
+
+            if (results.ponder_move != MOVE_NULL) {
+                std::cout << " ponder " << results.ponder_move.to_uci();
+            }
+
+            std::cout << std::endl;
 
             m_searching = false;
         }
@@ -180,6 +208,9 @@ void State::register_options() {
             const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
             m_searcher.tt().resize(spin.value() * 1024 * 1024);
         });
+
+    m_options.register_option<UCIOptionSpin>("Thread", 1, 1, 1);
+    m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, 1);
 }
 
 State::State() {

@@ -103,9 +103,11 @@ const RootInfo& SearchContext::root_info() const {
 }
 
 struct WorkerResults {
-    Move  best_move = MOVE_NULL;
-    Score score     = 0;
-    ui64  nodes     = 0;
+    Move  best_move   = MOVE_NULL;
+    Move  ponder_move = MOVE_NULL;
+    Score score       = 0;
+    Depth sel_depth   = 0;
+    ui64  nodes       = 0;
     BoundType bound_type = BT_EXACT;
 };
 
@@ -132,6 +134,8 @@ private:
     Board       m_board;
     bool        m_main;
     Depth       m_curr_depth;
+    Move        m_curr_move;
+    int         m_curr_move_number = 0;
 
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
@@ -148,7 +152,7 @@ private:
     void make_null_move();
     void undo_null_move();
 
-    void update_results();
+    void report_pv_results();
 };
 
 inline void SearchWorker::make_move(Move move) {
@@ -233,6 +237,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
     m_results.nodes++;
+    m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
 
     if (should_stop()) {
         return alpha;
@@ -323,15 +328,29 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         depth--;
     }
 
+    if (ROOT && m_main) {
+        m_curr_move_number = 0;
+    }
+
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
+
+        // Skip moves not included in searchmoves argument.
         if (ROOT &&
             std::find(root_info.moves.begin(), root_info.moves.end(), move) == root_info.moves.end()) {
-            // Move not included in searchmoves, skip.
             continue;
+        }
+
+        // Report 'currmove' and 'currmovenumber'.
+        if (ROOT && m_main) {
+            m_curr_move_number++;
+            m_curr_move = move;
+            m_context->listeners().curr_move_listener(m_curr_depth,
+                                                      m_curr_move,
+                                                      m_curr_move_number);
         }
 
         // SEE pruning.
@@ -464,7 +483,7 @@ void SearchWorker::aspiration_windows() {
             // We found an exact score within our bounds, finish
             // the current depth search.
             m_results.bound_type = BT_EXACT;
-            update_results();
+            report_pv_results();
             break;
         }
 
@@ -482,7 +501,7 @@ void SearchWorker::aspiration_windows() {
             prev_score = score;
             best_move  = m_results.best_move;
             m_results.bound_type = BT_LOWERBOUND;
-            update_results();
+            report_pv_results();
         }
 
         check_time_bounds();
@@ -491,32 +510,33 @@ void SearchWorker::aspiration_windows() {
     }
 }
 
-void SearchWorker::update_results() {
+void SearchWorker::report_pv_results() {
     if (!m_main) {
         return;
     }
 
-    PVResults results;
+    PVResults pv_results;
 
-    results.depth      = m_curr_depth;
-    results.best_move  = m_results.best_move;
-    results.score      = m_results.score;
-    results.nodes      = m_results.nodes;
-    results.time       = m_context->elapsed();
-    results.bound_type = m_results.bound_type;
+    pv_results.depth      = m_curr_depth;
+    pv_results.sel_depth  = m_results.sel_depth;
+    pv_results.best_move  = m_results.best_move;
+    pv_results.score      = m_results.score;
+    pv_results.nodes      = m_results.nodes;
+    pv_results.time       = m_context->elapsed();
+    pv_results.bound_type = m_results.bound_type;
 
     // Extract the PV line.
-    results.line.push_back(m_results.best_move);
+    pv_results.line.push_back(m_results.best_move);
     m_board.make_move(m_results.best_move);
 
-    TranspositionTableEntry tt_entry;
+    TranspositionTableEntry tt_entry {};
     while (m_context->tt().probe(m_board.hash_key(), tt_entry)) {
         Move move = tt_entry.move();
         if (move == MOVE_NULL) {
             break;
         }
 
-        results.line.push_back(tt_entry.move());
+        pv_results.line.push_back(tt_entry.move());
         m_board.make_move(tt_entry.move());
 
         if (m_board.is_repetition_draw()) {
@@ -524,11 +544,15 @@ void SearchWorker::update_results() {
         }
     }
 
-    for (Move _: results.line) {
+    for (Move _: pv_results.line) {
         m_board.undo_move();
     }
 
-    m_context->listeners().pv_finish(results);
+    if (pv_results.line.size() >= 2) {
+        m_results.ponder_move = pv_results.line[1];
+    }
+
+    m_context->listeners().pv_finish(pv_results);
 }
 
 void SearchWorker::iterative_deepening() {
@@ -608,8 +632,9 @@ SearchResults Searcher::search(const Board& board,
     const WorkerResults& worker_results = worker.results();
 
     SearchResults results {};
-    results.score     = worker_results.score;
-    results.best_move = worker_results.best_move;
+    results.score       = worker_results.score;
+    results.best_move   = worker_results.best_move;
+    results.ponder_move = worker_results.ponder_move;
 
     return results;
 }

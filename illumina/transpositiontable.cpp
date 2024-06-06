@@ -67,7 +67,13 @@ void TranspositionTable::try_store(ui64 key,
                                    BoundType bound_type) {
     TranspositionTableEntry& entry = entry_ref(key);
 
-    if (!entry.valid() || entry.generation() != m_gen) {
+    if (!entry.valid()) {
+        entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
+        m_entry_count++;
+        return;
+    }
+
+    if (entry.generation() != m_gen) {
         entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
         return;
     }
@@ -88,23 +94,25 @@ void TranspositionTable::try_store(ui64 key,
 }
 
 void TranspositionTable::clear() {
-    std::memset(m_buf.get(), 0, m_n_entries * sizeof(TranspositionTableEntry));
+    std::memset(m_buf.get(), 0, m_max_entry_count * sizeof(TranspositionTableEntry));
+    m_entry_count = 0;
 }
 
 inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
-    return m_buf[key % m_n_entries];
+    return m_buf[key % m_max_entry_count];
 }
 
 void TranspositionTable::resize(size_t new_size) {
     try {
-        if (new_size == m_size && m_buf != nullptr) {
+        if (new_size == m_size_in_bytes && m_buf != nullptr) {
             return;
         }
 
         size_t new_n_entries = new_size / sizeof(TranspositionTableEntry);
         auto new_buf         = std::make_unique<TranspositionTableEntry[]>(new_n_entries);
         m_buf                = std::move(new_buf);
-        m_n_entries          = new_n_entries;
+        m_max_entry_count    = new_n_entries;
+        m_entry_count        = 0;
     }
     catch (const std::bad_alloc& bad_alloc) {
         std::cerr << "Failed to resize transposition table, not enough memory." << std::endl;
@@ -112,7 +120,7 @@ void TranspositionTable::resize(size_t new_size) {
 }
 
 TranspositionTable::TranspositionTable(size_t size)
-    : m_size(size), m_n_entries(size / sizeof(TranspositionTableEntry)) {
+    : m_size_in_bytes(size), m_max_entry_count(size / sizeof(TranspositionTableEntry)) {
     resize(size);
     clear();
 }
