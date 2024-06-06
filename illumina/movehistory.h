@@ -9,7 +9,7 @@
 namespace illumina {
 
 class MoveHistory {
-    using HistoryArray = std::array<std::array<int, SQ_COUNT>, SQ_COUNT>;
+    using ButterflyHistoryArray = std::array<std::array<int, SQ_COUNT>, SQ_COUNT>;
 
 public:
     const std::array<Move, 2>& killers(Depth ply) const;
@@ -22,15 +22,15 @@ public:
 
 private:
     std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
-    HistoryArray m_quiet_history {};
+    ButterflyHistoryArray m_quiet_history {};
 
-    static int& history_ref(HistoryArray& history,
+    static int& history_ref(ButterflyHistoryArray& history,
                             Move move);
 
-    static const int& history_ref(const HistoryArray& history,
+    static const int& history_ref(const ButterflyHistoryArray& history,
                                   Move move);
 
-    static void update_history(HistoryArray& history,
+    static void update_history(ButterflyHistoryArray& history,
                                Move move,
                                Depth depth,
                                bool good);
@@ -72,22 +72,22 @@ inline void MoveHistory::update_quiet_history(Move move,
     update_history(m_quiet_history, move, depth, good);
 }
 
-inline int& MoveHistory::history_ref(HistoryArray& history, Move move) {
+inline int& MoveHistory::history_ref(ButterflyHistoryArray& history, Move move) {
     return history[move.source()][move.destination()];
 }
 
-inline const int& MoveHistory::history_ref(const MoveHistory::HistoryArray& history, Move move) {
-    return history_ref(const_cast<HistoryArray&>(history), move);
+inline const int& MoveHistory::history_ref(const MoveHistory::ButterflyHistoryArray& history, Move move) {
+    return history_ref(const_cast<ButterflyHistoryArray&>(history), move);
 }
 
-inline void MoveHistory::update_history(MoveHistory::HistoryArray& history,
+inline void MoveHistory::update_history(MoveHistory::ButterflyHistoryArray& history,
                                         Move move,
                                         Depth depth,
                                         bool good) {
     int delta = (depth < 12) ? (depth * depth) : (32 * depth * depth);
     int sign  = good ? 1 : -1;
     int& hist = history_ref(history, move);
-    hist     += sign * delta;
+    hist     += (sign * delta) - std::min(hist, 16384) * delta / 16384;
 }
 
 } // illumina

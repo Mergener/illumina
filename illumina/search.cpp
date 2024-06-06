@@ -332,6 +332,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         m_curr_move_number = 0;
     }
 
+    StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
+
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     bool has_legal_moves = false;
@@ -398,6 +400,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
         undo_move();
 
+        if (move.is_quiet()) {
+            quiets_played.push_back(move);
+        }
+
         n_searched_moves++;
 
         if (score >= beta) {
@@ -406,7 +412,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);
-                m_hist.update_quiet_history(move, depth, true);
+
+                for (Move quiet: quiets_played) {
+                    m_hist.update_quiet_history(quiet, depth, quiet == best_move);
+                }
             }
 
             if (ROOT && m_main && (!should_stop() || depth <= 2)) {
