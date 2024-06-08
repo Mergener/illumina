@@ -349,6 +349,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Check extensions.
+    // Extend positions in check
     if (in_check && ply < MAX_DEPTH && depth < MAX_DEPTH) {
         depth++;
     }
@@ -362,6 +363,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     static_eval = m_eval.get();
 
     // Reverse futility pruning.
+    // If our position is too good, by a safe margin and low depth, prune.
     Score rfp_margin = 50 + 70 * depth;
     if (!PV        &&
         !in_check  &&
@@ -392,6 +394,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Internal iterative reductions.
     if (depth >= 4 && !found_in_tt) {
         depth--;
+    }
+
+    // Mate distance pruning.
+    Score expected_mate_score = MATE_SCORE - ply;
+    if (expected_mate_score < beta) {
+        beta = expected_mate_score;
+        if (alpha >= beta) {
+            return beta;
+        }
     }
 
     // Kickstart our curr move counter for later reporting.
