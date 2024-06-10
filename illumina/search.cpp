@@ -360,7 +360,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Compute the static eval. Useful for many heuristics.
-    static_eval = m_eval.get();
+    static_eval = !in_check ? m_eval.get() : 0;
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
