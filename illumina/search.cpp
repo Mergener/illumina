@@ -414,10 +414,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Useful for history updates later on.
     StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
 
+    int move_idx = -1;
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
+        move_idx++;
         has_legal_moves = true;
 
         // Skip moves not included in searchmoves argument.
@@ -457,11 +459,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Late move reductions.
         Depth reductions = 0;
-        if (n_searched_moves >= 1 &&
+        if (move_idx >= 1 &&
             depth >= 2            &&
             move.is_quiet()       &&
             !m_board.in_check()) {
-            reductions += s_lmr_table[n_searched_moves - 1][depth];
+            reductions += s_lmr_table[move_idx - 1][depth];
         }
 
         Score score;
