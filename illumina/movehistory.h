@@ -101,7 +101,7 @@ inline void MoveHistory::update_history(MoveHistory::ButterflyHistoryArray& hist
     hist     += (sign * delta) - std::min(hist, 16384) * delta / 16384;
 }
 
-Move& MoveHistory::counter_move_ref(CounterMovesArray& counter_moves,
+inline Move& MoveHistory::counter_move_ref(CounterMovesArray& counter_moves,
                                     Move previous_move) {
     Color color = previous_move.source_piece().color();
     Square src  = previous_move.source();
@@ -109,7 +109,7 @@ Move& MoveHistory::counter_move_ref(CounterMovesArray& counter_moves,
     return counter_moves[color][src][dst];
 }
 
-const Move& MoveHistory::counter_move_ref(const CounterMovesArray& counter_moves,
+inline const Move& MoveHistory::counter_move_ref(const CounterMovesArray& counter_moves,
                                           Move previous_move) {
     return counter_move_ref(const_cast<CounterMovesArray&>(counter_moves), previous_move);
 }
