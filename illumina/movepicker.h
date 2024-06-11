@@ -429,15 +429,16 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         constexpr i32 MVV_LVA[PT_COUNT][PT_COUNT] {
             /*         x-    xP    xN    xB    xR    xQ    xK  */
             /* -- */ { 0,    0,    0,    0,    0,    0,    0   },
-            /* Px */ { 0,   105,  205,  305,  405,  505,  9999 },
-            /* Nx */ { 0,   104,  204,  304,  404,  504,  9999 },
-            /* Bx */ { 0,   103,  203,  303,  403,  503,  9999 },
-            /* Rx */ { 0,   102,  202,  302,  600,  502,  9999 },
-            /* Qx */ { 0,   101,  201,  301,  401,  501,  9999 },
-            /* Kx */ { 0,   100,  200,  300,  400,  500,  9999 },
+            /* Px */ { 0,    5,    1005, 1205, 2405, 4805,  9999 },
+            /* Nx */ { 0,    4,    1004, 1204, 2404, 4804,  9999 },
+            /* Bx */ { 0,    3,    1003, 1203, 2403, 4803,  9999 },
+            /* Rx */ { 0,    2,    1002, 1202, 2402, 4802,  9999 },
+            /* Qx */ { 0,    1,    1001, 1201, 2401, 4801,  9999 },
+            /* Kx */ { 0,    0,    1000, 1200, 2400, 4800,  9999 },
         };
 
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
+        move.add_value(m_mv_hist->capture_history(move));
     }
     else {
         move.add_value(m_mv_hist->quiet_history(move));

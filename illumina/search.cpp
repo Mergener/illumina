@@ -410,9 +410,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         m_curr_move_number = 0;
     }
 
-    // Store played quiet moves in this list.
+    // Store played moves in the following lists accordingly.
     // Useful for history updates later on.
     StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
+    StaticList<Move, MAX_GENERATED_MOVES> captures_played;
 
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
@@ -481,8 +482,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
         undo_move();
 
+        // Store move in history lists.
         if (move.is_quiet()) {
             quiets_played.push_back(move);
+        }
+        else if (move.is_capture()) {
+            captures_played.push_back(move);
         }
 
         n_searched_moves++;
@@ -498,6 +503,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
                 for (Move quiet: quiets_played) {
                     m_hist.update_quiet_history(quiet, depth, quiet == best_move);
+                }
+            }
+            else if (move.is_capture()) {
+                for (Move capture: captures_played) {
+                    m_hist.update_capture_history(capture, depth, capture == best_move);
                 }
             }
 
