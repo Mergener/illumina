@@ -441,6 +441,9 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     }
     else {
         move.add_value(m_mv_hist->quiet_history(move));
+        if (m_mv_hist->is_counter_move(move, m_board->last_move())) {
+            move.add_value(2048);
+        }
     }
 }
 

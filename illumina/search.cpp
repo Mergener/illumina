@@ -510,6 +510,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Update our history scores and refutation moves.
             if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);
+                m_hist.update_counter_move(move, m_board.last_move());
 
                 for (Move quiet: quiets_played) {
                     m_hist.update_quiet_history(quiet, depth, quiet == best_move);

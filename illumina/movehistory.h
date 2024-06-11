@@ -10,6 +10,7 @@ namespace illumina {
 
 class MoveHistory {
     using ButterflyHistoryArray = std::array<std::array<int, SQ_COUNT>, SQ_COUNT>;
+    using CounterMovesArray     = std::array<std::array<std::array<Move, SQ_COUNT>, SQ_COUNT>, CL_COUNT>;
 
 public:
     const std::array<Move, 2>& killers(Depth ply) const;
@@ -20,15 +21,25 @@ public:
     int  quiet_history(Move move) const;
     void update_quiet_history(Move move, Depth depth, bool good);
 
+    bool is_counter_move(Move move, Move previous_move) const;
+    void update_counter_move(Move move, Move previous_move);
+
 private:
     std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
     ButterflyHistoryArray m_quiet_history {};
+    CounterMovesArray m_counter_moves {};
 
     static int& history_ref(ButterflyHistoryArray& history,
                             Move move);
 
     static const int& history_ref(const ButterflyHistoryArray& history,
                                   Move move);
+
+    static Move& counter_move_ref(CounterMovesArray& counter_moves,
+                                  Move previous_move);
+
+    static const Move& counter_move_ref(const CounterMovesArray& counter_moves,
+                                        Move previous_move);
 
     static void update_history(ButterflyHistoryArray& history,
                                Move move,
@@ -88,6 +99,27 @@ inline void MoveHistory::update_history(MoveHistory::ButterflyHistoryArray& hist
     int sign  = good ? 1 : -1;
     int& hist = history_ref(history, move);
     hist     += (sign * delta) - std::min(hist, 16384) * delta / 16384;
+}
+
+Move& MoveHistory::counter_move_ref(CounterMovesArray& counter_moves,
+                                    Move previous_move) {
+    Color color = previous_move.source_piece().color();
+    Square src  = previous_move.source();
+    Square dst  = previous_move.destination();
+    return counter_moves[color][src][dst];
+}
+
+const Move& MoveHistory::counter_move_ref(const CounterMovesArray& counter_moves,
+                                          Move previous_move) {
+    return counter_move_ref(const_cast<CounterMovesArray&>(counter_moves), previous_move);
+}
+
+inline bool MoveHistory::is_counter_move(Move move, Move previous_move) const {
+    return counter_move_ref(m_counter_moves, previous_move) == move;
+}
+
+inline void MoveHistory::update_counter_move(Move move, Move previous_move) {
+    counter_move_ref(m_counter_moves, previous_move) = move;
 }
 
 } // illumina
