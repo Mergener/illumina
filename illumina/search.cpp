@@ -441,7 +441,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Late move pruning.
         if (alpha > -MATE_THRESHOLD &&
-            depth <= 8 &&
+            depth <= (8 + m_board.gives_check(move)) &&
             n_searched_moves >= s_lmp_count_table[improving][depth] &&
             move_picker.stage() > MPS_KILLER_MOVES &&
             !in_check &&
