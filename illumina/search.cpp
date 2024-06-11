@@ -460,6 +460,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         if (n_searched_moves >= 1 &&
             depth >= 2            &&
             move.is_quiet()       &&
+            !in_check             &&
             !m_board.in_check()) {
             reductions += s_lmr_table[n_searched_moves - 1][depth];
         }
