@@ -294,10 +294,11 @@ void SearchWorker::aspiration_windows() {
 }
 
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
-static std::array<int, MAX_DEPTH> s_lmp_count_table;
+static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
+    // Keep track on some stats to report or use later.
     m_results.nodes++;
     m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
 
@@ -349,7 +350,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Check extensions.
-    // Extend positions in check
+    // Extend positions in check.
     if (in_check && ply < MAX_DEPTH && depth < MAX_DEPTH) {
         depth++;
     }
@@ -360,7 +361,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Compute the static eval. Useful for many heuristics.
-    static_eval = !in_check ? m_eval.get() : 0;
+    static_eval    = !in_check ? m_eval.get() : 0;
+    bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
@@ -414,11 +416,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Useful for history updates later on.
     StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
 
+    int move_idx = -1;
+
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
+        move_idx++;
 
         // Skip moves not included in searchmoves argument.
         if (ROOT &&
@@ -433,6 +438,16 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             m_context->listeners().curr_move_listener(m_curr_depth,
                                                       m_curr_move,
                                                       m_curr_move_number);
+        }
+
+        // Late move pruning.
+        if (alpha > -MATE_THRESHOLD &&
+            depth <= (8 + m_board.gives_check(move)) &&
+            move_idx >= s_lmp_count_table[improving][depth] &&
+            move_picker.stage() > MPS_KILLER_MOVES &&
+            !in_check &&
+            move.is_quiet()) {
+            continue;
         }
 
         // SEE pruning.
@@ -705,7 +720,8 @@ static void init_search_constants() {
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {
-        s_lmp_count_table[d] = int(3.9 + 0.8 * d * d);
+        s_lmp_count_table[false][d] = int(3 + 0.6 * d * d);
+        s_lmp_count_table[true][d]  = int(4 + 1.2 * d * d);
     }
 }
 
