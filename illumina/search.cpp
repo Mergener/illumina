@@ -504,6 +504,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 for (Move quiet: quiets_played) {
                     m_hist.update_quiet_history(quiet, depth, quiet == best_move);
                 }
+                for (Move capture: captures_played) {
+                    m_hist.update_capture_history(capture, depth, false);
+                }
             }
             else if (move.is_capture()) {
                 for (Move capture: captures_played) {
