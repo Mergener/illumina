@@ -47,6 +47,7 @@ public:
     void new_search();
     bool probe(ui64 key, TranspositionTableEntry& entry, Depth ply = 0);
     void try_store(ui64 key, Depth ply, Move move, Score score, Depth depth, BoundType bound_type);
+    int hash_full() const;
 
     explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
     ~TranspositionTable() = default;
@@ -56,8 +57,9 @@ public:
 
 private:
     std::unique_ptr<TranspositionTableEntry[]> m_buf = nullptr;
-    size_t m_size;
-    size_t m_n_entries;
+    size_t m_size_in_bytes;
+    size_t m_max_entry_count;
+    size_t m_entry_count = 0;
     ui8 m_gen = 0;
 
     TranspositionTableEntry& entry_ref(ui64 key);
@@ -90,6 +92,11 @@ inline Depth TranspositionTableEntry::depth() const {
 inline Score TranspositionTableEntry::score() const {
     return m_score;
 }
+
+inline int TranspositionTable::hash_full() const {
+    return int(double(m_entry_count) / double(m_max_entry_count) * 1000);
+}
+
 
 } // illumina
 

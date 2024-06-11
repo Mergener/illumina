@@ -14,6 +14,7 @@ namespace illumina {
 
 struct PVResults {
     Depth depth;
+    Depth sel_depth;
     Move  best_move;
     Score score;
     ui64  nodes;
@@ -23,6 +24,7 @@ struct PVResults {
 };
 
 struct SearchSettings {
+    Score contempt = 0;
     std::optional<Depth> max_depth;
     std::optional<i64>   white_time;
     std::optional<i64>   white_inc;
@@ -34,6 +36,7 @@ struct SearchSettings {
 
 struct SearchResults {
     Move  best_move;
+    Move  ponder_move;
     Score score;
 };
 
@@ -43,6 +46,7 @@ class Searcher {
 
 public:
     using PVFinishListener = std::function<void(PVResults&)>;
+    using CurrentMoveListener = std::function<void(Depth depth, Move move, int move_num)>;
 
     TranspositionTable& tt();
 
@@ -51,6 +55,7 @@ public:
     void stop();
 
     void set_pv_finish_listener(const PVFinishListener& listener);
+    void set_currmove_listener(const CurrentMoveListener& listener);
 
     Searcher() = default;
     Searcher(const Searcher& other) = delete;
@@ -67,12 +72,17 @@ private:
     TimeManager m_tm;
 
     struct Listeners {
-        PVFinishListener pv_finish = [](PVResults&) {};
+        PVFinishListener    pv_finish = [](PVResults&) {};
+        CurrentMoveListener curr_move_listener = [](Depth,Move,int) {};
     } m_listeners;
 };
 
 inline void Searcher::set_pv_finish_listener(const PVFinishListener& listener) {
     m_listeners.pv_finish = listener;
+}
+
+inline void Searcher::set_currmove_listener(const CurrentMoveListener& listener) {
+    m_listeners.curr_move_listener = listener;
 }
 
 inline Searcher::Searcher(TranspositionTable&& tt)
