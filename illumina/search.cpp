@@ -416,11 +416,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Useful for history updates later on.
     StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
 
+    int move_idx = -1;
+
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
+        move_idx++;
 
         // Skip moves not included in searchmoves argument.
         if (ROOT &&
@@ -440,7 +443,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         // Late move pruning.
         if (alpha > -MATE_THRESHOLD &&
             depth <= (8 + m_board.gives_check(move)) &&
-            n_searched_moves >= s_lmp_count_table[improving][depth] &&
+            move_idx >= s_lmp_count_table[improving][depth] &&
             move_picker.stage() > MPS_KILLER_MOVES &&
             !in_check &&
             move.is_quiet()) {
@@ -716,8 +719,8 @@ static void init_search_constants() {
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {
-        s_lmp_count_table[false][d] = int(2.0767 + 0.3743 * d * d) - 1;
-        s_lmp_count_table[true][d]  = int(3.8733 + 0.7124 * d * d) - 1;
+        s_lmp_count_table[false][d] = int(3 + 0.6 * d * d);
+        s_lmp_count_table[true][d]  = int(4 + 1.2 * d * d);
     }
 }
 
