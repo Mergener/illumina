@@ -327,9 +327,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Depth ply              = node->ply;
     Score& static_eval     = node->static_eval;
 
-
-    bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
-
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
@@ -353,7 +350,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Check extensions.
-    // Extend positions in check
+    // Extend positions in check.
     if (in_check && ply < MAX_DEPTH && depth < MAX_DEPTH) {
         depth++;
     }
@@ -364,7 +361,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Compute the static eval. Useful for many heuristics.
-    static_eval = !in_check ? m_eval.get() : 0;
+    static_eval    = !in_check ? m_eval.get() : 0;
+    bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
