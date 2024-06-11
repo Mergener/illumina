@@ -364,6 +364,19 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     static_eval    = !in_check ? m_eval.get() : 0;
     bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
 
+    // Use the TT score as a better static eval.
+    // Note that the 'improving' flag must be set before this since it is
+    // only related to the true static eval.
+    if (!in_check && found_in_tt) {
+        static_eval = tt_entry.bound_type() == BT_EXACT
+            ? tt_entry.score()
+            : tt_entry.bound_type() == BT_LOWERBOUND
+            ? std::max(static_eval, tt_entry.score())
+            : tt_entry.bound_type() == BT_UPPERBOUND
+            ? std::min(static_eval, tt_entry.score())
+            : static_eval;
+    }
+
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
     Score rfp_margin = 50 + 70 * depth;
