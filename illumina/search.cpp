@@ -477,7 +477,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             move.is_quiet()       &&
             !in_check             &&
             !m_board.in_check()) {
-            reductions += s_lmr_table[n_searched_moves - 1][depth];
+            reductions  = s_lmr_table[n_searched_moves - 1][depth];
+            reductions += !improving;
+            reductions += m_hist.quiet_history(move) <= -400;
+            reductions  = std::clamp(reductions, 0, depth);
         }
 
         Score score;
