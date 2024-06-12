@@ -135,6 +135,7 @@ private:
     Move        m_curr_move  = MOVE_NULL;
     int         m_curr_move_number = 0;
 
+    template <bool PV>
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
     template <bool PV, bool SKIP_NULL = false, bool ROOT = false>
@@ -357,7 +358,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
-        return quiescence_search(ply, alpha, beta);
+        return quiescence_search<PV>(ply, alpha, beta);
     }
 
     // Compute the static eval. Useful for many heuristics.
@@ -566,21 +567,38 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     return alpha;
 }
 
+template <bool PV>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     m_results.nodes++;
 
     TranspositionTable& tt = m_context->tt();
     ui64 board_key         = m_board.hash_key();
     Score original_alpha   = alpha;
+    Move hash_move         = MOVE_NULL;
 
     TranspositionTableEntry tt_entry {};
-    Move hash_move = tt.probe(board_key, tt_entry, ply)
-        ? tt_entry.move()
-        : MOVE_NULL;
+    bool found_in_tt = tt.probe(board_key, tt_entry, ply);
+    if (found_in_tt) {
+        hash_move = tt_entry.move();
+
+        if constexpr (!PV) {
+            if (tt_entry.bound_type() == BT_EXACT) {
+                // TT Cuttoff.
+                return tt_entry.score();
+            }
+            else if (tt_entry.bound_type() == BT_LOWERBOUND) {
+                alpha = tt_entry.score();
+            }
+            else {
+                beta = tt_entry.score();
+            }
+        }
+    }
 
     Score stand_pat = m_eval.get();
 
     if (stand_pat >= beta) {
+        tt.try_store(board_key, ply, MOVE_NULL, beta, 0, BT_LOWERBOUND);
         return beta;
     }
     if (stand_pat > alpha) {
@@ -604,7 +622,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
 
         make_move(move);
-        Score score = -quiescence_search(ply + 1, -beta, -alpha);
+        Score score = -quiescence_search<PV>(ply + 1, -beta, -alpha);
         undo_move();
 
         if (score >= beta) {
