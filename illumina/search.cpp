@@ -25,6 +25,7 @@ struct RootInfo {
 struct SearchNode {
     Depth ply = 0;
     Score static_eval = 0;
+    Move skip_move = MOVE_NULL;
 };
 
 /**
@@ -327,6 +328,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Color us               = m_board.color_to_move();
     Depth ply              = node->ply;
     Score& static_eval     = node->static_eval;
+    Move skip_move         = node->skip_move;
 
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions)
@@ -362,7 +364,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Compute the static eval. Useful for many heuristics.
-    static_eval    = !in_check ? m_eval.get() : 0;
+    // If we're on a singular search, assume that the static eval
+    // was already calculated.
+    if (skip_move == MOVE_NULL) {
+        static_eval = !in_check ? m_eval.get() : 0;
+    }
     bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
 
     // Reverse futility pruning.
@@ -426,6 +432,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         has_legal_moves = true;
         move_idx++;
 
+        check_time_bounds();
+        if (should_stop()) {
+            break;
+        }
+
         // Skip moves not included in searchmoves argument.
         if (ROOT &&
             std::find(root_info.moves.begin(), root_info.moves.end(), move) == root_info.moves.end()) {
@@ -459,6 +470,31 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
+        // Singular extensions.
+        Depth extensions = 0;
+        if (!ROOT             &&
+            move == hash_move &&
+            !in_check         &&
+            depth >= 8        &&
+            skip_move == MOVE_NULL            &&
+            tt_entry.depth() >= (depth - 3)   && // Limits excessive extensions
+            tt_entry.score() < MATE_THRESHOLD &&
+            (tt_entry.bound_type() != BT_UPPERBOUND)) {
+            Score se_beta = std::min(beta, tt_entry.score() - 50);
+
+            node->skip_move = move;
+            Score score = pvs<true>((depth - 1) / 2, se_beta - 1, se_beta, node);
+            node->skip_move = MOVE_NULL;
+
+            if (score < se_beta) {
+                // We have a singular move. Search it with extended depth.
+                extensions++;
+            }
+            else if (score >= beta) {
+                return se_beta;
+            }
+        }
+
         make_move(move);
 
         // Futility pruning.
@@ -487,15 +523,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
-            score = -pvs<true>(depth - 1, -beta, -alpha, node + 1);
+            score = -pvs<true>(depth - 1 + extensions, -beta, -alpha, node + 1);
         }
         else {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -pvs<false>(depth - 1 - reductions, -alpha - 1, -alpha, node + 1);
+            score = -pvs<false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
             if (score > alpha && score < beta) {
-                score = -pvs<true>(depth - 1, -beta, -alpha, node + 1);
+                score = -pvs<true>(depth - 1 + extensions, -beta, -alpha, node + 1);
             }
         }
         undo_move();
