@@ -586,19 +586,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             !hash_move.is_promotion()) {
             hash_move = MOVE_NULL;
         }
-
-        if constexpr (!PV) {
-            if (tt_entry.bound_type() == BT_EXACT) {
-                // TT Cuttoff.
-                return tt_entry.score();
-            }
-            else if (tt_entry.bound_type() == BT_LOWERBOUND) {
-                alpha = tt_entry.score();
-            }
-            else {
-                beta = tt_entry.score();
-            }
-        }
     }
 
     Score stand_pat = m_eval.get();
