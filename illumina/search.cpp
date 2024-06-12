@@ -581,6 +581,12 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     if (found_in_tt) {
         hash_move = tt_entry.move();
 
+        // Prevent quiet moves from being searched in qsearch.
+        if (!hash_move.is_capture() &&
+            !hash_move.is_promotion()) {
+            hash_move = MOVE_NULL;
+        }
+
         if constexpr (!PV) {
             if (tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff.
