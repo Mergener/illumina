@@ -569,6 +569,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     m_results.nodes++;
 
+    TranspositionTable& tt = m_context->tt();
+    ui64 board_key         = m_board.hash_key();
+    Score original_alpha   = alpha;
+
+    TranspositionTableEntry tt_entry {};
+    Move hash_move = tt.probe(board_key, tt_entry, ply)
+        ? tt_entry.move()
+        : MOVE_NULL;
+
     Score stand_pat = m_eval.get();
 
     if (stand_pat >= beta) {
@@ -583,8 +592,10 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         return alpha;
     }
 
-    MovePicker<true> move_picker(m_board, ply, m_hist);
+    // Finally, start looping over available noisy moves.
+    MovePicker<true> move_picker(m_board, ply, m_hist, hash_move);
     SearchMove move;
+    SearchMove best_move;
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (move_picker.stage() >= MPS_BAD_CAPTURES &&
@@ -597,12 +608,28 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         undo_move();
 
         if (score >= beta) {
+            best_move = move;
             alpha = beta;
             break;
         }
         if (score > alpha) {
+            best_move = move;
             alpha = score;
         }
+    }
+
+    // Store in transposition table.
+    if (alpha >= beta) {
+        // Beta-Cutoff, lowerbound score.
+        tt.try_store(board_key, ply, best_move, alpha, 0, BT_LOWERBOUND);
+    }
+    else if (alpha <= original_alpha) {
+        // Couldn't raise alpha, score is an upperbound.
+        tt.try_store(board_key, ply, best_move, alpha, 0, BT_UPPERBOUND);
+    }
+    else {
+        // We have an exact score.
+        tt.try_store(board_key, ply, best_move, alpha, 0, BT_EXACT);
     }
 
     return alpha;
