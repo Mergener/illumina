@@ -304,7 +304,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if constexpr (ROOT) {
         // Nodes are counted in worker.make_move() calls.
         // Make sure the root node counts here as well.
-        m_results.nodes = 1;
+        m_results.nodes++;
     }
 
     // Check if we must stop our search.
