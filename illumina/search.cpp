@@ -113,7 +113,7 @@ class SearchWorker {
 public:
     void iterative_deepening();
     bool should_stop() const;
-    void check_time_bounds();
+    void check_limits();
 
     const WorkerResults& results() const;
 
@@ -225,7 +225,7 @@ void SearchWorker::iterative_deepening() {
 
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        check_time_bounds();
+        check_limits();
         aspiration_windows();
         if (should_stop() || m_context->time_manager().finished_soft()) {
             // If we finished soft, we don't want to start a new iteration.
@@ -288,7 +288,7 @@ void SearchWorker::aspiration_windows() {
             report_pv_results();
         }
 
-        check_time_bounds();
+        check_limits();
 
         window += window / 2;
     }
@@ -300,12 +300,16 @@ static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
     // Keep track on some stats to report or use later.
-    m_results.nodes++;
     m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
+    if constexpr (ROOT) {
+        // Nodes are counted in worker.make_move() calls.
+        // Make sure the root node counts here as well.
+        m_results.nodes = 1;
+    }
 
     // Check if we must stop our search.
     // If so, return the best score we've found so far.
-    check_time_bounds();
+    check_limits();
     if (should_stop()) {
         return alpha;
     }
@@ -569,8 +573,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
 template <bool PV>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
-    m_results.nodes++;
-
     TranspositionTable& tt = m_context->tt();
     ui64 board_key         = m_board.hash_key();
     Score original_alpha   = alpha;
@@ -598,7 +600,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         alpha = stand_pat;
     }
 
-    check_time_bounds();
+    check_limits();
     if (should_stop()) {
         return alpha;
     }
@@ -697,8 +699,13 @@ void SearchWorker::report_pv_results() {
     m_context->listeners().pv_finish(pv_results);
 }
 
-void SearchWorker::check_time_bounds() {
+void SearchWorker::check_limits() {
     if (!m_main) {
+        return;
+    }
+
+    if (m_results.nodes >= m_settings->max_nodes) {
+        m_context->stop_search();
         return;
     }
 
@@ -720,6 +727,7 @@ Score SearchWorker::draw_score() const {
 void SearchWorker::make_move(Move move) {
     m_board.make_move(move);
     m_eval.on_make_move(m_board);
+    m_results.nodes++;
 }
 
 void SearchWorker::undo_move() {
