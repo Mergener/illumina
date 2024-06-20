@@ -2,6 +2,7 @@
 #define ILLUMINA_BOARD_H
 
 #include <array>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -12,6 +13,23 @@
 namespace illumina {
 
 constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
+
+enum class BoardOutcome {
+    UNFINISHED,
+    STALEMATE,
+    CHECKMATE,
+    DRAW_BY_REPETITION,
+    DRAW_BY_50_MOVES_RULE,
+    DRAW_BY_INSUFFICIENT_MATERIAL
+};
+
+struct BoardResult {
+    std::optional<Color> winner  = std::nullopt;
+    BoardOutcome         outcome = BoardOutcome::UNFINISHED;
+
+    bool is_draw() const;
+    bool is_finished() const;
+};
 
 class Board {
 public:
@@ -42,9 +60,11 @@ public:
     bool           gives_check(Move move) const;
     std::string    fen() const;
     std::string    pretty() const;
+    bool           is_50_move_rule_draw() const;
     bool           is_repetition_draw(int max_appearances = 3) const;
     bool           is_insufficient_material_draw() const;
     bool           color_has_sufficient_material(Color color) const;
+    BoardResult    result() const;
 
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
@@ -365,6 +385,10 @@ inline bool Board::is_repetition_draw(int max_appearances) const {
     }
 
     return false;
+}
+
+inline bool Board::is_50_move_rule_draw() const {
+    return rule50() >= 100;
 }
 
 inline bool Board::color_has_sufficient_material(Color color) const {
