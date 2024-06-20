@@ -2,6 +2,7 @@
 
 #include <sstream>
 
+#include "movegen.h"
 #include "utils.h"
 #include "parsehelper.h"
 #include "movegen.h"
@@ -567,6 +568,40 @@ void Board::scan_pins(Bitboard attackers, Square king_square, Color pinned_color
             m_pinners[pinned_sq] = s;
         }
     }
+}
+
+
+BoardResult Board::result() const {
+    BoardResult result;
+
+    if (is_50_move_rule_draw()) {
+        result.outcome = BoardOutcome::DRAW_BY_50_MOVES_RULE;
+    }
+    else if (is_repetition_draw()) {
+        result.outcome = BoardOutcome::DRAW_BY_REPETITION;
+    }
+    else if (is_insufficient_material_draw()) {
+        result.outcome = BoardOutcome::DRAW_BY_INSUFFICIENT_MATERIAL;
+    }
+    else {
+        // Check for stalemate or checkmate.
+        Move moves[MAX_GENERATED_MOVES];
+        Move* begin = moves;
+        Move* end   = generate_moves(*this, moves);
+
+        if (begin == end) {
+            // No moves generated, we either have stalemate or checkmate.
+            if (in_check()) {
+                result.outcome = BoardOutcome::CHECKMATE;
+                result.winner  = opposite_color(color_to_move());
+            }
+            else {
+                result.outcome = BoardOutcome::STALEMATE;
+            }
+        }
+    }
+
+    return result;
 }
 
 bool Board::legal() const {
