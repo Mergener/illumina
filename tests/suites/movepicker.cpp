@@ -124,7 +124,7 @@ void test_move_picker() {
                     // Save all history.
                     for (auto& h: history) {
                         auto [depth, src, dest] = h;
-                        mv_hist.increment_history_score(Move::new_normal(src, dest, WHITE_QUEEN), depth);
+                        mv_hist.update_quiet_history(Move::new_normal(src, dest, WHITE_QUEEN), depth, true);
                     }
                 }
             }
@@ -161,7 +161,7 @@ void test_move_picker() {
                     for (int i = 0; i < 100; ++i) {
                         // Pick a move.
                         Move move = validation_moves[random(size_t(0), n_expected_moves)];
-                        mv_hist.increment_history_score(move, random(1, 15));
+                        mv_hist.update_quiet_history(move, random(1, 15), true);
                     }
                 }
                 else {
@@ -347,6 +347,17 @@ void test_move_picker() {
         { "7r/6p1/3p2pp/pn4k1/3P3P/P2BP3/1r3PP1/3RK2R b K h3 0 19", {}, 0, {}, {}},
         { "r3k2r/8/8/8/8/8/8/2R1K2R b Kkq - 0 1", "", 0, { { 0, "e8g8" }, { 0, "a8b8" } }, {} },
         { "7k/3p4/8/8/3P4/8/8/K7 b - - 0 1", "h8g8", 0, { { 0, "d7d5" }, { 0, "h8g8" } }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", "g8f8", 0, {}, {}},
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", "g8f8", 0, { {0, "g8f8"} }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", {}, 0, { {0, "g8f8"} }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", {}, 0, { {0, "g8f8"}, { 0, "g8f8" } }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", {}, 0, { {}, { 0, "g8f8" } }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", "g8f8", 0, { {0, "g8f8"} }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", "g8f8", 0, { {0, "g8f8"}, { 0, "g8f8" } }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", "g8f8", 0, { {}, { 0, "g8f8" } }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", {}, 0, { {0, "g8f8"} }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", {}, 0, { {0, "g8f8"}, { 0, "f6g7" } }, {} },
+        { "2r1b1k1/1p3p1Q/3rpqp1/p3N1N1/Pb1Pp3/1P2P1P1/5PP1/1R1R2K1 b - - 3 30", "g8f8", 0, { {0, "g8f8"}, { 0, "f6g7" } }, {} },
     };
 
     for (auto& test: tests) {

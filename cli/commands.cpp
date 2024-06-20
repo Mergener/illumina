@@ -124,6 +124,10 @@ void register_commands(CLIApplication& server) {
             settings.move_time = ctx.int_after("movetime");
         }
 
+        if (ctx.has_arg("nodes")) {
+            settings.max_nodes = ctx.int_after("nodes");
+        }
+
         if (ctx.has_arg("searchmoves")) {
             // Parse all searchmoves.
             std::vector<Move> search_moves;

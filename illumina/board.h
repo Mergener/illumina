@@ -4,7 +4,6 @@
 #include <array>
 #include <string_view>
 #include <vector>
-#include <optional>
 
 #include "attacks.h"
 #include "types.h"
@@ -13,23 +12,6 @@
 namespace illumina {
 
 constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
-
-enum class BoardOutcome {
-    UNFINISHED,
-    STALEMATE,
-    CHECKMATE,
-    DRAW_BY_REPETITION,
-    DRAW_BY_50_MOVES_RULE,
-    DRAW_BY_INSUFFICIENT_MATERIAL
-};
-
-struct BoardResult {
-    std::optional<Color> winner  = std::nullopt;
-    BoardOutcome         outcome = BoardOutcome::UNFINISHED;
-
-    bool is_draw() const;
-    bool is_finished() const;
-};
 
 class Board {
 public:
@@ -57,13 +39,12 @@ public:
     Square         king_square(Color color) const;
     bool           is_attacked_by(Color c, Square s) const;
     bool           is_attacked_by(Color c, Square s, Bitboard occ) const;
+    bool           gives_check(Move move) const;
     std::string    fen() const;
     std::string    pretty() const;
     bool           is_repetition_draw(int max_appearances = 3) const;
     bool           is_insufficient_material_draw() const;
-    bool           is_50_move_rule_draw() const;
     bool           color_has_sufficient_material(Color color) const;
-    BoardResult    result() const;
 
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
@@ -425,8 +406,57 @@ inline bool Board::is_insufficient_material_draw() const {
     return !color_has_sufficient_material(CL_WHITE) && !color_has_sufficient_material(CL_BLACK);
 }
 
-inline bool Board::is_50_move_rule_draw() const {
-    return rule50() >= 100;
+inline bool Board::gives_check(Move move) const {
+    // Normal check.
+    Piece p      = move.source_piece();
+    Color c      = p.color();
+    Square ks    = king_square(opposite_color(c));
+    Bitboard occ = occupancy();
+    Bitboard atks_from_dest = piece_attacks(p, move.destination(), occ);
+
+    if (bit_is_set(atks_from_dest, ks)) {
+        return true;
+    }
+
+    // Check if we can have a potential discovered check.
+    Bitboard between = between_bb(move.source(), ks);
+    if (bit_is_set(between, move.destination())) {
+        // Piece is moving along the line between it and the king.
+        // No discovered check is happening.
+        return false;
+    }
+
+    // Discovered check -- remove the piece from the occupancy and see
+    // if a slider would attack the king.
+    Bitboard disc_occ = unset_bit(occ, move.source());
+    Bitboard queens = piece_bb(Piece(c, PT_QUEEN));
+    Bitboard vert_sliders = queens | piece_bb(Piece(c, PT_ROOK));
+    Bitboard diag_sliders = queens | piece_bb(Piece(c, PT_BISHOP));
+
+    if (move.type() == MT_EN_PASSANT) {
+        disc_occ = unset_bit(disc_occ, ep_square() - pawn_push_direction(c));
+    }
+
+    if ((bishop_attacks(ks, disc_occ) & diag_sliders) != 0) {
+        // Discovered diagonal attack.
+        return true;
+    }
+    if ((rook_attacks(ks, disc_occ) & vert_sliders) != 0) {
+        // Discovered diagonal attack.
+        return true;
+    }
+
+    // Promotion check -- check if the newly promoted piece
+    // checks the king. We can use the discovered attacks occupancy
+    // since the square previously occupied by the pawn won't
+    // be occupied after the promotion.
+    if (move.is_promotion()) {
+        if (bit_is_set(piece_attacks(Piece(c, move.promotion_piece_type()), move.destination(), disc_occ), ks)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>
@@ -636,17 +666,6 @@ inline bool Board::is_move_legal(Move move) const {
         }
     }
     return true;
-}
-
-inline bool BoardResult::is_draw() const {
-    return outcome == BoardOutcome::DRAW_BY_50_MOVES_RULE ||
-           outcome == BoardOutcome::DRAW_BY_INSUFFICIENT_MATERIAL ||
-           outcome == BoardOutcome::DRAW_BY_REPETITION ||
-           outcome == BoardOutcome::STALEMATE;
-}
-
-inline bool BoardResult::is_finished() const {
-    return outcome != BoardOutcome::UNFINISHED;
 }
 
 } // illumina

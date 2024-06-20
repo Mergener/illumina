@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <functional>
+#include <type_traits>
 
 #include "illumina.h"
 
@@ -138,8 +139,11 @@ public:
     template <typename TOption, typename... TArgs>
     TOption& register_option(const std::string& name, TArgs&&... args);
 
-    UCIOption&       option(std::string_view name);
-    const UCIOption& option(std::string_view name) const;
+    template <typename T = UCIOption>
+    T& option(std::string_view name);
+
+    template <typename T = UCIOption>
+    const T& option(std::string_view name) const;
 
     using OptionList = std::vector<std::reference_wrapper<UCIOption>>;
     OptionList list_options() const;
@@ -163,6 +167,32 @@ inline TOption& UCIOptionManager::register_option(const std::string& name, TArgs
     m_options[name] = std::move(option_ptr);
 
     return option;
+}
+
+template <typename T>
+T& UCIOptionManager::option(std::string_view name) {
+    static_assert(std::is_base_of_v<UCIOption, T>,
+                  "T must be derived from UCIOption.");
+
+    std::string name_str = std::string(name);
+    auto it = m_options.find(name_str);
+    if (it == m_options.end()) {
+        throw std::out_of_range("Option not found: " + name_str);
+    }
+    return dynamic_cast<T&>(*it->second);
+}
+
+template <typename T>
+const T& UCIOptionManager::option(std::string_view name) const {
+    static_assert(std::is_base_of_v<UCIOption, T>,
+                  "T must be derived from UCIOption.");
+
+    std::string name_str = std::string(name);
+    auto it = m_options.find(name_str);
+    if (it == m_options.end()) {
+        throw std::out_of_range("Option not found: " + name_str);
+    }
+    return dynamic_cast<const T&>(*it->second);
 }
 
 } // illumina

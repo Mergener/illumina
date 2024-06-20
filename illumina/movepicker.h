@@ -6,25 +6,11 @@
 #include "staticlist.h"
 #include "searchdefs.h"
 #include "movegen.h"
+#include "movehistory.h"
 
 #include <iostream>
 
 namespace illumina {
-
-class MoveHistory {
-public:
-    const std::array<Move, 2>& killers(Depth ply) const;
-    bool is_killer(Depth ply, Move move) const;
-    void set_killer(Depth ply, Move killer);
-    void reset();
-
-    int get_history_score(Move move) const;
-    void increment_history_score(Move move, Depth depth);
-
-private:
-    std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
-    std::array<std::array<int, SQ_COUNT>, SQ_COUNT> m_history {};
-};
 
 enum {
     MPS_NOT_STARTED = 0,
@@ -238,17 +224,17 @@ void MovePicker<QUIESCE>::generate_noisy_evasions() {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_killer_moves() {
-    int n_killers;
     SearchMove* begin = m_moves_end;
 
     auto& killers = m_mv_hist->killers(m_ply);
-    for (n_killers = 0; n_killers < 2; ++n_killers) {
-        Move killer = killers[n_killers];
+    size_t n_killers = 0;
+    for (size_t i = 0; i < 2; ++i) {
+        Move killer = killers[i];
         if (!m_board->is_move_pseudo_legal(killer)
             || (m_board->in_check() && !m_board->is_move_legal(killer))) {
-            break;
+            continue;
         }
-        begin[n_killers] = killer;
+        begin[n_killers++] = killer;
     }
 
     m_moves_end += n_killers;
@@ -278,36 +264,6 @@ void MovePicker<QUIESCE>::generate_hash_move() {
         *m_moves_end++ = m_hash_move;
     }
     m_curr_move_range = { begin, m_moves_end };
-}
-
-inline const std::array<Move, 2>& MoveHistory::killers(Depth ply) const {
-    return m_killers[ply];
-}
-
-inline bool MoveHistory::is_killer(Depth ply, Move move) const {
-    const std::array<Move, 2>& arr = killers(ply);
-    return arr[0] == move || arr[1] == move;
-}
-
-inline void MoveHistory::set_killer(Depth ply, Move killer) {
-    std::array<Move, 2>& arr = m_killers[ply];
-    if (killer == arr[0]) {
-        return;
-    }
-    arr[1] = arr[0];
-    arr[0] = killer;
-}
-
-inline void MoveHistory::reset() {
-    std::fill(m_killers.begin(), m_killers.end(), std::array<Move, 2> { MOVE_NULL, MOVE_NULL });
-}
-
-inline int MoveHistory::get_history_score(Move move) const {
-    return m_history[move.source()][move.destination()];
-}
-
-inline void MoveHistory::increment_history_score(Move move, Depth depth) {
-    m_history[move.source()][move.destination()] += depth * depth;
 }
 
 template <bool QUIESCE>
@@ -484,7 +440,7 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
     }
     else {
-        move.add_value(m_mv_hist->get_history_score(move));
+        move.add_value(m_mv_hist->quiet_history(move));
     }
 }
 

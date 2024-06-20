@@ -365,3 +365,34 @@ TEST_CASE(IsMovePseudoLegal) {
         EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e8g8"))).to_be(true);
     }
 }
+
+TEST_CASE(MoveGivesCheck) {
+    struct {
+        std::string fen;
+        std::string move_str;
+        bool gives_check;
+
+        void run() {
+            Board board(fen);
+            Move move = Move::parse_uci(board, move_str);
+
+            EXPECT(board.gives_check(move)).to_be(gives_check);
+        }
+    } tests[] = {
+        { "rnbqkbnr/ppp2ppp/4p3/3p4/2PP4/5N2/PP2PPPP/RNBQKB1R b KQkq - 1 3", "f8b4", true },
+        { "rnbqkbnr/ppp2ppp/4p3/3p4/2PP4/5N2/PP2PPPP/RNBQKB1R b KQkq - 1 3", "g8f6", false },
+        { "8/2p2k2/8/8/8/5N2/1K3R2/8 w - - 0 1", "f3d4", true },
+        { "8/2p2k2/8/8/8/5N2/1K3R2/8 w - - 0 1", "f3e5", true },
+        { "8/2p2k2/5p2/8/8/5N2/1K3R2/8 w - - 0 1", "f3d4", false },
+        { "8/2p2k2/5p2/8/8/5N2/1K3R2/8 w - - 0 1", "f3e5", true },
+        { "8/5P2/5k2/8/8/2K5/8/8 w - - 0 1", "f7f8r", true },
+        { "8/5P2/5k2/8/8/2K5/8/8 w - - 0 1", "f7f8q", true },
+        { "8/5P2/5k2/8/8/2K5/8/8 w - - 0 1", "f7f8n", false },
+        { "8/5P2/5k2/8/8/2K5/8/8 w - - 0 1", "f7f8b", false },
+        { "8/8/8/1RPp1k2/8/8/2K5/8 w - d6 0 2", "c5d6", true },
+    };
+
+    for (auto& test: tests) {
+        test.run();
+    }
+}
