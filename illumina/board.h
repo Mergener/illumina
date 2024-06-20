@@ -692,6 +692,15 @@ inline bool Board::is_move_legal(Move move) const {
     return true;
 }
 
+inline bool BoardResult::is_finished() const {
+    return outcome != BoardOutcome::UNFINISHED;
+}
+
+inline bool BoardResult::is_draw() const {
+    return outcome != BoardOutcome::UNFINISHED &&
+           outcome != BoardOutcome::CHECKMATE;
+}
+
 } // illumina
 
 #endif // ILLUMINA_BOARD_H
