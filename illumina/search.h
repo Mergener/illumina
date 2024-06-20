@@ -32,7 +32,6 @@ struct SearchSettings {
     std::optional<i64>   black_time;
     std::optional<i64>   black_inc;
     std::optional<i64>   move_time;
-    std::optional<ui64>  max_nodes;
     std::optional<std::vector<Move>> search_moves;
 };
 

@@ -782,39 +782,6 @@ void Board::compute_checkers() {
     m_state.n_checkers = popcount(checkers);
 }
 
-BoardResult Board::result() const {
-    BoardResult result;
-
-    if (is_50_move_rule_draw()) {
-        result.outcome = BoardOutcome::DRAW_BY_50_MOVES_RULE;
-    }
-    else if (is_repetition_draw()) {
-        result.outcome = BoardOutcome::DRAW_BY_REPETITION;
-    }
-    else if (is_insufficient_material_draw()) {
-        result.outcome = BoardOutcome::DRAW_BY_INSUFFICIENT_MATERIAL;
-    }
-    else {
-        // Check for stalemate or checkmate.
-        Move moves[MAX_GENERATED_MOVES];
-        Move* begin = moves;
-        Move* end   = generate_moves(*this, moves);
-
-        if (begin == end) {
-            // No moves generated, we either have stalemate or checkmate.
-            if (in_check()) {
-                result.outcome = BoardOutcome::CHECKMATE;
-                result.winner  = opposite_color(color_to_move());
-            }
-            else {
-                result.outcome = BoardOutcome::STALEMATE;
-            }
-        }
-    }
-
-    return result;
-}
-
 Board Board::standard_startpos() {
     return Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
