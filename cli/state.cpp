@@ -1,8 +1,11 @@
 #include "state.h"
 
+#include <type_traits>
+
 #include "cliapplication.h"
 #include "evaluation.h"
 #include "transpositiontable.h"
+#include "tunablevalues.h"
 
 namespace illumina {
 
@@ -204,6 +207,21 @@ void State::quit() {
     std::exit(EXIT_SUCCESS);
 }
 
+#ifdef TUNING_BUILD
+static void add_tuning_option(UCIOptionManager& options,
+                              const std::string& opt_name,
+                              int& opt_ref,
+                              int default_value,
+                              int min = INT_MIN,
+                              int max = INT_MAX) {
+    options.register_option<UCIOptionSpin>(opt_name, default_value, min, max)
+           .add_update_handler([&opt_ref](const UCIOption& opt) {
+               const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+               opt_ref = spin.value();
+           });
+}
+#endif
+
 void State::register_options() {
     m_options.register_option<UCIOptionSpin>("Hash", TT_DEFAULT_SIZE_MB, 1, 1024 * 1024)
         .add_update_handler([this](const UCIOption& opt) {
@@ -214,6 +232,14 @@ void State::register_options() {
     m_options.register_option<UCIOptionSpin>("Thread", 1, 1, 1);
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, 1);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
+
+#ifdef TUNING_BUILD
+#define TUNABLE_VALUE(name, type, value) add_tuning_option(m_options, \
+                                                           std::string("TUNABLE_") + #name, \
+                                                           name, \
+                                                           value);
+#include "tunablevalues.def"
+#endif
 }
 
 State::State() {

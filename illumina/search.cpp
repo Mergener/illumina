@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "timemanager.h"
+#include "tunablevalues.h"
 #include "movepicker.h"
 #include "evaluation.h"
 
@@ -246,7 +247,7 @@ void SearchWorker::aspiration_windows() {
     Score prev_score = m_results.score;
     Score alpha      = -MAX_SCORE;
     Score beta       = MAX_SCORE;
-    Score window     = 50;
+    Score window     = ASP_WIN_WINDOW;
     Depth depth      = m_curr_depth;
 
     // Don't use aspiration windows in lower depths since
@@ -370,10 +371,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
-    Score rfp_margin = 50 + 70 * depth;
+    Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
     if (!PV        &&
         !in_check  &&
-        depth <= 7 &&
+        depth <= RFP_MAX_DEPTH &&
         alpha < MATE_THRESHOLD &&
         static_eval - rfp_margin > beta) {
         return static_eval - rfp_margin;
@@ -383,10 +384,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (!PV        &&
         !SKIP_NULL &&
         !in_check  &&
-        popcount(m_board.color_bb(us)) >= 4 &&
+        popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES &&
         static_eval >= beta &&
-        depth >= 3) {
-        Depth reduction = std::max(depth, std::min(2, 2 + (static_eval - beta) / 200));
+        depth >= NMP_MIN_DEPTH) {
+        Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
 
         make_null_move();
         Score score = -pvs<false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
@@ -446,7 +447,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Late move pruning.
         if (alpha > -MATE_THRESHOLD &&
-            depth <= (8 + m_board.gives_check(move)) &&
+            depth <= (LMP_BASE_MIN_DEPTH + m_board.gives_check(move)) &&
             move_idx >= s_lmp_count_table[improving][depth] &&
             move_picker.stage() > MPS_KILLER_MOVES &&
             !in_check &&
@@ -455,10 +456,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         // SEE pruning.
-        if (depth <= 8          &&
-            !m_board.in_check() &&
+        if (depth <= SEE_PRUNING_DEPTH &&
+            !m_board.in_check()        &&
             move_picker.stage() > MPS_GOOD_CAPTURES &&
-            !has_good_see(m_board, move.source(), move.destination(), -2)) {
+            !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
             continue;
         }
 
