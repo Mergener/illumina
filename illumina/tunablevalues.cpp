@@ -3,7 +3,7 @@
 namespace illumina {
 
 #ifdef TUNING_BUILD
-#define TUNABLE_VALUE(name, type, value) type name = value;
+#define TUNABLE_VALUE(name, type, value, ...) type name = value;
 #include "tunablevalues.def"
 #endif
 

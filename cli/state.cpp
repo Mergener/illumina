@@ -1,6 +1,7 @@
 #include "state.h"
 
 #include <type_traits>
+#include <limits>
 
 #include "cliapplication.h"
 #include "evaluation.h"
@@ -215,10 +216,28 @@ static void add_tuning_option(UCIOptionManager& options,
                               int min = INT_MIN,
                               int max = INT_MAX) {
     options.register_option<UCIOptionSpin>(opt_name, default_value, min, max)
-           .add_update_handler([&opt_ref](const UCIOption& opt) {
-               const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
-               opt_ref = spin.value();
-           });
+            .add_update_handler([&opt_ref](const UCIOption& opt) {
+                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+                opt_ref = spin.value();
+                recompute_search_constants();
+            });
+}
+
+static void add_tuning_option(UCIOptionManager& options,
+                              const std::string& opt_name,
+                              double& opt_ref,
+                              double default_value,
+                              double min = std::numeric_limits<double>::min(),
+                              double max = std::numeric_limits<double>::max()) {
+    options.register_option<UCIOptionSpin>(opt_name + std::string("_FP"),
+                                           default_value * 1000,
+                                           min * 1000,
+                                           max * 1000)
+            .add_update_handler([&opt_ref](const UCIOption& opt) {
+                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+                opt_ref = double(spin.value()) / 1000.0;
+                recompute_search_constants();
+            });
 }
 #endif
 
@@ -234,10 +253,10 @@ void State::register_options() {
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
 
 #ifdef TUNING_BUILD
-#define TUNABLE_VALUE(name, type, value) add_tuning_option(m_options, \
-                                                           std::string("TUNABLE_") + #name, \
-                                                           name, \
-                                                           value);
+#define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
+                                                         std::string("TUNABLE_") + #name, \
+                                                         name, \
+                                                         __VA_ARGS__);
 #include "tunablevalues.def"
 #endif
 }

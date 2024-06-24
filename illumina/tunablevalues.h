@@ -6,9 +6,9 @@
 namespace illumina {
 
 #ifdef TUNING_BUILD
-#define TUNABLE_VALUE(name, type, value) extern type name;
+#define TUNABLE_VALUE(name, type, value, ...) extern type name;
 #else
-#define TUNABLE_VALUE(name, type, value) static constexpr type name = value;
+#define TUNABLE_VALUE(name, type, value, ...) static constexpr type name = value;
 #endif
 
 #include "tunablevalues.def"

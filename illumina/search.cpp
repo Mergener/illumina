@@ -252,7 +252,7 @@ void SearchWorker::aspiration_windows() {
 
     // Don't use aspiration windows in lower depths since
     // their results is still too unstable.
-    if (depth >= 6) {
+    if (depth >= ASP_WIN_MIN_DEPTH) {
         alpha = std::max(-MAX_SCORE, prev_score - window);
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
@@ -399,8 +399,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Internal iterative reductions.
-    if (depth >= 4 && !found_in_tt) {
-        depth--;
+    if (depth >= IIR_MIN_DEPTH && !found_in_tt) {
+        depth -= IIR_DEPTH_RED;
     }
 
     // Mate distance pruning.
@@ -456,8 +456,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         // SEE pruning.
-        if (depth <= SEE_PRUNING_DEPTH &&
-            !m_board.in_check()        &&
+        if (depth <= SEE_PRUNING_MAX_DEPTH &&
+            !m_board.in_check()            &&
             move_picker.stage() > MPS_GOOD_CAPTURES &&
             !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
             continue;
@@ -466,25 +466,25 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         make_move(move);
 
         // Futility pruning.
-        if (depth <= 6 &&
-            !in_check  &&
-            !m_board.in_check() &&
-            move.is_quiet() &&
-            (static_eval + 80) < alpha) {
+        if (depth <= FP_MAX_DEPTH &&
+            !in_check             &&
+            !m_board.in_check()   &&
+            move.is_quiet()       &&
+            (static_eval + FP_MARGIN) < alpha) {
             undo_move();
             continue;
         }
 
         // Late move reductions.
         Depth reductions = 0;
-        if (n_searched_moves >= 1 &&
-            depth >= 2            &&
-            move.is_quiet()       &&
-            !in_check             &&
+        if (n_searched_moves >= LMR_MIN_MOVE_IDX &&
+            depth >= LMR_MIN_DEPTH               &&
+            move.is_quiet() &&
+            !in_check       &&
             !m_board.in_check()) {
             reductions  = s_lmr_table[n_searched_moves - 1][depth];
             reductions += !improving;
-            reductions += m_hist.quiet_history(move) <= -400;
+            reductions += m_hist.quiet_history(move) <= LMR_BAD_HISTORY_THRESHOLD;
             reductions  = std::clamp(reductions, 0, depth);
         }
 
@@ -593,7 +593,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (move_picker.stage() >= MPS_BAD_CAPTURES &&
-            !has_good_see(m_board, move.source(), move.destination(), -2)) {
+            !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
             continue;
         }
 
@@ -732,13 +732,17 @@ const WorkerResults& SearchWorker::results() const {
 static void init_search_constants() {
     for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
         for (Depth d = 0; d < MAX_DEPTH; ++d) {
-            s_lmr_table[m][d] = Depth(1.25 + std::log(d) * std::log(m) * 100.0 / 267.0);
+            s_lmr_table[m][d] = Depth(LMR_REDUCTIONS_BASE + std::log(d) * std::log(m) * 100.0 / LMR_REDUCTIONS_DIVISOR);
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {
-        s_lmp_count_table[false][d] = int(3 + 0.6 * d * d);
-        s_lmp_count_table[true][d]  = int(4 + 1.2 * d * d);
+        s_lmp_count_table[false][d] = int(LMP_BASE_IDX_NON_IMPROVING + LMP_DEPTH_FACTOR_NON_IMPROVING * d * d);
+        s_lmp_count_table[true][d]  = int(LMP_BASE_IDX_IMPROVING + LMP_DEPTH_FACTOR_IMPROVING * d * d);
     }
+}
+
+void recompute_search_constants() {
+    init_search_constants();
 }
 
 void init_search() {
