@@ -1,6 +1,10 @@
 #include <iostream>
 #include <sstream>
 #include <random>
+#include <string_view>
+#include <string>
+#include <fstream>
+#include <algorithm>
 
 #include <illumina.h>
 
@@ -40,11 +44,13 @@ Game simulate() {
 
     SearchSettings search_settings;
     search_settings.max_nodes = SEARCH_NODE_LIMIT;
+    search_settings.move_time = 10000;
 
     Board board = Board::standard_startpos();
 
     // Play some random moves to apply variety to the
-    // starting positions.
+    // starting positions, but don't add positions that
+    // are too one-sided.
     bool done_creating_startpos = false;
     size_t n_random_plies = random(MIN_RANDOM_PLIES, MAX_RANDOM_PLIES + 1);
     while (!done_creating_startpos) {
@@ -153,59 +159,87 @@ Game simulate() {
     return game;
 }
 
-void generate_data() {
-    // Initialize random number generator. Will be used
-    // to shuffle data later.
-    std::random_device rd;
-    std::mt19937 g(rd());
+void generate_data(std::string_view out_file) {
+    try {
+        std::ofstream stream((std::string(out_file)), std::ios_base::app);
+        stream.exceptions(std::ios::badbit);
 
-    // Keep generating data until we reach the byte limit.
-    size_t bytes = 0;
-    while (bytes < MAX_BYTES) {
-        // Vector to store and shuffle which data will be outputted from
-        // each game.
-        std::vector<OutputTuple> out_tuples;
+        // Initialize random number generator. Will be used
+        // to shuffle data later.
+        std::random_device rd;
+        std::mt19937 g(rd());
 
-        // Simulate the game and gather information about it.
-        Game game = simulate();
-        const std::vector<GamePlyData>& ply_data_vec = game.ply_data;
+        // Keep generating data until we reach the byte limit.
+        size_t bytes = 0;
+        size_t n_positions = 0;
+        TimePoint time_start = Clock::now();
+        while (bytes < MAX_BYTES) {
+            // Vector to store and shuffle which data will be outputted from
+            // each game.
+            std::vector<OutputTuple> out_tuples;
 
-        // We'll recreate the positions from the game and filter out
-        // some of them before we output them.
-        Board board = game.start_pos;
+            // Simulate the game and gather information about it.
+            Game game = simulate();
+            const std::vector<GamePlyData>& ply_data_vec = game.ply_data;
 
-        // Gather information from each ply from the simulated game.
-        for (const GamePlyData& ply_data: ply_data_vec) {
-            // We want to filter out some positions, so simply play out the moves
-            // but don't add them to the out_tuples.
-            if (board.in_check() ||                         // Checks shouldn't have a static eval.
-                board.last_move().is_capture() ||           // Likely right before a recapture.
-                is_mate_score(ply_data.white_pov_score)) {  // Mate scores behave differently than regular eval.
+            // We'll recreate the positions from the game and filter out
+            // some of them before we output them.
+            Board board = game.start_pos;
+
+            // Gather information from each ply from the simulated game.
+            for (const GamePlyData& ply_data: ply_data_vec) {
+                // We want to filter out some positions, so simply play out the moves
+                // but don't add them to the out_tuples.
+                if (board.in_check() ||                         // Checks shouldn't have a static eval.
+                    board.last_move().is_capture() ||           // Likely right before a recapture.
+                    is_mate_score(ply_data.white_pov_score)) {  // Mate scores behave differently than regular eval.
+                    board.make_move(ply_data.best_move);
+                    continue;
+                }
+
+                out_tuples.push_back({ board.fen(), ply_data.white_pov_score, game.outcome });
+
                 board.make_move(ply_data.best_move);
-                continue;
             }
 
-            out_tuples.push_back({ board.fen(), ply_data.white_pov_score, game.outcome });
+            // Since the tuples will be sliced, shuffling them allows us
+            // to not only save data from the beginning of the game.
+            std::shuffle(out_tuples.begin(), out_tuples.end(), g);
 
-            board.make_move(ply_data.best_move);
+            for (size_t i = 0; i < std::min(out_tuples.size(), POSITIONS_PER_GAME); ++i) {
+                const OutputTuple& out_tuple = out_tuples[i];
+
+                std::stringstream ss;
+                ss << out_tuple.fen             << " | "
+                   << out_tuple.white_pov_score << " | "
+                   << out_tuple.wdl             << '\n';
+
+                std::string s = ss.str();
+                bytes += s.size();
+                stream << s;
+                n_positions++;
+
+                if ((n_positions - 1) % 1000 == 999) {
+                    TimePoint now = Clock::now();
+
+                    double dt = double(delta_ms(now, time_start)) / 1000.0;
+                    double pos_per_sec = double(n_positions) / dt;
+
+                    stream.flush();
+                    std::cout << n_positions << " positions generated so far. ("
+                              << int(dt) << " sec"
+                              << ", " << int(pos_per_sec) << " pos/sec"
+                              << ", " << int(bytes) << " bytes"
+                              << ", " << int(double(bytes) / double(n_positions)) << " bytes/pos"
+                              << ")" << std::endl;
+
+                }
+            }
         }
-
-        // Since the tuples will be sliced, shuffling them allows us
-        // to not only save data from the beginning of the game.
-        std::shuffle(out_tuples.begin(), out_tuples.end(), g);
-
-        for (size_t i = 0; i < std::min(out_tuples.size(), POSITIONS_PER_GAME); ++i) {
-            const OutputTuple& out_tuple = out_tuples[i];
-
-            std::stringstream ss;
-            ss << out_tuple.fen             << " | "
-               << out_tuple.white_pov_score << " | "
-               << out_tuple.wdl             << '\n';
-
-            std::string s = ss.str();
-            bytes += s.size();
-            std::cout << s;
-        }
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Fatal: " << e.what() << std::endl;
+        throw e;
     }
 }
 
@@ -214,8 +248,21 @@ void generate_data() {
 int main(int argc, char* argv[]) {
     std::ios_base::sync_with_stdio(false);
 
+    std::string out_file;
+
+    if (argc < 2) {
+        std::cout << "Enter an output file path: " << std::endl;
+        std::getline(std::cin, out_file);
+
+        out_file.erase(std::remove(out_file.begin(), out_file.end(), '"'), out_file.end());
+        out_file.erase(std::remove(out_file.begin(), out_file.end(), '\n'), out_file.end());
+    }
+    else {
+        out_file = argv[1];
+    }
+
     illumina::init();
 
-    illumina::generate_data();
+    illumina::generate_data(out_file);
     return 0;
 }
