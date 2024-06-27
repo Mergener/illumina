@@ -435,7 +435,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         has_legal_moves = true;
         move_idx++;
 
-        check_time_bounds();
+        check_limits();
         if (should_stop()) {
             break;
         }
