@@ -114,7 +114,7 @@ class SearchWorker {
 public:
     void iterative_deepening();
     bool should_stop() const;
-    void check_time_bounds();
+    void check_limits();
 
     const WorkerResults& results() const;
 
@@ -136,7 +136,6 @@ private:
     Move        m_curr_move  = MOVE_NULL;
     int         m_curr_move_number = 0;
 
-    template <bool PV>
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
     template <bool PV, bool SKIP_NULL = false, bool ROOT = false>
@@ -226,7 +225,7 @@ void SearchWorker::iterative_deepening() {
 
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        check_time_bounds();
+        check_limits();
         aspiration_windows();
         if (should_stop() || m_context->time_manager().finished_soft()) {
             // If we finished soft, we don't want to start a new iteration.
@@ -289,7 +288,7 @@ void SearchWorker::aspiration_windows() {
             report_pv_results();
         }
 
-        check_time_bounds();
+        check_limits();
 
         window += window / 2;
     }
@@ -301,12 +300,16 @@ static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
     // Keep track on some stats to report or use later.
-    m_results.nodes++;
     m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
+
+    // Make sure we count the root node.
+    if constexpr (ROOT) {
+        m_results.nodes++;
+    }
 
     // Check if we must stop our search.
     // If so, return the best score we've found so far.
-    check_time_bounds();
+    check_limits();
     if (should_stop()) {
         return alpha;
     }
@@ -360,7 +363,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
-        return quiescence_search<PV>(ply, alpha, beta);
+        return quiescence_search(ply, alpha, beta);
     }
 
     // Compute the static eval. Useful for many heuristics.
@@ -511,13 +514,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Depth reductions = 0;
         if (n_searched_moves >= 1 &&
             depth >= 2            &&
-            move.is_quiet()       &&
             !in_check             &&
             !m_board.in_check()) {
-            reductions  = s_lmr_table[n_searched_moves - 1][depth];
-            reductions += !improving;
-            reductions += m_hist.quiet_history(move) <= -400;
-            reductions  = std::clamp(reductions, 0, depth);
+            reductions = s_lmr_table[n_searched_moves - 1][depth];
+            if (move.is_quiet()) {
+                reductions += !improving;
+                reductions += m_hist.quiet_history(move) <= -400;
+            }
+            else if (move_picker.stage() == MPS_BAD_CAPTURES) {
+                bool stable = alpha >= 250;
+                reductions -= !stable * (reductions / 2);
+            }
+            reductions = std::clamp(reductions, 0, depth);
         }
 
         Score score;
@@ -603,44 +611,23 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     return alpha;
 }
 
-template <bool PV>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
-    m_results.nodes++;
-
-    TranspositionTable& tt = m_context->tt();
-    ui64 board_key         = m_board.hash_key();
-    Score original_alpha   = alpha;
-    Move hash_move         = MOVE_NULL;
-
-    TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry, ply);
-    if (found_in_tt) {
-        hash_move = tt_entry.move();
-
-        // Prevent quiet moves from being searched in qsearch.
-        if (!hash_move.is_capture() &&
-            !hash_move.is_promotion()) {
-            hash_move = MOVE_NULL;
-        }
-    }
-
     Score stand_pat = m_eval.get();
 
     if (stand_pat >= beta) {
-        tt.try_store(board_key, ply, MOVE_NULL, beta, 0, BT_LOWERBOUND);
         return beta;
     }
     if (stand_pat > alpha) {
         alpha = stand_pat;
     }
 
-    check_time_bounds();
+    check_limits();
     if (should_stop()) {
         return alpha;
     }
 
     // Finally, start looping over available noisy moves.
-    MovePicker<true> move_picker(m_board, ply, m_hist, hash_move);
+    MovePicker<true> move_picker(m_board, ply, m_hist);
     SearchMove move;
     SearchMove best_move;
     while ((move = move_picker.next()) != MOVE_NULL) {
@@ -651,7 +638,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
 
         make_move(move);
-        Score score = -quiescence_search<PV>(ply + 1, -beta, -alpha);
+        Score score = -quiescence_search(ply + 1, -beta, -alpha);
         undo_move();
 
         if (score >= beta) {
@@ -663,20 +650,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             best_move = move;
             alpha = score;
         }
-    }
-
-    // Store in transposition table.
-    if (alpha >= beta) {
-        // Beta-Cutoff, lowerbound score.
-        tt.try_store(board_key, ply, best_move, alpha, 0, BT_LOWERBOUND);
-    }
-    else if (alpha <= original_alpha) {
-        // Couldn't raise alpha, score is an upperbound.
-        tt.try_store(board_key, ply, best_move, alpha, 0, BT_UPPERBOUND);
-    }
-    else {
-        // We have an exact score.
-        tt.try_store(board_key, ply, best_move, alpha, 0, BT_EXACT);
     }
 
     return alpha;
@@ -733,8 +706,13 @@ void SearchWorker::report_pv_results() {
     m_context->listeners().pv_finish(pv_results);
 }
 
-void SearchWorker::check_time_bounds() {
+void SearchWorker::check_limits() {
     if (!m_main) {
+        return;
+    }
+
+    if (m_results.nodes >= m_settings->max_nodes) {
+        m_context->stop_search();
         return;
     }
 
@@ -749,13 +727,14 @@ void SearchWorker::check_time_bounds() {
 
 Score SearchWorker::draw_score() const {
     return m_board.color_to_move() == m_context->root_info().color
-        ? -m_settings->contempt
-        :  m_settings->contempt;
+           ? -m_settings->contempt
+           :  m_settings->contempt;
 }
 
 void SearchWorker::make_move(Move move) {
     m_board.make_move(move);
     m_eval.on_make_move(m_board);
+    m_results.nodes++;
 }
 
 void SearchWorker::undo_move() {
@@ -783,7 +762,7 @@ SearchWorker::SearchWorker(bool main,
                            const SearchSettings* settings)
     : m_main(main), m_board(std::move(board)),
       m_context(context), m_settings(settings) {
-      m_eval.on_new_board(m_board);
+    m_eval.on_new_board(m_board);
 }
 
 const WorkerResults& SearchWorker::results() const {
