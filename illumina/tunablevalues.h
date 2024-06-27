@@ -1,9 +1,9 @@
 #ifndef ILLUMINA_TUNABLEVALUES_H
 #define ILLUMINA_TUNABLEVALUES_H
 
-#define TUNING_BUILD
-
 namespace illumina {
+
+//#define TUNING_BUILD
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, value, ...) extern type name;
