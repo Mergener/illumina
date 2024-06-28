@@ -246,7 +246,7 @@ void SearchWorker::aspiration_windows() {
     Score prev_score = m_results.score;
     Score alpha      = -MAX_SCORE;
     Score beta       = MAX_SCORE;
-    Score window     = 50;
+    Score window     = 10;
     Depth depth      = m_curr_depth;
 
     // Don't use aspiration windows in lower depths since
@@ -482,13 +482,20 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             !m_board.in_check()) {
             reductions = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
+                // Further reduce moves that are not improving the static evaluation.
                 reductions += !improving;
+
+                // Further reduce moves that have been historically very bad.
                 reductions += m_hist.quiet_history(move) <= -400;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
+                // Further reduce bad captures when we're in a very good position
+                // and probably don't need unsound sacrifices.
                 bool stable = alpha >= 250;
                 reductions -= !stable * (reductions / 2);
             }
+
+            // Prevent too high or below zero reductions.
             reductions = std::clamp(reductions, 0, depth);
         }
 
