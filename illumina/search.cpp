@@ -241,7 +241,6 @@ void SearchWorker::aspiration_windows() {
     for (Depth ply = 0; ply < STACK_SIZE; ++ply) {
         SearchNode& node = search_stack[ply];
         node.ply = ply;
-        node.pv[0] = MOVE_NULL;
     }
 
     // Prepare aspiration windows.
@@ -300,6 +299,11 @@ static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
+    // Initialize the PV line with a null move. Specially useful for all-nodes.
+    if constexpr (PV) {
+        node->pv[0] = MOVE_NULL;
+    }
+
     // Keep track on some stats to report or use later.
     m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
 
