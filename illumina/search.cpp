@@ -25,6 +25,7 @@ struct RootInfo {
 struct SearchNode {
     Depth ply = 0;
     Score static_eval = 0;
+    Move  pv[MAX_DEPTH];
 };
 
 /**
@@ -150,7 +151,7 @@ private:
     void make_null_move();
     void undo_null_move();
 
-    void report_pv_results();
+    void report_pv_results(const SearchNode* search_stack);
 
     Score draw_score() const;
 };
@@ -266,7 +267,7 @@ void SearchWorker::aspiration_windows() {
             // We found an exact score within our bounds, finish
             // the current depth search.
             m_results.bound_type = BT_EXACT;
-            report_pv_results();
+            report_pv_results(search_stack);
             break;
         }
 
@@ -284,7 +285,7 @@ void SearchWorker::aspiration_windows() {
             prev_score = score;
             best_move  = m_results.best_move;
             m_results.bound_type = BT_LOWERBOUND;
-            report_pv_results();
+            report_pv_results(search_stack);
         }
 
         check_limits();
@@ -298,6 +299,11 @@ static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
+    // Initialize the PV line with a null move. Specially useful for all-nodes.
+    if constexpr (PV) {
+        node->pv[0] = MOVE_NULL;
+    }
+
     // Keep track on some stats to report or use later.
     m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
 
@@ -541,6 +547,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 m_results.best_move = move;
                 m_results.score     = alpha;
             }
+
+            if constexpr (PV) {
+                node->pv[0] = MOVE_NULL;
+            }
             break;
         }
         if (score > alpha) {
@@ -552,6 +562,20 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             if (ROOT && m_main && (!should_stop() || depth <= 2)) {
                 m_results.best_move = move;
                 m_results.score     = alpha;
+            }
+
+            // Update the PV table.
+            if constexpr (PV) {
+                node->pv[0] = best_move;
+                size_t i;
+                for (i = 0; i < MAX_DEPTH - 2; ++i) {
+                    Move pv_move = (node + 1)->pv[i];
+                    if (pv_move == MOVE_NULL) {
+                        break;
+                    }
+                    node->pv[i + 1] = pv_move;
+                }
+                node->pv[i + 1] = MOVE_NULL;
             }
         }
     }
@@ -626,7 +650,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     return alpha;
 }
 
-void SearchWorker::report_pv_results() {
+void SearchWorker::report_pv_results(const SearchNode* search_stack) {
     if (!m_main) {
         return;
     }
@@ -642,26 +666,12 @@ void SearchWorker::report_pv_results() {
     pv_results.bound_type = m_results.bound_type;
 
     // Extract the PV line.
-    pv_results.line.push_back(m_results.best_move);
-    m_board.make_move(m_results.best_move);
-
-    TranspositionTableEntry tt_entry {};
-    while (m_context->tt().probe(m_board.hash_key(), tt_entry)) {
-        Move move = tt_entry.move();
-        if (move == MOVE_NULL) {
+    pv_results.line.clear();
+    for (Move pv_move: search_stack->pv) {
+        if (pv_move == MOVE_NULL) {
             break;
         }
-
-        pv_results.line.push_back(tt_entry.move());
-        m_board.make_move(tt_entry.move());
-
-        if (m_board.is_repetition_draw()) {
-            break;
-        }
-    }
-
-    for (Move _: pv_results.line) {
-        m_board.undo_move();
+        pv_results.line.push_back(pv_move);
     }
 
     if (pv_results.line.size() >= 2) {
