@@ -135,6 +135,9 @@ private:
     Depth       m_curr_depth = 1;
     Move        m_curr_move  = MOVE_NULL;
     int         m_curr_move_number = 0;
+    int         m_curr_pv_idx;
+
+    std::vector<Move> m_search_moves;
 
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
@@ -144,7 +147,7 @@ private:
               Score beta,
               SearchNode* stack_node);
 
-    void aspiration_windows();
+    Move aspiration_windows();
 
     void make_move(Move move);
     void undo_move();
@@ -219,22 +222,41 @@ SearchResults Searcher::search(const Board& board,
 void SearchWorker::iterative_deepening() {
     // Make sure we set a valid move as the best move so that
     // we can return it if our search is interrupted early.
-    Move moves[MAX_GENERATED_MOVES];
-    generate_moves(m_board, moves);
-    m_results.best_move = moves[0];
+    m_results.best_move = m_context->root_info().moves[0];
 
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        check_limits();
-        aspiration_windows();
-        if (should_stop() || m_context->time_manager().finished_soft()) {
-            // If we finished soft, we don't want to start a new iteration.
-            break;
+        // Make sure this thread's search moves list is full once
+        // each new iteration starts.
+        m_search_moves = m_context->root_info().moves;
+
+        int n_pvs = std::clamp(m_settings->n_pvs, 1, MAX_PVS);
+        for (m_curr_pv_idx = 0; m_curr_pv_idx < n_pvs; ++m_curr_pv_idx) {
+            check_limits();
+            Move pv_move = aspiration_windows();
+            check_limits();
+            if (should_stop() || m_context->time_manager().finished_soft()) {
+                // If we finished soft, we don't want to start a new iteration.
+                break;
+            }
+
+            // When using MultiPV, erase the best searched move and look for a new
+            // pv without it.
+            auto best_move_it = std::find(m_search_moves.begin(), m_search_moves.end(), pv_move);
+            if (best_move_it != m_search_moves.end()) {
+                m_search_moves.erase(best_move_it);
+            }
+
+            // If the number of legal moves is inferior to the number of
+            // request pvs, just don't search them.
+            if (m_search_moves.empty()) {
+                break;
+            }
         }
     }
 }
 
-void SearchWorker::aspiration_windows() {
+Move SearchWorker::aspiration_windows() {
     // Prepare the search stack.
     constexpr size_t STACK_SIZE = MAX_DEPTH + 64;
     SearchNode search_stack[STACK_SIZE];
@@ -276,8 +298,10 @@ void SearchWorker::aspiration_windows() {
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_curr_depth;
 
-            m_results.score     = prev_score;
-            m_results.best_move = best_move;
+            if (m_curr_pv_idx == 0) {
+                m_results.score = prev_score;
+                m_results.best_move = best_move;
+            }
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
@@ -292,6 +316,8 @@ void SearchWorker::aspiration_windows() {
 
         window += window / 2;
     }
+
+    return search_stack[0].pv[0];
 }
 
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
@@ -325,7 +351,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Setup some important values.
-    const RootInfo& root_info = m_context->root_info();
     TranspositionTable& tt = m_context->tt();
     Score original_alpha   = alpha;
     int n_searched_moves   = 0;
@@ -435,9 +460,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         has_legal_moves = true;
         move_idx++;
 
-        // Skip moves not included in searchmoves argument.
+        // Skip unrequested moves.
         if (ROOT &&
-            std::find(root_info.moves.begin(), root_info.moves.end(), move) == root_info.moves.end()) {
+            std::find(m_search_moves.begin(), m_search_moves.end(), move) == m_search_moves.end()) {
             continue;
         }
 
@@ -543,12 +568,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             // Due to aspiration windows, our search may have failed high in the root.
             // Make sure we always have a best_move and a best_score.
-            if (ROOT && m_main && (!should_stop() || depth <= 2)) {
+            if (ROOT && m_main && (!should_stop() || depth <= 2) && m_curr_pv_idx == 0) {
                 m_results.best_move = move;
                 m_results.score     = alpha;
             }
 
-            if constexpr (PV) {
+            if constexpr (PV && !ROOT) {
                 node->pv[0] = MOVE_NULL;
             }
             break;
@@ -559,7 +584,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             best_move = move;
 
             // Make sure we update our best_move in the root ASAP.
-            if (ROOT && m_main && (!should_stop() || depth <= 2)) {
+            if (ROOT && m_main && (!should_stop() || depth <= 2) && m_curr_pv_idx == 0) {
                 m_results.best_move = move;
                 m_results.score     = alpha;
             }
@@ -651,15 +676,16 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 }
 
 void SearchWorker::report_pv_results(const SearchNode* search_stack) {
+    // We only want the main thread to report results, the others
+    // should just assist on the search.
     if (!m_main) {
         return;
     }
 
     PVResults pv_results;
-
+    pv_results.pv_idx     = m_curr_pv_idx;
     pv_results.depth      = m_curr_depth;
     pv_results.sel_depth  = m_results.sel_depth;
-    pv_results.best_move  = m_results.best_move;
     pv_results.score      = m_results.score;
     pv_results.nodes      = m_results.nodes;
     pv_results.time       = m_context->elapsed();
@@ -674,16 +700,27 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
         pv_results.line.push_back(pv_move);
     }
 
-    if (pv_results.line.size() >= 2) {
+    // The best move for a PV result is the first move of the line.
+    // To not be confused with the SearchWorker's best move, as this
+    // would be the best move of the entire search.
+    if (!pv_results.line.empty()) {
+        pv_results.best_move = pv_results.line[0];
+    }
+
+    // Ponder move is the move we would consider pondering about if we could.
+    // We assume the best response from our opponent to be that move.
+    if (pv_results.line.size() >= 2 && m_curr_pv_idx == 0) {
         m_results.ponder_move = pv_results.line[1];
     }
 
+    // Notify the time manager that we finished a pv iteration.
     if (m_main) {
         m_context->time_manager().on_new_pv(pv_results.depth,
                                             pv_results.best_move,
                                             pv_results.score);
     }
 
+    // Notify whoever else needs to know about it.
     m_context->listeners().pv_finish(pv_results);
 }
 
