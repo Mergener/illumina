@@ -14,6 +14,7 @@ namespace illumina {
 
 struct PVResults {
     Depth depth;
+    int pv_idx;
     Depth sel_depth;
     Move  best_move;
     Score score;
@@ -25,6 +26,7 @@ struct PVResults {
 
 struct SearchSettings {
     Score contempt = 0;
+    int n_pvs = 1;
     ui64 max_nodes = UINT64_MAX;
     std::optional<Depth> max_depth;
     std::optional<i64>   white_time;
