@@ -229,6 +229,10 @@ SearchResults Searcher::search(const Board& board,
 void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
+        if (should_stop() || m_context->time_manager().finished_soft()) {
+            break;
+        }
+
         // Make sure this thread's search moves list is full once
         // each new iteration starts.
         m_search_moves = m_context->root_info().moves;
@@ -262,6 +266,7 @@ void SearchWorker::iterative_deepening() {
                 m_search_moves.erase(best_move_it);
             }
         }
+        m_curr_pv_idx = 0;
     }
 }
 
@@ -313,7 +318,7 @@ void SearchWorker::aspiration_windows() {
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
 
-            prev_score = m_results.pv_results[m_curr_pv_idx].score;
+            prev_score = score;
             best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
             m_results.pv_results[m_curr_pv_idx].bound_type = BT_LOWERBOUND;
             report_pv_results(search_stack);
@@ -715,7 +720,7 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
     // Ponder move is the move we would consider pondering about if we could.
     // We assume the best response from our opponent to be that move.
     if (pv_results.line.size() >= 2) {
-        m_results.pv_results[0].ponder_move = pv_results.line[1];
+        m_results.pv_results[m_curr_pv_idx].ponder_move = pv_results.line[1];
     }
 
     // Notify the time manager that we finished a pv iteration.
