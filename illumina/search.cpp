@@ -102,12 +102,14 @@ const RootInfo& SearchContext::root_info() const {
 }
 
 struct WorkerResults {
-    Move  best_move   = MOVE_NULL;
-    Move  ponder_move = MOVE_NULL;
-    Score score       = 0;
+    struct {
+        Move best_move = MOVE_NULL;
+        Move ponder_move = MOVE_NULL;
+        Score score = 0;
+        BoundType bound_type = BT_EXACT;
+    } pv_results[MAX_PVS];
     Depth sel_depth   = 0;
     ui64  nodes       = 0;
-    BoundType bound_type = BT_EXACT;
 };
 
 class SearchWorker {
@@ -135,7 +137,7 @@ private:
     Depth       m_curr_depth = 1;
     Move        m_curr_move  = MOVE_NULL;
     int         m_curr_move_number = 0;
-    int         m_curr_pv_idx;
+    int         m_curr_pv_idx = 0;
 
     std::vector<Move> m_search_moves;
 
@@ -147,7 +149,7 @@ private:
               Score beta,
               SearchNode* stack_node);
 
-    Move aspiration_windows();
+    void aspiration_windows();
 
     void make_move(Move move);
     void undo_move();
@@ -211,19 +213,20 @@ SearchResults Searcher::search(const Board& board,
 
     const WorkerResults& worker_results = worker.results();
 
+    // Fill in the search results object to be returned.
+    // We assume that the best move is the one at MultiPV 1.
+    // Although this is not necessarily true, we don't want
+    // to focus our efforts in improving MultiPV mode since
+    // it is already not the one used for playing.
     SearchResults results {};
-    results.score       = worker_results.score;
-    results.best_move   = worker_results.best_move;
-    results.ponder_move = worker_results.ponder_move;
+    results.score       = worker_results.pv_results[0].score;
+    results.best_move   = worker_results.pv_results[0].best_move;
+    results.ponder_move = worker_results.pv_results[0].ponder_move;
 
     return results;
 }
 
 void SearchWorker::iterative_deepening() {
-    // Make sure we set a valid move as the best move so that
-    // we can return it if our search is interrupted early.
-    m_results.best_move = m_context->root_info().moves[0];
-
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
         // Make sure this thread's search moves list is full once
@@ -232,8 +235,19 @@ void SearchWorker::iterative_deepening() {
 
         int n_pvs = std::clamp(m_settings->n_pvs, 1, MAX_PVS);
         for (m_curr_pv_idx = 0; m_curr_pv_idx < n_pvs; ++m_curr_pv_idx) {
+            // If there are no moves to search, abort.
+            if (m_search_moves.empty()) {
+                break;
+            }
+
+            // Make sure we set a valid move as the best move so that
+            // we can return it if our search is interrupted early.
+            if (m_results.pv_results[m_curr_pv_idx].best_move == MOVE_NULL) {
+                m_results.pv_results[m_curr_pv_idx].best_move = m_search_moves[0];
+            }
+
             check_limits();
-            Move pv_move = aspiration_windows();
+            aspiration_windows();
             check_limits();
             if (should_stop() || m_context->time_manager().finished_soft()) {
                 // If we finished soft, we don't want to start a new iteration.
@@ -242,21 +256,16 @@ void SearchWorker::iterative_deepening() {
 
             // When using MultiPV, erase the best searched move and look for a new
             // pv without it.
+            Move pv_move = m_results.pv_results[m_curr_pv_idx].best_move;
             auto best_move_it = std::find(m_search_moves.begin(), m_search_moves.end(), pv_move);
             if (best_move_it != m_search_moves.end()) {
                 m_search_moves.erase(best_move_it);
-            }
-
-            // If the number of legal moves is inferior to the number of
-            // request pvs, just don't search them.
-            if (m_search_moves.empty()) {
-                break;
             }
         }
     }
 }
 
-Move SearchWorker::aspiration_windows() {
+void SearchWorker::aspiration_windows() {
     // Prepare the search stack.
     constexpr size_t STACK_SIZE = MAX_DEPTH + 64;
     SearchNode search_stack[STACK_SIZE];
@@ -266,7 +275,7 @@ Move SearchWorker::aspiration_windows() {
     }
 
     // Prepare aspiration windows.
-    Score prev_score = m_results.score;
+    Score prev_score = m_results.pv_results[m_curr_pv_idx].score;
     Score alpha      = -MAX_SCORE;
     Score beta       = MAX_SCORE;
     Score window     = 10;
@@ -279,7 +288,7 @@ Move SearchWorker::aspiration_windows() {
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
 
-    Move best_move = m_results.best_move;
+    Move best_move = m_results.pv_results[m_curr_pv_idx].best_move;
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
@@ -288,7 +297,7 @@ Move SearchWorker::aspiration_windows() {
         if (score > alpha && score < beta) {
             // We found an exact score within our bounds, finish
             // the current depth search.
-            m_results.bound_type = BT_EXACT;
+            m_results.pv_results[m_curr_pv_idx].bound_type = BT_EXACT;
             report_pv_results(search_stack);
             break;
         }
@@ -298,17 +307,15 @@ Move SearchWorker::aspiration_windows() {
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_curr_depth;
 
-            if (m_curr_pv_idx == 0) {
-                m_results.score = prev_score;
-                m_results.best_move = best_move;
-            }
+            m_results.pv_results[m_curr_pv_idx].score     = prev_score;
+            m_results.pv_results[m_curr_pv_idx].best_move = best_move;
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
 
-            prev_score = score;
-            best_move  = m_results.best_move;
-            m_results.bound_type = BT_LOWERBOUND;
+            prev_score = m_results.pv_results[m_curr_pv_idx].score;
+            best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
+            m_results.pv_results[m_curr_pv_idx].bound_type = BT_LOWERBOUND;
             report_pv_results(search_stack);
         }
 
@@ -316,8 +323,6 @@ Move SearchWorker::aspiration_windows() {
 
         window += window / 2;
     }
-
-    return search_stack[0].pv[0];
 }
 
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
@@ -568,9 +573,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             // Due to aspiration windows, our search may have failed high in the root.
             // Make sure we always have a best_move and a best_score.
-            if (ROOT && m_main && (!should_stop() || depth <= 2) && m_curr_pv_idx == 0) {
-                m_results.best_move = move;
-                m_results.score     = alpha;
+            if (ROOT && m_main && (!should_stop() || depth <= 2)) {
+                m_results.pv_results[m_curr_pv_idx].best_move = move;
+                m_results.pv_results[m_curr_pv_idx].score     = alpha;
             }
 
             if constexpr (PV && !ROOT) {
@@ -584,9 +589,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             best_move = move;
 
             // Make sure we update our best_move in the root ASAP.
-            if (ROOT && m_main && (!should_stop() || depth <= 2) && m_curr_pv_idx == 0) {
-                m_results.best_move = move;
-                m_results.score     = alpha;
+            if (ROOT && m_main && (!should_stop() || depth <= 2)) {
+                m_results.pv_results[m_curr_pv_idx].best_move = move;
+                m_results.pv_results[m_curr_pv_idx].score     = alpha;
             }
 
             // Update the PV table.
@@ -686,10 +691,10 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
     pv_results.pv_idx     = m_curr_pv_idx;
     pv_results.depth      = m_curr_depth;
     pv_results.sel_depth  = m_results.sel_depth;
-    pv_results.score      = m_results.score;
+    pv_results.score      = m_results.pv_results[m_curr_pv_idx].score;
     pv_results.nodes      = m_results.nodes;
     pv_results.time       = m_context->elapsed();
-    pv_results.bound_type = m_results.bound_type;
+    pv_results.bound_type = m_results.pv_results[m_curr_pv_idx].bound_type;
 
     // Extract the PV line.
     pv_results.line.clear();
@@ -709,8 +714,8 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
 
     // Ponder move is the move we would consider pondering about if we could.
     // We assume the best response from our opponent to be that move.
-    if (pv_results.line.size() >= 2 && m_curr_pv_idx == 0) {
-        m_results.ponder_move = pv_results.line[1];
+    if (pv_results.line.size() >= 2) {
+        m_results.pv_results[0].ponder_move = pv_results.line[1];
     }
 
     // Notify the time manager that we finished a pv iteration.
