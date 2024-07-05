@@ -26,6 +26,7 @@ struct RootInfo {
 struct SearchNode {
     Depth ply = 0;
     Score static_eval = 0;
+    Move  pv[MAX_DEPTH];
 };
 
 /**
@@ -102,12 +103,14 @@ const RootInfo& SearchContext::root_info() const {
 }
 
 struct WorkerResults {
-    Move  best_move   = MOVE_NULL;
-    Move  ponder_move = MOVE_NULL;
-    Score score       = 0;
+    struct {
+        Move best_move = MOVE_NULL;
+        Move ponder_move = MOVE_NULL;
+        Score score = 0;
+        BoundType bound_type = BT_EXACT;
+    } pv_results[MAX_PVS];
     Depth sel_depth   = 0;
     ui64  nodes       = 0;
-    BoundType bound_type = BT_EXACT;
 };
 
 class SearchWorker {
@@ -135,6 +138,9 @@ private:
     Depth       m_curr_depth = 1;
     Move        m_curr_move  = MOVE_NULL;
     int         m_curr_move_number = 0;
+    int         m_curr_pv_idx = 0;
+
+    std::vector<Move> m_search_moves;
 
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
@@ -151,7 +157,7 @@ private:
     void make_null_move();
     void undo_null_move();
 
-    void report_pv_results();
+    void report_pv_results(const SearchNode* search_stack);
 
     Score draw_score() const;
 };
@@ -208,29 +214,60 @@ SearchResults Searcher::search(const Board& board,
 
     const WorkerResults& worker_results = worker.results();
 
+    // Fill in the search results object to be returned.
+    // We assume that the best move is the one at MultiPV 1.
+    // Although this is not necessarily true, we don't want
+    // to focus our efforts in improving MultiPV mode since
+    // it is already not the one used for playing.
     SearchResults results {};
-    results.score       = worker_results.score;
-    results.best_move   = worker_results.best_move;
-    results.ponder_move = worker_results.ponder_move;
+    results.score       = worker_results.pv_results[0].score;
+    results.best_move   = worker_results.pv_results[0].best_move;
+    results.ponder_move = worker_results.pv_results[0].ponder_move;
 
     return results;
 }
 
 void SearchWorker::iterative_deepening() {
-    // Make sure we set a valid move as the best move so that
-    // we can return it if our search is interrupted early.
-    Move moves[MAX_GENERATED_MOVES];
-    generate_moves(m_board, moves);
-    m_results.best_move = moves[0];
-
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        check_limits();
-        aspiration_windows();
         if (should_stop() || m_context->time_manager().finished_soft()) {
-            // If we finished soft, we don't want to start a new iteration.
             break;
         }
+
+        // Make sure this thread's search moves list is full once
+        // each new iteration starts.
+        m_search_moves = m_context->root_info().moves;
+
+        int n_pvs = std::clamp(m_settings->n_pvs, 1, MAX_PVS);
+        for (m_curr_pv_idx = 0; m_curr_pv_idx < n_pvs; ++m_curr_pv_idx) {
+            // If there are no moves to search, abort.
+            if (m_search_moves.empty()) {
+                break;
+            }
+
+            // Make sure we set a valid move as the best move so that
+            // we can return it if our search is interrupted early.
+            if (m_results.pv_results[m_curr_pv_idx].best_move == MOVE_NULL) {
+                m_results.pv_results[m_curr_pv_idx].best_move = m_search_moves[0];
+            }
+
+            check_limits();
+            aspiration_windows();
+            check_limits();
+            if (should_stop() || m_context->time_manager().finished_soft()) {
+                // If we finished soft, we don't want to start a new iteration.
+                break;
+            }
+
+            // When using MultiPV, erase the best searched move and look for a new
+            // pv without it.
+            Move pv_move = m_results.pv_results[m_curr_pv_idx].best_move;
+            auto best_move_it = std::find(m_search_moves.begin(), m_search_moves.end(), pv_move);
+            if (best_move_it != m_search_moves.end()) {
+                m_search_moves.erase(best_move_it);
+            }
+        }
+        m_curr_pv_idx = 0;
     }
 }
 
@@ -244,7 +281,7 @@ void SearchWorker::aspiration_windows() {
     }
 
     // Prepare aspiration windows.
-    Score prev_score = m_results.score;
+    Score prev_score = m_results.pv_results[m_curr_pv_idx].score;
     Score alpha      = -MAX_SCORE;
     Score beta       = MAX_SCORE;
     Score window     = ASP_WIN_WINDOW;
@@ -257,7 +294,7 @@ void SearchWorker::aspiration_windows() {
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
 
-    Move best_move = m_results.best_move;
+    Move best_move = m_results.pv_results[m_curr_pv_idx].best_move;
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
@@ -266,8 +303,8 @@ void SearchWorker::aspiration_windows() {
         if (score > alpha && score < beta) {
             // We found an exact score within our bounds, finish
             // the current depth search.
-            m_results.bound_type = BT_EXACT;
-            report_pv_results();
+            m_results.pv_results[m_curr_pv_idx].bound_type = BT_EXACT;
+            report_pv_results(search_stack);
             break;
         }
 
@@ -276,16 +313,16 @@ void SearchWorker::aspiration_windows() {
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_curr_depth;
 
-            m_results.score     = prev_score;
-            m_results.best_move = best_move;
+            m_results.pv_results[m_curr_pv_idx].score     = prev_score;
+            m_results.pv_results[m_curr_pv_idx].best_move = best_move;
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
 
             prev_score = score;
-            best_move  = m_results.best_move;
-            m_results.bound_type = BT_LOWERBOUND;
-            report_pv_results();
+            best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
+            m_results.pv_results[m_curr_pv_idx].bound_type = BT_LOWERBOUND;
+            report_pv_results(search_stack);
         }
 
         check_limits();
@@ -299,6 +336,11 @@ static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
+    // Initialize the PV line with a null move. Specially useful for all-nodes.
+    if constexpr (PV) {
+        node->pv[0] = MOVE_NULL;
+    }
+
     // Keep track on some stats to report or use later.
     m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
 
@@ -320,7 +362,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Setup some important values.
-    const RootInfo& root_info = m_context->root_info();
     TranspositionTable& tt = m_context->tt();
     Score original_alpha   = alpha;
     int n_searched_moves   = 0;
@@ -430,9 +471,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         has_legal_moves = true;
         move_idx++;
 
-        // Skip moves not included in searchmoves argument.
+        // Skip unrequested moves.
         if (ROOT &&
-            std::find(root_info.moves.begin(), root_info.moves.end(), move) == root_info.moves.end()) {
+            std::find(m_search_moves.begin(), m_search_moves.end(), move) == m_search_moves.end()) {
             continue;
         }
 
@@ -478,14 +519,26 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         // Late move reductions.
         Depth reductions = 0;
         if (n_searched_moves >= LMR_MIN_MOVE_IDX &&
-            depth >= LMR_MIN_DEPTH               &&
-            move.is_quiet() &&
-            !in_check       &&
+            depth >= LMR_MIN_DEPTH &&
+            !in_check              &&
             !m_board.in_check()) {
-            reductions  = s_lmr_table[n_searched_moves - 1][depth];
-            reductions += !improving;
-            reductions += m_hist.quiet_history(move) <= LMR_BAD_HISTORY_THRESHOLD;
-            reductions  = std::clamp(reductions, 0, depth);
+            reductions = s_lmr_table[n_searched_moves - 1][depth];
+            if (move.is_quiet()) {
+                // Further reduce moves that are not improving the static evaluation.
+                reductions += !improving;
+
+                // Further reduce moves that have been historically very bad.
+                reductions += m_hist.quiet_history(move) <= LMR_BAD_HISTORY_THRESHOLD;
+            }
+            else if (move_picker.stage() == MPS_BAD_CAPTURES) {
+                // Further reduce bad captures when we're in a very good position
+                // and probably don't need unsound sacrifices.
+                bool stable = alpha >= 250;
+                reductions -= !stable * (reductions / 2);
+            }
+
+            // Prevent too high or below zero reductions.
+            reductions = std::clamp(reductions, 0, depth);
         }
 
         Score score;
@@ -527,8 +580,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Due to aspiration windows, our search may have failed high in the root.
             // Make sure we always have a best_move and a best_score.
             if (ROOT && m_main && (!should_stop() || depth <= 2)) {
-                m_results.best_move = move;
-                m_results.score     = alpha;
+                m_results.pv_results[m_curr_pv_idx].best_move = move;
+                m_results.pv_results[m_curr_pv_idx].score     = alpha;
+            }
+
+            if constexpr (PV && !ROOT) {
+                node->pv[0] = MOVE_NULL;
             }
             break;
         }
@@ -539,8 +596,22 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             // Make sure we update our best_move in the root ASAP.
             if (ROOT && m_main && (!should_stop() || depth <= 2)) {
-                m_results.best_move = move;
-                m_results.score     = alpha;
+                m_results.pv_results[m_curr_pv_idx].best_move = move;
+                m_results.pv_results[m_curr_pv_idx].score     = alpha;
+            }
+
+            // Update the PV table.
+            if constexpr (PV) {
+                node->pv[0] = best_move;
+                size_t i;
+                for (i = 0; i < MAX_DEPTH - 2; ++i) {
+                    Move pv_move = (node + 1)->pv[i];
+                    if (pv_move == MOVE_NULL) {
+                        break;
+                    }
+                    node->pv[i + 1] = pv_move;
+                }
+                node->pv[i + 1] = MOVE_NULL;
             }
         }
     }
@@ -615,54 +686,52 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     return alpha;
 }
 
-void SearchWorker::report_pv_results() {
+void SearchWorker::report_pv_results(const SearchNode* search_stack) {
+    // We only want the main thread to report results, the others
+    // should just assist on the search.
     if (!m_main) {
         return;
     }
 
     PVResults pv_results;
-
+    pv_results.pv_idx     = m_curr_pv_idx;
     pv_results.depth      = m_curr_depth;
     pv_results.sel_depth  = m_results.sel_depth;
-    pv_results.best_move  = m_results.best_move;
-    pv_results.score      = m_results.score;
+    pv_results.score      = m_results.pv_results[m_curr_pv_idx].score;
     pv_results.nodes      = m_results.nodes;
     pv_results.time       = m_context->elapsed();
-    pv_results.bound_type = m_results.bound_type;
+    pv_results.bound_type = m_results.pv_results[m_curr_pv_idx].bound_type;
 
     // Extract the PV line.
-    pv_results.line.push_back(m_results.best_move);
-    m_board.make_move(m_results.best_move);
-
-    TranspositionTableEntry tt_entry {};
-    while (m_context->tt().probe(m_board.hash_key(), tt_entry)) {
-        Move move = tt_entry.move();
-        if (move == MOVE_NULL) {
+    pv_results.line.clear();
+    for (Move pv_move: search_stack->pv) {
+        if (pv_move == MOVE_NULL) {
             break;
         }
-
-        pv_results.line.push_back(tt_entry.move());
-        m_board.make_move(tt_entry.move());
-
-        if (m_board.is_repetition_draw()) {
-            break;
-        }
+        pv_results.line.push_back(pv_move);
     }
 
-    for (Move _: pv_results.line) {
-        m_board.undo_move();
+    // The best move for a PV result is the first move of the line.
+    // To not be confused with the SearchWorker's best move, as this
+    // would be the best move of the entire search.
+    if (!pv_results.line.empty()) {
+        pv_results.best_move = pv_results.line[0];
     }
 
+    // Ponder move is the move we would consider pondering about if we could.
+    // We assume the best response from our opponent to be that move.
     if (pv_results.line.size() >= 2) {
-        m_results.ponder_move = pv_results.line[1];
+        m_results.pv_results[m_curr_pv_idx].ponder_move = pv_results.line[1];
     }
 
+    // Notify the time manager that we finished a pv iteration.
     if (m_main) {
         m_context->time_manager().on_new_pv(pv_results.depth,
                                             pv_results.best_move,
                                             pv_results.score);
     }
 
+    // Notify whoever else needs to know about it.
     m_context->listeners().pv_finish(pv_results);
 }
 
