@@ -10,7 +10,7 @@
 
 namespace illumina {
 
-constexpr ui64 SEARCH_NODE_LIMIT    = 4096;
+constexpr ui64 SEARCH_NODE_LIMIT    = 5128;
 constexpr int  MIN_RANDOM_PLIES     = 6;
 constexpr int  MAX_RANDOM_PLIES     = 12;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
