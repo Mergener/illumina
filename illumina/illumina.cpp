@@ -2,8 +2,6 @@
 
 #include <atomic>
 
-#include "types.h"
-
 namespace illumina {
 
 static std::atomic_bool s_initialized = false;
@@ -20,6 +18,7 @@ void init() {
 
     s_initialized = true;
 
+    init_eval();
     init_types();
     init_zob();
     init_attacks();
