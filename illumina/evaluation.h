@@ -1,34 +1,67 @@
 #ifndef ILLUMINA_EVALUATION_H
 #define ILLUMINA_EVALUATION_H
 
+#include <istream>
+#include <ostream>
+
 #include "board.h"
 #include "searchdefs.h"
 
 namespace illumina {
 
+static constexpr size_t N_INPUTS = 768;
+static constexpr size_t L1_SIZE  = 128;
+
+struct EvalNetwork {
+    alignas(32) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
+    alignas(32) std::array<i16, L1_SIZE> l1_biases;
+    alignas(32) std::array<i16, L1_SIZE * 2> output_weights;
+    i16 output_bias;
+
+    EvalNetwork() = default;
+    EvalNetwork(std::istream& stream);
+};
+
+struct Accumulator {
+    alignas(32) std::array<i16, L1_SIZE> white {};
+    alignas(32) std::array<i16, L1_SIZE> black {};
+};
+
+class NNUE {
+public:
+    void clear();
+
+    void enable_feature(Square square, Piece piece);
+    void disable_feature(Square square, Piece piece);
+
+    Score forward(Color color) const;
+
+    NNUE();
+
+private:
+    const EvalNetwork* m_net;
+    Accumulator m_accum {};
+};
+
 class Evaluation {
 public:
     Score get() const;
     void on_new_board(const Board& board);
-    void on_make_move(const Board& board);
-    void on_undo_move(const Board& board);
+    void on_make_move(const Board& board, Move move);
+    void on_undo_move(const Board& board, Move move);
+    void on_make_null_move(const Board& board);
+    void on_undo_null_move(const Board& board);
 
 private:
-    Score m_score_white = 0;
-    Color m_ctm = CL_WHITE;
+    NNUE m_nnue;
+    Color m_ctm;
 };
 
 inline Score Evaluation::get() const {
-    return m_ctm == CL_WHITE ? m_score_white : -m_score_white;
+    return std::clamp(m_nnue.forward(m_ctm), -MATE_THRESHOLD + 1, MATE_THRESHOLD - 1);
 }
 
-inline void Evaluation::on_make_move(const Board& board) {
-    on_new_board(board);
-}
-
-inline void Evaluation::on_undo_move(const Board& board) {
-    on_new_board(board);
-}
+void init_eval();
 
 } // illumina
 
