@@ -10,7 +10,7 @@
 namespace illumina {
 
 static constexpr size_t N_INPUTS = 768;
-static constexpr size_t L1_SIZE  = 128;
+static constexpr size_t L1_SIZE  = 64;
 
 struct EvalNetwork {
     alignas(32) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;

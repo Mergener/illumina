@@ -183,7 +183,6 @@ static void copy_params_from_json(const nlohmann::json& j,
                                    std::string_view json_field_name,
                                    T& arr) {
     nlohmann::json j_arr = j[json_field_name];
-    std::cout << "j_arr size " << json_field_name << " " << j_arr.size() << std::endl;
     for (size_t i = 0; i < arr.size(); ++i) {
         arr[i] = j_arr.at(i);
     }
