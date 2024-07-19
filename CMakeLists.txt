@@ -12,7 +12,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS "-mavx2 -mbmi2 -pthread -static-libstdc++ -static-libgcc --static")
 endif()
 
-include_directories(ext/include)
+include_directories(${CMAKE_SOURCE_DIR}/ext/include)
+
+set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.json)
 
 enable_testing()
 

@@ -131,6 +131,13 @@ static std::string bound_type_string(BoundType boundType) {
     return "";
 }
 
+static std::string multipv_string(bool multi_pv, int pv_idx) {
+    if (!multi_pv) {
+        return "";
+    }
+    return " multipv " + std::to_string(pv_idx + 1);
+}
+
 void State::setup_searcher() {
     m_searcher.set_currmove_listener([this](Depth depth, Move move, int move_num) {
         if (depth < 6 || delta_ms(Clock::now(), m_search_start) <= 3000) {
@@ -146,7 +153,11 @@ void State::setup_searcher() {
     });
 
     m_searcher.set_pv_finish_listener([this](const PVResults& res) {
+        // Check if we need to log multipv.
+        UCIOptionSpin& opt_multi_pv = m_options.option<UCIOptionSpin>("MultiPV");
+
         std::cout << "info"
+                  << multipv_string(opt_multi_pv.value() > 1, res.pv_idx)
                   << " depth "    << res.depth
                   << " seldepth " << res.sel_depth
                   << " score "    << score_string(res.score)
@@ -172,6 +183,7 @@ void State::search(SearchSettings settings) {
     }
 
     settings.contempt = m_options.option<UCIOptionSpin>("Contempt").value();
+    settings.n_pvs    = m_options.option<UCIOptionSpin>("MultiPV").value();
 
     m_search_thread = new std::thread([this, settings]() {
         try {
@@ -212,7 +224,7 @@ void State::register_options() {
         });
 
     m_options.register_option<UCIOptionSpin>("Thread", 1, 1, 1);
-    m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, 1);
+    m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, MAX_PVS);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
 }
 

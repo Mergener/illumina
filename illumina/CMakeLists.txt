@@ -5,3 +5,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # GCC requires some flags in order for threads and <filesystem> to work.
     target_link_libraries(illumina_lib PUBLIC stdc++fs)
 endif()
+
+target_include_directories(illumina_lib PUBLIC ${CMAKE_SOURCE_DIR}/ext)
+
+target_compile_definitions(illumina_lib PUBLIC NNUE_PATH=\"${NNUE_PATH}\")

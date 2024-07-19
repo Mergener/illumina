@@ -2,6 +2,7 @@
 #define ILLUMINA_SEARCHTYPES_H
 
 #include "types.h"
+#include "movegen.h"
 
 namespace illumina {
 
@@ -16,7 +17,12 @@ using Depth = int;
 // Constants
 //
 
-constexpr Depth MAX_DEPTH        = 128;
+constexpr Depth MAX_DEPTH = 128;
+
+/**
+ * Maximum number of multi pvs (as set by the MultiPV option).
+ */
+constexpr int MAX_PVS = MAX_GENERATED_MOVES;
 
 /**
  * Limited by the number of bits dedicated to store the score
