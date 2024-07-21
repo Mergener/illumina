@@ -1,4 +1,6 @@
-set(lib_src types.h types.h debug.h illumina.h types.cpp illumina.cpp board.cpp board.h zobrist.cpp parsehelper.cpp parsehelper.h utils.h attacks.cpp attacks.h movegen.h perft.cpp perft.h clock.h search.h transpositiontable.cpp transpositiontable.h searchdefs.h movepicker.h search.cpp evaluation.cpp evaluation.h timemanager.cpp timemanager.h boardutils.h boardutils.cpp movegen_impl.h utils.cpp movehistory.h)
+set(lib_src types.h types.h debug.h illumina.h types.cpp illumina.cpp board.cpp board.h zobrist.cpp parsehelper.cpp parsehelper.h utils.h attacks.cpp attacks.h movegen.h perft.cpp perft.h clock.h search.h transpositiontable.cpp transpositiontable.h searchdefs.h movepicker.h search.cpp evaluation.cpp evaluation.h timemanager.cpp timemanager.h boardutils.h boardutils.cpp movegen_impl.h utils.cpp movehistory.h
+        pext_attacks.cpp
+        magic_attacks.cpp)
 
 foreach(ARCH ${ARCHS})
     set(TARGET illumina_lib_${ARCH})

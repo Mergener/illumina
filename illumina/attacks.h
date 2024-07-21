@@ -3,7 +3,9 @@
 
 #include "types.h"
 
+#ifdef USE_PEXT
 #include <immintrin.h>
+#endif
 
 namespace illumina {
 
@@ -65,17 +67,37 @@ inline Bitboard knight_attacks(Square s) {
 inline Bitboard bishop_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
+#ifdef USE_PEXT
     extern Bitboard g_bishop_attacks[SQ_COUNT][N_ATTACK_KEYS];
     extern const Bitboard g_bishop_masks[];
     return g_bishop_attacks[s][_pext_u64(occ, g_bishop_masks[s])];
+#else
+    extern Bitboard g_bishop_attacks[64][512];
+    extern const Bitboard g_bishop_masks[64];
+    extern const Bitboard g_bishop_magics[64];
+    extern const int g_bishop_shifts[64];
+    occ &= g_bishop_masks[s];
+    ui64 key = (occ * g_bishop_magics[s]) >> (g_bishop_shifts[s]);
+    return g_bishop_attacks[s][key];
+#endif
 }
 
 inline Bitboard rook_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
+#ifdef USE_PEXT
     extern Bitboard g_rook_attacks[SQ_COUNT][N_ATTACK_KEYS];
     extern const Bitboard g_rook_masks[];
     return g_rook_attacks[s][_pext_u64(occ, g_rook_masks[s])];
+#else
+    extern Bitboard g_rook_attacks[64][4096];
+    extern const Bitboard g_rook_masks[64];
+    extern const Bitboard g_rook_magics[64];
+    extern const int g_rook_shifts[64];
+    occ &= g_rook_masks[s];
+    ui64 key = (occ * g_rook_magics[s]) >> (g_rook_shifts[s]);
+    return g_rook_attacks[s][key];
+#endif
 }
 
 inline Bitboard queen_attacks(Square s, Bitboard occ) {
