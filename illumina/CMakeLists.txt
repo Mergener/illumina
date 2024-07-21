@@ -1,11 +1,18 @@
-add_library(illumina_lib STATIC types.h types.h debug.h illumina.h types.cpp illumina.cpp board.cpp board.h zobrist.cpp parsehelper.cpp parsehelper.h utils.h attacks.cpp attacks.h movegen.h perft.cpp perft.h clock.h search.h transpositiontable.cpp transpositiontable.h searchdefs.h movepicker.h search.cpp evaluation.cpp evaluation.h timemanager.cpp timemanager.h boardutils.h boardutils.cpp movegen_impl.h utils.cpp movehistory.h)
-set_target_properties(illumina_lib PROPERTIES OUTPUT_NAME illumina)
+set(lib_src types.h types.h debug.h illumina.h types.cpp illumina.cpp board.cpp board.h zobrist.cpp parsehelper.cpp parsehelper.h utils.h attacks.cpp attacks.h movegen.h perft.cpp perft.h clock.h search.h transpositiontable.cpp transpositiontable.h searchdefs.h movepicker.h search.cpp evaluation.cpp evaluation.h timemanager.cpp timemanager.h boardutils.h boardutils.cpp movegen_impl.h utils.cpp movehistory.h)
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # GCC requires some flags in order for threads and <filesystem> to work.
-    target_link_libraries(illumina_lib PUBLIC stdc++fs)
-endif()
+foreach(ARCH ${ARCHS})
+    set(TARGET illumina_lib_${ARCH})
 
-target_include_directories(illumina_lib PUBLIC ${CMAKE_SOURCE_DIR}/ext)
+    add_library(${TARGET} STATIC ${lib_src})
+    apply_arch_options(${TARGET} ${ARCH})
+    set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME illumina_${ARCH})
 
-target_compile_definitions(illumina_lib PUBLIC NNUE_PATH=\"${NNUE_PATH}\")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # GCC requires some flags in order for threads and <filesystem> to work.
+        target_link_libraries(${TARGET} PUBLIC stdc++fs)
+    endif()
+
+    target_include_directories(${TARGET} PUBLIC ${CMAKE_SOURCE_DIR}/ext)
+
+    target_compile_definitions(${TARGET} PUBLIC NNUE_PATH=\"${NNUE_PATH}\")
+endforeach()
