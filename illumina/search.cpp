@@ -761,24 +761,24 @@ Score SearchWorker::draw_score() const {
 }
 
 void SearchWorker::make_move(Move move) {
+    m_eval.on_make_move(m_board, move);
     m_board.make_move(move);
-    m_eval.on_make_move(m_board);
     m_results.nodes++;
 }
 
 void SearchWorker::undo_move() {
+    m_eval.on_undo_move(m_board, m_board.last_move());
     m_board.undo_move();
-    m_eval.on_undo_move(m_board);
 }
 
 void SearchWorker::make_null_move() {
+    m_eval.on_make_null_move(m_board);
     m_board.make_null_move();
-    m_eval.on_new_board(m_board);
 }
 
 void SearchWorker::undo_null_move() {
+    m_eval.on_undo_null_move(m_board);
     m_board.undo_null_move();
-    m_eval.on_new_board(m_board);
 }
 
 bool SearchWorker::should_stop() const {

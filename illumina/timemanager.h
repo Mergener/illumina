@@ -36,19 +36,20 @@ private:
     ui64 m_hard_bound = 0;
     ui64 m_elapsed = 0;
     bool m_running = false;
-    bool m_movetime = false;
+    bool m_tourney_time = false;
 
     Move m_last_best_move   = MOVE_NULL;
     Score m_last_best_score = 0;
     int m_stable_iterations = 0;
 
-    void setup();
+    void setup(bool tourney_time);
     void set_starting_bounds(ui64 soft, ui64 hard);
 };
 
-inline void TimeManager::setup() {
+inline void TimeManager::setup(bool tourney_time) {
     m_time_start = now();
     m_running = true;
+    m_tourney_time = tourney_time;
 }
 
 inline bool TimeManager::running() const {
@@ -75,8 +76,7 @@ inline void TimeManager::set_starting_bounds(ui64 soft, ui64 hard) {
 }
 
 inline void TimeManager::start_movetime(ui64 movetime_ms) {
-    m_movetime = true;
-    setup();
+    setup(false);
     ui64 bound = movetime_ms - 25;
     set_starting_bounds(bound, bound);
 }
@@ -86,14 +86,13 @@ inline void TimeManager::start_tourney_time(ui64 our_time_ms,
                                             ui64 their_time_ms,
                                             ui64 their_inc_ms,
                                             int moves_to_go) {
-    m_movetime = false;
     ui64 max_time = our_time_ms - 25;
     our_time_ms  += our_inc_ms * 45;
-    setup();
+    setup(true);
 
     if (moves_to_go != 1) {
-        set_starting_bounds(std::min(max_time, our_time_ms / 10),
-                            std::min(max_time, our_time_ms / 6));
+        set_starting_bounds(std::min(max_time, our_time_ms / 12),
+                            std::min(max_time, our_time_ms / 2));
     }
     else {
         set_starting_bounds(max_time, max_time);
@@ -123,8 +122,9 @@ inline TimeManager::TimeManager() {
 inline void TimeManager::on_new_pv(Depth depth,
                                    Move best_move,
                                    Score score) {
-    // Do nothing if we've set to movetime mode.
-    if (m_movetime) {
+    // If not on tourney time, new pvs shouldn't affect
+    // our thinking time.
+    if (!m_tourney_time) {
         return;
     }
 
