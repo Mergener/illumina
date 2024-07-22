@@ -283,7 +283,7 @@ void SearchWorker::aspiration_windows() {
     Score prev_score = m_results.pv_results[m_curr_pv_idx].score;
     Score alpha      = -MAX_SCORE;
     Score beta       = MAX_SCORE;
-    Score window     = 10;
+    Score window     = 20;
     Depth depth      = m_curr_depth;
 
     // Don't use aspiration windows in lower depths since
