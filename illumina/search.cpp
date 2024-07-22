@@ -26,6 +26,7 @@ struct SearchNode {
     Depth ply = 0;
     Score static_eval = 0;
     Move  pv[MAX_DEPTH];
+    Move  skip_move = MOVE_NULL;
 };
 
 /**
@@ -371,6 +372,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Color us               = m_board.color_to_move();
     Depth ply              = node->ply;
     Score& static_eval     = node->static_eval;
+    Move skip_move         = node->skip_move;
 
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions)
@@ -476,6 +478,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
+        // Skip 'skip_move'.
+        if (move == skip_move) {
+            continue;
+        }
+
         // Report 'currmove' and 'currmovenumber'.
         if (ROOT && m_main) {
             m_curr_move_number++;
@@ -501,6 +508,28 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             move_picker.stage() > MPS_GOOD_CAPTURES &&
             !has_good_see(m_board, move.source(), move.destination(), -2)) {
             continue;
+        }
+
+        // Singular extensions.
+        Depth extensions = 0;
+        if (!in_check   &&
+            hash_move != MOVE_NULL &&
+            tt_entry.bound_type() != BT_UPPERBOUND &&
+            depth >= 6 &&
+            move == hash_move &&
+            depth - tt_entry.depth() >= 3) {
+            Score se_beta = std::min(beta, tt_entry.score() - 10 - depth * 2);
+
+            node->skip_move = move;
+            Score score = -pvs<PV>((depth - 1) / 2, se_beta - 1, se_beta, node);
+            node->skip_move = MOVE_NULL;
+
+            if (score >= se_beta) {
+                extensions++;
+            }
+            else if (score >= beta) {
+                return score;
+            }
         }
 
         make_move(move);
