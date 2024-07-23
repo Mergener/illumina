@@ -3,8 +3,6 @@
 
 namespace illumina {
 
-//#define TUNING_BUILD
-
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, value, ...) extern type name;
 #else
