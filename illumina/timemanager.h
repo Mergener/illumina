@@ -3,6 +3,7 @@
 
 #include "clock.h"
 #include "searchdefs.h"
+#include "tunablevalues.h"
 #include "types.h"
 
 namespace illumina {
@@ -129,14 +130,14 @@ inline void TimeManager::on_new_pv(Depth depth,
 
     // If we think that our next search won't be finished
     // before the next depth ends, interrupt the search.
-    if (depth >= 10 &&
-        elapsed() > (m_hard_bound * 7 / 12)) {
+    if (depth >= TM_CUTOFF_MIN_DEPTH &&
+        elapsed() > (m_hard_bound * TM_CUTOFF_HARD_BOUND_FACTOR / TM_CUTOFF_HARD_BOUND_DIVISOR)) {
         m_soft_bound = 0;
         m_hard_bound = 0;
         return;
     }
 
-    if (depth < 11) {
+    if (depth <= TM_STABILITY_MIN_DEPTH) {
         m_last_best_score = score;
         m_last_best_move  = best_move;
         return;
@@ -146,20 +147,20 @@ inline void TimeManager::on_new_pv(Depth depth,
     // the search softly.
     Score cp_delta = score - m_last_best_score;
     if (best_move == m_last_best_move &&
-        (cp_delta > -25 && cp_delta < 50)) {
+        (cp_delta > TM_STABILITY_MIN_CP_DELTA && cp_delta < TM_STABILITY_MAX_CP_DELTA)) {
         // We have the same last move and a close score to the previous
         // iteration.
         m_stable_iterations++;
 
-        if (m_stable_iterations >= 6) {
+        if (m_stable_iterations >= TM_STABILITY_SB_RED_MIN_ITER) {
             // Search has been stable for a while, decrease our soft bound.
-            m_soft_bound = m_soft_bound * 11 / 18;
+            m_soft_bound = m_soft_bound * TM_STABILITY_SB_RED_FACTOR / TM_STABILITY_SB_RED_DIVISOR;
         }
     }
     else {
         // Our search deviated a bit from what we were expecting.
         // Give it some more thought.
-        m_soft_bound = (m_soft_bound + m_orig_soft_bound * 8) / 9;
+        m_soft_bound = (m_soft_bound + m_orig_soft_bound * TM_STABILITY_SB_EXT_FACTOR) / TM_STABILITY_SB_EXT_DIVISOR;
     }
 }
 

@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "timemanager.h"
+#include "tunablevalues.h"
 #include "movepicker.h"
 #include "evaluation.h"
 
@@ -283,12 +284,12 @@ void SearchWorker::aspiration_windows() {
     Score prev_score = m_results.pv_results[m_curr_pv_idx].score;
     Score alpha      = -MAX_SCORE;
     Score beta       = MAX_SCORE;
-    Score window     = 20;
+    Score window     = ASP_WIN_WINDOW;
     Depth depth      = m_curr_depth;
 
     // Don't use aspiration windows in lower depths since
     // their results is still too unstable.
-    if (depth >= 6) {
+    if (depth >= ASP_WIN_MIN_DEPTH) {
         alpha = std::max(-MAX_SCORE, prev_score - window);
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
@@ -411,10 +412,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
-    Score rfp_margin = 50 + 70 * depth;
+    Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
     if (!PV        &&
         !in_check  &&
-        depth <= 7 &&
+        depth <= RFP_MAX_DEPTH &&
         alpha < MATE_THRESHOLD &&
         static_eval - rfp_margin > beta) {
         return static_eval - rfp_margin;
@@ -424,10 +425,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (!PV        &&
         !SKIP_NULL &&
         !in_check  &&
-        popcount(m_board.color_bb(us)) >= 4 &&
+        popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES &&
         static_eval >= beta &&
-        depth >= 3) {
-        Depth reduction = std::max(depth, std::min(2, 2 + (static_eval - beta) / 200));
+        depth >= NMP_MIN_DEPTH) {
+        Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
 
         make_null_move();
         Score score = -pvs<false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
@@ -439,8 +440,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Internal iterative reductions.
-    if (depth >= 4 && !found_in_tt) {
-        depth--;
+    if (depth >= IIR_MIN_DEPTH && !found_in_tt) {
+        depth -= IIR_DEPTH_RED;
     }
 
     // Mate distance pruning.
@@ -487,7 +488,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Late move pruning.
         if (alpha > -MATE_THRESHOLD &&
-            depth <= (8 + m_board.gives_check(move)) &&
+            depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move)) &&
             move_idx >= s_lmp_count_table[improving][depth] &&
             move_picker.stage() > MPS_KILLER_MOVES &&
             !in_check &&
@@ -496,30 +497,30 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         // SEE pruning.
-        if (depth <= 8          &&
-            !m_board.in_check() &&
+        if (depth <= SEE_PRUNING_MAX_DEPTH &&
+            !m_board.in_check()            &&
             move_picker.stage() > MPS_GOOD_CAPTURES &&
-            !has_good_see(m_board, move.source(), move.destination(), -2)) {
+            !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
             continue;
         }
 
         make_move(move);
 
         // Futility pruning.
-        if (depth <= 6 &&
-            !in_check  &&
-            !m_board.in_check() &&
-            move.is_quiet() &&
-            (static_eval + 80) < alpha) {
+        if (depth <= FP_MAX_DEPTH &&
+            !in_check             &&
+            !m_board.in_check()   &&
+            move.is_quiet()       &&
+            (static_eval + FP_MARGIN) < alpha) {
             undo_move();
             continue;
         }
 
         // Late move reductions.
         Depth reductions = 0;
-        if (n_searched_moves >= 1 &&
-            depth >= 2            &&
-            !in_check             &&
+        if (n_searched_moves >= LMR_MIN_MOVE_IDX &&
+            depth >= LMR_MIN_DEPTH &&
+            !in_check              &&
             !m_board.in_check()) {
             reductions = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
@@ -527,7 +528,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 reductions += !improving;
 
                 // Further reduce moves that have been historically very bad.
-                reductions += m_hist.quiet_history(move) <= -400;
+                reductions += m_hist.quiet_history(move) <= LMR_BAD_HISTORY_THRESHOLD;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
@@ -663,7 +664,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (move_picker.stage() >= MPS_BAD_CAPTURES &&
-            !has_good_see(m_board, move.source(), move.destination(), -2)) {
+            !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
             continue;
         }
 
@@ -800,13 +801,17 @@ const WorkerResults& SearchWorker::results() const {
 static void init_search_constants() {
     for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
         for (Depth d = 0; d < MAX_DEPTH; ++d) {
-            s_lmr_table[m][d] = Depth(1.25 + std::log(d) * std::log(m) * 100.0 / 267.0);
+            s_lmr_table[m][d] = Depth(LMR_REDUCTIONS_BASE + std::log(d) * std::log(m) * 100.0 / LMR_REDUCTIONS_DIVISOR);
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {
-        s_lmp_count_table[false][d] = int(3 + 0.6 * d * d);
-        s_lmp_count_table[true][d]  = int(4 + 1.2 * d * d);
+        s_lmp_count_table[false][d] = int(LMP_BASE_IDX_NON_IMPROVING + LMP_DEPTH_FACTOR_NON_IMPROVING * d * d);
+        s_lmp_count_table[true][d]  = int(LMP_BASE_IDX_IMPROVING + LMP_DEPTH_FACTOR_IMPROVING * d * d);
     }
+}
+
+void recompute_search_constants() {
+    init_search_constants();
 }
 
 void init_search() {
