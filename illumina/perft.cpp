@@ -64,15 +64,16 @@ ui64 perft(const Board& board, int depth, PerftArgs args) {
     Board replica = board;
     if (args.log) {
         log_init();
+
         TimePoint before = now();
-        ui64 res = perft<true, true>(replica, depth);
-        TimePoint after = now();
-        ui64 time_delta = delta_ms(after, before);
+        ui64 res         = perft<true, true>(replica, depth);
+        TimePoint after  = now();
+        ui64 time_delta  = delta_ms(after, before);
 
         flush_logs(args.sort_output);
         std::cout << "\nResult: " << res << std::endl;
-        std::cout << "Time: " << time_delta << "ms" << std::endl;
-        std::cout << "NPS: " << ui64(res / double(time_delta / 1000.0)) << std::endl;
+        std::cout << "Time: "     << time_delta << "ms" << std::endl;
+        std::cout << "NPS: "      << ui64(res / double(time_delta / 1000.0)) << std::endl;
 
         return res;
     }
@@ -118,8 +119,8 @@ ui64 move_picker_perft(const Board& board, int depth, PerftArgs args) {
         flush_logs(args.sort_output);
 
         std::cout << "\nResult: " << res << std::endl;
-        std::cout << "Time: " << time_delta << "ms" << std::endl;
-        std::cout << "NPS: " << ui64(res / double(time_delta / 1000.0)) << std::endl;
+        std::cout << "Time: "     << time_delta << "ms" << std::endl;
+        std::cout << "NPS: "      << ui64(res / double(time_delta / 1000.0)) << std::endl;
         return res;
     }
     else {

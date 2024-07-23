@@ -91,6 +91,8 @@ inline void Searcher::set_currmove_listener(const CurrentMoveListener& listener)
 inline Searcher::Searcher(TranspositionTable&& tt)
     : m_tt(std::move(tt)) { }
 
+void recompute_search_constants();
+
 } // illumina
 
 #endif // ILLUMINA_SEARCH_H
