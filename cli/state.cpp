@@ -239,8 +239,8 @@ static void add_tuning_option(UCIOptionManager& options,
                               const std::string& opt_name,
                               double& opt_ref,
                               double default_value,
-                              double min = std::numeric_limits<double>::min(),
-                              double max = std::numeric_limits<double>::max()) {
+                              double min = -0x100000,
+                              double max = 0x100000) {
     options.register_option<UCIOptionSpin>(opt_name + std::string("_FP"),
                                            default_value * 1000,
                                            min * 1000,
@@ -260,7 +260,7 @@ void State::register_options() {
             m_searcher.tt().resize(spin.value() * 1024 * 1024);
         });
 
-    m_options.register_option<UCIOptionSpin>("Thread", 1, 1, 1);
+    m_options.register_option<UCIOptionSpin>("Threads", 1, 1, 1);
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, MAX_PVS);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
 
