@@ -442,7 +442,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Internal iterative reductions.
-    if (depth >= IIR_MIN_DEPTH && !found_in_tt) {
+    if (depth >= IIR_MIN_DEPTH && !found_in_tt && skip_move == MOVE_NULL) {
         depth -= IIR_DEPTH_RED;
     }
 
@@ -513,16 +513,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Singular extensions.
         Depth extensions = 0;
-        if (!in_check   &&
+        if (!ROOT     &&
+            !in_check &&
             hash_move != MOVE_NULL &&
             tt_entry.bound_type() != BT_UPPERBOUND &&
-            depth >= 6 &&
+            depth >= 8 &&
             move == hash_move &&
-            depth - tt_entry.depth() >= 3) {
-            Score se_beta = std::min(beta, tt_entry.score() - 10 - depth * 2);
+            depth - tt_entry.depth() >= 3 &&
+            std::abs(tt_entry.score()) < MATE_THRESHOLD) {
+            Score se_beta = std::min(beta, tt_entry.score() - depth * 2);
 
             node->skip_move = move;
-            Score score = -pvs<PV>((depth - 1) / 2, se_beta - 1, se_beta, node);
+            Score score = pvs<PV>((depth - 1) / 2, se_beta - 1, se_beta, node);
             node->skip_move = MOVE_NULL;
 
             if (score >= se_beta) {
