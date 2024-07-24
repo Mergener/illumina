@@ -2,6 +2,7 @@
 
 #include <type_traits>
 #include <limits>
+#include <iomanip>
 
 #include "cliapplication.h"
 #include "evaluation.h"
@@ -97,9 +98,46 @@ void State::check_if_ready() {
 }
 
 void State::evaluate() const {
+    if (m_board.in_check()) {
+        std::cout << "Final evaluation: None (check)" << std::endl;
+        return;
+    }
+
     Evaluation eval;
-    eval.on_new_board(m_board);
-    std::cout << "info score cp " << eval.get() << std::endl;
+    Board repl = m_board;
+    eval.on_new_board(repl);
+    Score score = eval.get();
+
+    std::cout << "      ";
+
+    for (BoardFile f: FILES) {
+        std::cout << file_to_char(f) << "     ";
+    }
+
+    for (BoardRank r: RANKS_REVERSE) {
+        std::cout << std::endl;
+        std::cout << rank_to_char(r) << " |";
+        for (BoardFile f: FILES) {
+            Square s = make_square(f, r);
+            Piece p = repl.piece_at(s);
+            if (p.type() != PT_KING) {
+                repl.set_piece_at(s, PIECE_NULL);
+                eval.on_new_board(repl);
+                Score score_without_piece = eval.get();
+                repl.set_piece_at(s, p);
+
+                std::cout << std::setw(6)
+                          << std::fixed
+                          << std::setprecision(2)
+                          << double(score - score_without_piece) / 100;
+            }
+            else {
+                std::cout << "   " << p.to_char() << "  ";
+            }
+        }
+    }
+
+    std::cout << "\n\nFinal evaluation: " << double(score) / 100 << " (" << score << " cp)" << std::endl;
 }
 
 static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& line) {
