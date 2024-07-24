@@ -439,6 +439,29 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
+    // ProbCut.
+    Score beta_cut = beta + 130;
+    if (!PV && !in_check && depth >= 5 &&
+        !(found_in_tt && tt_entry.depth() >= depth - 3 && tt_entry.score() < beta_cut)) {
+        MovePicker<true> move_picker_quiesce(m_board, ply, m_hist);
+        Move move;
+        while ((move = move_picker_quiesce.next()) != MOVE_NULL) {
+            make_move(move);
+
+            Score score = -quiescence_search(ply, -beta_cut, beta_cut + 1);
+            if (score >= beta_cut) {
+                score = -pvs<false>(depth - 4, -beta_cut, beta_cut + 1, node);
+            }
+
+            undo_move();
+
+            if (score >= beta_cut) {
+                tt.try_store(board_key, ply, move, score, depth - 3, BT_LOWERBOUND);
+                return beta_cut;
+            }
+        }
+    }
+
     // Internal iterative reductions.
     if (depth >= IIR_MIN_DEPTH && !found_in_tt) {
         depth -= IIR_DEPTH_RED;
