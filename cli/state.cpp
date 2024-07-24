@@ -99,6 +99,7 @@ void State::check_if_ready() {
 
 void State::evaluate() const {
     if (m_board.in_check()) {
+        // Positions in check don't have a static evaluation.
         std::cout << "Final evaluation: None (check)" << std::endl;
         return;
     }
@@ -111,16 +112,23 @@ void State::evaluate() const {
     std::cout << "      ";
 
     for (BoardFile f: FILES) {
-        std::cout << file_to_char(f) << "     ";
+        std::cout << " " << file_to_char(f) << "    ";
     }
+    std::cout << "\n    -------------------------------------------------";
 
     for (BoardRank r: RANKS_REVERSE) {
         std::cout << std::endl;
-        std::cout << rank_to_char(r) << " |";
+        std::cout << " " << rank_to_char(r) << " |";
         for (BoardFile f: FILES) {
             Square s = make_square(f, r);
             Piece p = repl.piece_at(s);
-            if (p.type() != PT_KING) {
+            if (p == PIECE_NULL) {
+                std::cout << "      ";
+            }
+            else if (p.type() == PT_KING) {
+                std::cout << "   " << '*' << "  ";
+            }
+            else {
                 repl.set_piece_at(s, PIECE_NULL);
                 eval.on_new_board(repl);
                 Score score_without_piece = eval.get();
@@ -131,13 +139,29 @@ void State::evaluate() const {
                           << std::setprecision(2)
                           << double(score - score_without_piece) / 100;
             }
+        }
+
+        std::cout << " |" << std::endl << "   |";
+        for (BoardFile f: FILES) {
+            Square s = make_square(f, r);
+            Piece p = repl.piece_at(s);
+            if (p == PIECE_NULL) {
+                std::cout << "      ";
+            }
             else {
                 std::cout << "   " << p.to_char() << "  ";
             }
         }
-    }
 
-    std::cout << "\n\nFinal evaluation: " << double(score) / 100 << " (" << score << " cp)" << std::endl;
+        std::cout << " |";
+    }
+    std::cout << "\n    -------------------------------------------------";
+
+    std::cout << "\n\nFinal evaluation ("
+              << (m_board.color_to_move() == CL_WHITE ? "white" : "black") << "'s perspective): "
+              << double(score) / 100
+              << " (" << score << " cp)"
+              << std::endl;
 }
 
 static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& line) {
