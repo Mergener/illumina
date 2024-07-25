@@ -11,7 +11,7 @@
 namespace illumina {
 
 constexpr ui64 SEARCH_NODE_LIMIT    = 5128;
-constexpr int  MIN_RANDOM_PLIES     = 6;
+constexpr int  MIN_RANDOM_PLIES     = 5;
 constexpr int  MAX_RANDOM_PLIES     = 12;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
 constexpr Score HI_SCORE            = 500;
@@ -84,7 +84,7 @@ Game simulate() {
 
         SearchResults search_results = player.searcher.search(board, validation_search_settings);
 
-        if (std::abs(search_results.score) > 120) {
+        if (std::abs(search_results.score) > 160) {
             // Position is excessively imbalanced.
             // Rewind to the start.
             board = Board::standard_startpos();
