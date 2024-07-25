@@ -227,9 +227,10 @@ void State::setup_searcher() {
                   << " depth "    << res.depth
                   << " seldepth " << res.sel_depth
                   << " score "    << score_string(res.score)
-                  << bound_type_string(res.bound_type)
-                  << " pv "       << res.line
-                  << " hashfull " << m_searcher.tt().hash_full()
+                  << bound_type_string(res.bound_type);
+        if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
+        std::cout << " pv "       << res.line;
+        std::cout << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
                   << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
                   << " time "     << res.time
