@@ -1,8 +1,13 @@
 #include "state.h"
 
+#include <type_traits>
+#include <limits>
+#include <iomanip>
+
 #include "cliapplication.h"
 #include "evaluation.h"
 #include "transpositiontable.h"
+#include "tunablevalues.h"
 
 namespace illumina {
 
@@ -93,9 +98,70 @@ void State::check_if_ready() {
 }
 
 void State::evaluate() const {
+    if (m_board.in_check()) {
+        // Positions in check don't have a static evaluation.
+        std::cout << "Final evaluation: None (check)" << std::endl;
+        return;
+    }
+
     Evaluation eval;
-    eval.on_new_board(m_board);
-    std::cout << "info score cp " << eval.get() << std::endl;
+    Board repl = m_board;
+    eval.on_new_board(repl);
+    Score score = eval.get();
+
+    std::cout << "      ";
+
+    for (BoardFile f: FILES) {
+        std::cout << " " << file_to_char(f) << "    ";
+    }
+    std::cout << "\n    -------------------------------------------------";
+
+    for (BoardRank r: RANKS_REVERSE) {
+        std::cout << std::endl;
+        std::cout << " " << rank_to_char(r) << " |";
+        for (BoardFile f: FILES) {
+            Square s = make_square(f, r);
+            Piece p = repl.piece_at(s);
+            if (p == PIECE_NULL) {
+                std::cout << "      ";
+            }
+            else if (p.type() == PT_KING) {
+                std::cout << "   " << '*' << "  ";
+            }
+            else {
+                repl.set_piece_at(s, PIECE_NULL);
+                eval.on_new_board(repl);
+                Score score_without_piece = eval.get();
+                repl.set_piece_at(s, p);
+
+                std::cout << std::setw(6)
+                          << std::fixed
+                          << std::setprecision(2)
+                          << double(score - score_without_piece) / 100;
+            }
+        }
+
+        std::cout << " |" << std::endl << "   |";
+        for (BoardFile f: FILES) {
+            Square s = make_square(f, r);
+            Piece p = repl.piece_at(s);
+            if (p == PIECE_NULL) {
+                std::cout << "      ";
+            }
+            else {
+                std::cout << "   " << p.to_char() << "  ";
+            }
+        }
+
+        std::cout << " |";
+    }
+    std::cout << "\n    -------------------------------------------------";
+
+    std::cout << "\n\nFinal evaluation ("
+              << (m_board.color_to_move() == CL_WHITE ? "white" : "black") << "'s perspective): "
+              << double(score) / 100
+              << " (" << score << " cp)"
+              << std::endl;
 }
 
 static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& line) {
@@ -161,9 +227,10 @@ void State::setup_searcher() {
                   << " depth "    << res.depth
                   << " seldepth " << res.sel_depth
                   << " score "    << score_string(res.score)
-                  << bound_type_string(res.bound_type)
-                  << " pv "       << res.line
-                  << " hashfull " << m_searcher.tt().hash_full()
+                  << bound_type_string(res.bound_type);
+        if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
+        std::cout << " pv "       << res.line;
+        std::cout << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
                   << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
                   << " time "     << res.time
@@ -216,6 +283,39 @@ void State::quit() {
     std::exit(EXIT_SUCCESS);
 }
 
+#ifdef TUNING_BUILD
+static void add_tuning_option(UCIOptionManager& options,
+                              const std::string& opt_name,
+                              int& opt_ref,
+                              int default_value,
+                              int min = INT_MIN,
+                              int max = INT_MAX) {
+    options.register_option<UCIOptionSpin>(opt_name, default_value, min, max)
+            .add_update_handler([&opt_ref](const UCIOption& opt) {
+                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+                opt_ref = spin.value();
+                recompute_search_constants();
+            });
+}
+
+static void add_tuning_option(UCIOptionManager& options,
+                              const std::string& opt_name,
+                              double& opt_ref,
+                              double default_value,
+                              double min = -0x100000,
+                              double max = 0x100000) {
+    options.register_option<UCIOptionSpin>(opt_name + std::string("_FP"),
+                                           default_value * 1000,
+                                           min * 1000,
+                                           max * 1000)
+            .add_update_handler([&opt_ref](const UCIOption& opt) {
+                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+                opt_ref = double(spin.value()) / 1000.0;
+                recompute_search_constants();
+            });
+}
+#endif
+
 void State::register_options() {
     m_options.register_option<UCIOptionSpin>("Hash", TT_DEFAULT_SIZE_MB, 1, 1024 * 1024)
         .add_update_handler([this](const UCIOption& opt) {
@@ -223,9 +323,17 @@ void State::register_options() {
             m_searcher.tt().resize(spin.value() * 1024 * 1024);
         });
 
-    m_options.register_option<UCIOptionSpin>("Thread", 1, 1, 1);
+    m_options.register_option<UCIOptionSpin>("Threads", 1, 1, 1);
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, MAX_PVS);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
+
+#ifdef TUNING_BUILD
+#define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
+                                                         std::string("TUNABLE_") + #name, \
+                                                         name, \
+                                                         __VA_ARGS__);
+#include "tunablevalues.def"
+#endif
 }
 
 State::State() {

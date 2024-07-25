@@ -9,6 +9,12 @@ set(ILLUMINA_TESTS_DIR ${CMAKE_SOURCE_DIR}/tests)
 set(ILLUMINA_EXT_DIR ${CMAKE_SOURCE_DIR}/ext)
 set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.json)
 
+# Add some compilation options.
+option(TUNING "Tunable values become runtime variables that can be changed via UCI options." OFF)
+if (TUNING)
+    add_definitions(-DTUNING_BUILD)
+endif()
+
 # For GCC-derived compilers, we need to specify some flags in order
 # to have <thread> and <filesystem> properly working.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
