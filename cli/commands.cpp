@@ -96,7 +96,7 @@ void register_commands(CLIApplication& server) {
         global_state().check_if_ready();
     });
 
-    server.register_command("evaluate", [](const CommandContext& ctx) {
+    server.register_command("eval", [](const CommandContext& ctx) {
         global_state().evaluate();
     });
 
