@@ -595,7 +595,7 @@ TMOVE* generate_evasions_by_color(const Board& board, TMOVE* moves) {
                 // A piece can only block a check if it's not being pinned
                 // from another angle.
                 if (!bit_is_set(board.pinned_bb(), blocker_sq)) {
-                    // Blocker is not pinned
+                    // Blocker is not pinned.
                     if (blocker_piece.type() != PT_PAWN || square_rank(s) != promotion_rank(C)) {
                         if constexpr (GEN_QUIET) {
                             // Blocker is not a pawn or is not going to the promotion rank.

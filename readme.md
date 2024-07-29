@@ -1,4 +1,4 @@
-Illumina is a strong chess engine that supports the [UCI protocol](https://en.wikipedia.org/wiki/Universal_Chess_Interface). 
+Illumina is a chess engine that supports the [UCI protocol](https://en.wikipedia.org/wiki/Universal_Chess_Interface). 
 
 ## Building Prerequisites
 
