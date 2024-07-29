@@ -556,7 +556,7 @@ inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
         Bitboard pawn_targets;
         Bitboard our_pawns = piece_bb(Piece(c, PT_PAWN));
         if constexpr (QUIET_PAWN_MOVES) {
-            pawn_targets = pawn_pushes<true>(s, opposite_color(c), occ & ~(our_pawns));
+            pawn_targets = reverse_pawn_pushes(s, c, occ & ~(our_pawns));
         }
         else {
             pawn_targets = pawn_attacks(s, opposite_color(c));
