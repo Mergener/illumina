@@ -67,10 +67,6 @@ static Score evaluate_endgame(const Board& board,
                               EndgameType eg_type,
                               Color stronger_player) {
     switch (eg_type) {
-        case EG_KQ_KR:
-            return KNOWN_WIN * 2
-                 - ((rook_attacks(board.king_square(stronger_player), 0) & board.piece_bb(Piece(stronger_player, PT_QUEEN))) != 0) * 500
-                 + corner_king_evaluation(board, stronger_player);
 
         case EG_KQ_KB:
             return KNOWN_WIN * 2
@@ -86,12 +82,17 @@ static Score evaluate_endgame(const Board& board,
         case EG_KR_K:
             return KNOWN_WIN * 2
                  + corner_king_evaluation(board, stronger_player)
-                 + 2500;
+                 + 250;
 
         case EG_KQ_K:
             return KNOWN_WIN * 2
                  + corner_king_evaluation(board, stronger_player)
-                 + 5000;
+                 + 500;
+
+        case EG_KQ_KR:
+            return 600
+                   - ((rook_attacks(board.king_square(stronger_player), 0) & board.piece_bb(Piece(stronger_player, PT_QUEEN))) != 0) * 50
+                   + corner_king_evaluation(board, stronger_player) / 3;
 
         case EG_KBN_K: {
             constexpr i32 LONE_KING_BONUS_DS[] {
@@ -115,7 +116,7 @@ static Score evaluate_endgame(const Board& board,
                 0, 1, 2, 3, 4, 5, 6, 7,
             };
 
-            i32 base = KNOWN_WIN / 2;
+            i32 base = 600;
 
             Square our_bishop = lsb(board.piece_bb(Piece(stronger_player, PT_BISHOP)));
             Square their_king = board.king_square(opposite_color(stronger_player));
@@ -128,15 +129,33 @@ static Score evaluate_endgame(const Board& board,
                 their_king_bonus = LONE_KING_BONUS_DS[their_king];
             }
 
-            return base - their_king_bonus * 50;
+            return base - their_king_bonus * 5;
         }
+
+        case EG_KR_KB:
+        case EG_KR_KN: {
+            Color them = opposite_color(stronger_player);
+            Bitboard their_occ_no_king = board.color_bb(them) & (~board.piece_bb(Piece(them, PT_KING)));
+            Square their_other_piece_sq = lsb(their_occ_no_king);
+            Square their_king_sq = board.king_square(them);
+            return corner_king_evaluation(board, stronger_player) / 4 +
+                   manhattan_distance(their_king_sq, their_other_piece_sq) * 2;
+        }
+
         default:
             return 0;
     }
 }
 
 Endgame identify_endgame(const Board& board) {
-    Endgame endgame;
+    Endgame endgame {};
+
+    if (popcount(board.occupancy()) > 4) {
+        // Speedup: return unknown endgame since we know our most advanced
+        // endgame only has 4 pieces (including kings).
+        return endgame;
+    }
+
     for (Color c: COLORS) {
         EndgameType type = identify_endgame_type(board, c);
         if (type == EG_UNKNOWN) {

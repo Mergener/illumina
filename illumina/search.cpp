@@ -327,6 +327,11 @@ void SearchWorker::aspiration_windows() {
             report_pv_results(search_stack);
         }
 
+        if (window >= 1200) {
+            alpha = -MAX_SCORE;
+            beta  = MAX_SCORE;
+        }
+
         check_limits();
 
         window += window / 2;
