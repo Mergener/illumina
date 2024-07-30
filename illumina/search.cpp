@@ -774,6 +774,7 @@ void SearchWorker::undo_move() {
 void SearchWorker::make_null_move() {
     m_eval.on_make_null_move(m_board);
     m_board.make_null_move();
+    m_results.nodes++;
 }
 
 void SearchWorker::undo_null_move() {
