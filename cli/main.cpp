@@ -27,7 +27,11 @@ int main(int argc, char* argv[]) {
         initialize_global_state();
 
         // Finally, run.
-        std::cout << "Illumina v1.0" << std::endl;
+        std::cout << "Illumina " << ILLUMINA_VERSION_NAME << std::endl;
+#ifdef TUNING_BUILD
+        std::cout << "This is a tuning build. Engine constants can be changed using UCI options." << std::endl;
+#endif
+
         server.listen();
 
         return EXIT_SUCCESS;

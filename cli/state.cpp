@@ -65,7 +65,7 @@ void State::mperft(int depth) const {
 }
 
 void State::uci() {
-    std::cout << "id name Illumina v1.0 " << std::endl;
+    std::cout << "id name Illumina " << ILLUMINA_VERSION_NAME << std::endl;
     std::cout << "id author Thomas Mergener" << std::endl;
 
     for (const UCIOption& option: m_options.list_options()) {
