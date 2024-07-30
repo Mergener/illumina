@@ -802,7 +802,7 @@ constexpr PieceType Move::promotion_piece_type() const {
     return (m_data >> 23) & BITMASK(3);
 }
 
-constexpr Square Move::castles_rook_src_file() const {
+constexpr BoardFile Move::castles_rook_src_file() const {
     return (m_data >> 26) & BITMASK(3);
 }
 

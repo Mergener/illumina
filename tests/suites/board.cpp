@@ -84,7 +84,6 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_default.piece_bb(Piece(CL_BLACK, PT_KING))).to_be(0ULL);
     EXPECT(board_default.ep_square()).to_be(SQ_NULL);
     EXPECT(board_default.rule50()).to_be(0);
-    EXPECT(board_default.frc()).to_be(false);
     EXPECT(board_default.in_check()).to_be(false);
     EXPECT(board_default.in_double_check()).to_be(false);
     EXPECT(board_default.hash_key()).to_be(EMPTY_BOARD_HASH_KEY);
@@ -111,7 +110,6 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_startpos.piece_bb(Piece(CL_BLACK, PT_QUEEN))).to_be(0x800000000000000ULL);
     EXPECT(board_startpos.piece_bb(Piece(CL_BLACK, PT_KING))).to_be(0x1000000000000000ULL);
     EXPECT(board_startpos.ep_square()).to_be(SQ_NULL);
-    EXPECT(board_startpos.frc()).to_be(false);
     EXPECT(board_startpos.in_check()).to_be(false);
     EXPECT(board_startpos.in_double_check()).to_be(false);
     EXPECT(board_startpos.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_H1);
@@ -138,7 +136,6 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_KING))).to_be(0x8000000000000000ULL);
     EXPECT(board_custompos_1.ep_square()).to_be(SQ_NULL);
     EXPECT(board_custompos_1.rule50()).to_be(32);
-    EXPECT(board_custompos_1.frc()).to_be(false);
     EXPECT(board_custompos_1.in_check()).to_be(false);
     EXPECT(board_custompos_1.in_double_check()).to_be(false);
     EXPECT(board_custompos_1.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_H1);
@@ -149,7 +146,6 @@ TEST_CASE(BoardFENConstructor) {
 
     // Test FRC construction with FEN.
     Board frc_board_1("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w KQkq - 0 1");
-    EXPECT(frc_board_1.frc()).to_be(true);
     EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
     EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_D1);
     EXPECT(frc_board_1.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
@@ -161,7 +157,6 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_QUEEN)).to_be(true);
 
     Board frc_board_2("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w FDfd - 0 1");
-    EXPECT(frc_board_1.frc()).to_be(true);
     EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
     EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_D1);
     EXPECT(frc_board_1.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
@@ -173,7 +168,6 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_QUEEN)).to_be(true);
 
     Board frc_board_3("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w Kkq - 0 1");
-    EXPECT(frc_board_3.frc()).to_be(true);
     EXPECT(frc_board_3.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
     EXPECT(frc_board_3.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
     EXPECT(frc_board_3.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_D8);

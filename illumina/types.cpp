@@ -152,7 +152,7 @@ std::string Move::to_uci(bool frc) const {
             if (frc) {
                 return square_name(source()) + square_name(castles_rook_src_square());
             }
-            return square_name(source()) + square_name(destination());
+            // Fallthrough
 
         default:
             return square_name(source()) + square_name(destination());
