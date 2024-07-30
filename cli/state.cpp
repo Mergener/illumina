@@ -164,20 +164,22 @@ void State::evaluate() const {
               << std::endl;
 }
 
-static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& line) {
+static std::string pv_to_string(const std::vector<Move>& line, bool frc) {
     if (line.empty()) {
-        return stream;
+        return "";
     }
 
-    std::cout << line[0].to_uci();
+    std::stringstream stream;
+    stream << line[0].to_uci(frc);
     for (auto it = line.begin() + 1; it != line.end(); ++it) {
         Move m = *it;
         if (m == MOVE_NULL) {
             break;
         }
-        stream << ' ' << m.to_uci();
+        stream << ' ' << m.to_uci(frc);
     }
-    return stream;
+    return stream.str();
+
 }
 
 static std::string score_string(Score score) {
@@ -213,7 +215,7 @@ void State::setup_searcher() {
 
         std::cout << "info"
                   << " depth "       << depth
-                  << " currmove "    << move.to_uci()
+                  << " currmove "    << move.to_uci(m_frc)
                   << " currmovenumber " << move_num
                   << std::endl;
     });
@@ -229,7 +231,7 @@ void State::setup_searcher() {
                   << " score "    << score_string(res.score)
                   << bound_type_string(res.bound_type);
         if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
-        std::cout << " pv "       << res.line;
+        std::cout << " pv "       << pv_to_string(res.line, m_frc);
         std::cout << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
                   << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
@@ -257,10 +259,10 @@ void State::search(SearchSettings settings) {
             m_search_start = Clock::now();
             SearchResults results = m_searcher.search(m_board, settings);
 
-            std::cout << "bestmove " << results.best_move.to_uci();
+            std::cout << "bestmove " << results.best_move.to_uci(m_frc);
 
             if (results.ponder_move != MOVE_NULL) {
-                std::cout << " ponder " << results.ponder_move.to_uci();
+                std::cout << " ponder " << results.ponder_move.to_uci(m_frc);
             }
 
             std::cout << std::endl;
@@ -326,6 +328,11 @@ void State::register_options() {
     m_options.register_option<UCIOptionSpin>("Threads", 1, 1, 1);
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, MAX_PVS);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
+    m_options.register_option<UCIOptionCheck>("UCI_Chess960", false)
+        .add_update_handler([this](const UCIOption& opt) {
+            const auto& check = dynamic_cast<const UCIOptionCheck&>(opt);
+            m_frc = check.value();
+        });
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
