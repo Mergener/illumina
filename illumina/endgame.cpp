@@ -69,18 +69,18 @@ static Score evaluate_endgame(const Board& board,
     switch (eg_type) {
 
         case EG_KQ_KB:
-            return KNOWN_WIN * 2
+            return KNOWN_WIN
                  + corner_king_evaluation(board, stronger_player)
                  - ((bishop_attacks(board.king_square(stronger_player), 0) & board.piece_bb(Piece(stronger_player, PT_QUEEN))) != 0) * 500
                  + 625;
 
         case EG_KQ_KN:
-            return KNOWN_WIN * 2
+            return KNOWN_WIN
                  + corner_king_evaluation(board, stronger_player)
                  + 1250;
 
         case EG_KR_K:
-            return KNOWN_WIN * 2
+            return KNOWN_WIN * 3 / 2
                  + corner_king_evaluation(board, stronger_player)
                  + 250;
 

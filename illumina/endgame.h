@@ -32,6 +32,6 @@ struct Endgame {
 
 Endgame identify_endgame(const Board& board);
 
-}
+} // illumina
 
 #endif // ILLUMINA_ENDGAME_H
