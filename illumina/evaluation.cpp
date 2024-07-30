@@ -207,7 +207,7 @@ void init_eval() {
 }
 
 Score Evaluation::get() const {
-    return std::clamp(m_nnue.forward(m_ctm), - + 1, MATE_THRESHOLD - 1);
+    return std::clamp(m_nnue.forward(m_ctm), -KNOWN_WIN + 1, KNOWN_WIN - 1);
 }
 
 } // illumina

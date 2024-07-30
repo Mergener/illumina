@@ -481,6 +481,13 @@ inline int manhattan_distance(Square a, Square b) {
     return g_manhattan[a][b];
 }
 
+inline int center_manhattan_distance(Square s) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+
+    extern int g_center_manhattan[SQ_COUNT];
+    return g_center_manhattan[s];
+}
+
 constexpr Square pawn_push_destination(Square src, Color color) {
     return src + pawn_push_direction(color);
 }

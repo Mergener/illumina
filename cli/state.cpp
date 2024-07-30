@@ -6,6 +6,7 @@
 
 #include "cliapplication.h"
 #include "evaluation.h"
+#include "endgame.h"
 #include "transpositiontable.h"
 #include "tunablevalues.h"
 
@@ -101,6 +102,16 @@ void State::evaluate() const {
     if (m_board.in_check()) {
         // Positions in check don't have a static evaluation.
         std::cout << "Final evaluation: None (check)" << std::endl;
+        return;
+    }
+
+    Endgame endgame = identify_endgame(m_board);
+    if (endgame.type != EG_UNKNOWN) {
+        std::cout << "Using endgame evaluation." << std::endl;
+        std::cout << "\n\nFinal evaluation ("
+                  << (m_board.color_to_move() == CL_WHITE ? "white" : "black") << "'s perspective): "
+                  << double(endgame.evaluation) / 100.0 << " (" << endgame.evaluation << " cp)"
+                  << std::endl;
         return;
     }
 

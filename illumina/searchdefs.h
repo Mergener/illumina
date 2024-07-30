@@ -31,7 +31,7 @@ constexpr int MAX_PVS = MAX_GENERATED_MOVES;
 constexpr Score MAX_SCORE        = 32500;
 constexpr Score MATE_SCORE       = MAX_SCORE - 1;
 constexpr Score MATE_THRESHOLD   = MATE_SCORE - 1024;
-constexpr Score KNOWN_WIN        = 12000;
+constexpr Score KNOWN_WIN        = 10000;
 
 static_assert(MAX_SCORE        <= INT16_MAX);
 static_assert(MATE_SCORE       < MAX_SCORE);
