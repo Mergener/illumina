@@ -57,10 +57,6 @@ private:
     Color m_ctm;
 };
 
-inline Score Evaluation::get() const {
-    return std::clamp(m_nnue.forward(m_ctm), -MATE_THRESHOLD + 1, MATE_THRESHOLD - 1);
-}
-
 void init_eval();
 
 } // illumina
