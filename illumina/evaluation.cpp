@@ -5,6 +5,8 @@
 #include <nlohmann/json/json.hpp>
 #include <incbin/incbin.h>
 
+#include "endgame.h"
+
 namespace illumina {
 
 INCTXT(_default_network, NNUE_PATH);
@@ -202,6 +204,10 @@ void init_eval() {
     std::string str = std::string(g_default_networkData, g_default_networkSize);
     std::istringstream stream(str);
     s_default_network = new EvalNetwork(stream);
+}
+
+Score Evaluation::get() const {
+    return std::clamp(m_nnue.forward(m_ctm), - + 1, MATE_THRESHOLD - 1);
 }
 
 } // illumina
