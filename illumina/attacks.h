@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
 #include <immintrin.h>
 #endif
 
@@ -89,7 +89,7 @@ inline Bitboard knight_attacks(Square s) {
 inline Bitboard bishop_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
     extern Bitboard g_bishop_attacks[SQ_COUNT][N_ATTACK_KEYS];
     extern const Bitboard g_bishop_masks[];
     return g_bishop_attacks[s][_pext_u64(occ, g_bishop_masks[s])];
@@ -107,7 +107,7 @@ inline Bitboard bishop_attacks(Square s, Bitboard occ) {
 inline Bitboard rook_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
     extern Bitboard g_rook_attacks[SQ_COUNT][N_ATTACK_KEYS];
     extern const Bitboard g_rook_masks[];
     return g_rook_attacks[s][_pext_u64(occ, g_rook_masks[s])];
