@@ -2,9 +2,11 @@
 
 #include <type_traits>
 #include <limits>
+#include <iomanip>
 
 #include "cliapplication.h"
 #include "evaluation.h"
+#include "endgame.h"
 #include "transpositiontable.h"
 #include "tunablevalues.h"
 
@@ -63,7 +65,7 @@ void State::mperft(int depth) const {
 }
 
 void State::uci() {
-    std::cout << "id name Illumina v1.0 " << std::endl;
+    std::cout << "id name Illumina " << ILLUMINA_VERSION_NAME << std::endl;
     std::cout << "id author Thomas Mergener" << std::endl;
 
     for (const UCIOption& option: m_options.list_options()) {
@@ -97,25 +99,98 @@ void State::check_if_ready() {
 }
 
 void State::evaluate() const {
-    Evaluation eval;
-    eval.on_new_board(m_board);
-    std::cout << "info score cp " << eval.get() << std::endl;
-}
-
-static std::ostream& operator<<(std::ostream& stream, const std::vector<Move>& line) {
-    if (line.empty()) {
-        return stream;
+    if (m_board.in_check()) {
+        // Positions in check don't have a static evaluation.
+        std::cout << "Final evaluation: None (check)" << std::endl;
+        return;
     }
 
-    std::cout << line[0].to_uci();
+    Endgame endgame = identify_endgame(m_board);
+    if (endgame.type != EG_UNKNOWN) {
+        std::cout << "Using endgame evaluation." << std::endl;
+        std::cout << "\n\nFinal evaluation ("
+                  << (m_board.color_to_move() == CL_WHITE ? "white" : "black") << "'s perspective): "
+                  << double(endgame.evaluation) / 100.0 << " (" << endgame.evaluation << " cp)"
+                  << std::endl;
+        return;
+    }
+
+    Evaluation eval;
+    Board repl = m_board;
+    eval.on_new_board(repl);
+    Score score = eval.get();
+
+    std::cout << "      ";
+
+    for (BoardFile f: FILES) {
+        std::cout << " " << file_to_char(f) << "    ";
+    }
+    std::cout << "\n    -------------------------------------------------";
+
+    for (BoardRank r: RANKS_REVERSE) {
+        std::cout << std::endl;
+        std::cout << " " << rank_to_char(r) << " |";
+        for (BoardFile f: FILES) {
+            Square s = make_square(f, r);
+            Piece p = repl.piece_at(s);
+            if (p == PIECE_NULL) {
+                std::cout << "      ";
+            }
+            else if (p.type() == PT_KING) {
+                std::cout << "   " << '*' << "  ";
+            }
+            else {
+                repl.set_piece_at(s, PIECE_NULL);
+                eval.on_new_board(repl);
+                Score score_without_piece = eval.get();
+                repl.set_piece_at(s, p);
+
+                std::cout << std::setw(6)
+                          << std::fixed
+                          << std::setprecision(2)
+                          << double(score - score_without_piece) / 100;
+            }
+        }
+
+        std::cout << " |" << std::endl << "   |";
+        for (BoardFile f: FILES) {
+            Square s = make_square(f, r);
+            Piece p = repl.piece_at(s);
+            if (p == PIECE_NULL) {
+                std::cout << "      ";
+            }
+            else {
+                std::cout << "   " << p.to_char() << "  ";
+            }
+        }
+
+        std::cout << " |";
+    }
+    std::cout << "\n    -------------------------------------------------";
+
+    std::cout << "\n\nFinal evaluation ("
+              << (m_board.color_to_move() == CL_WHITE ? "white" : "black") << "'s perspective): "
+              << double(score) / 100
+              << " (" << score << " cp)"
+              << std::endl;
+}
+
+static std::string pv_to_string(const std::vector<Move>& line, bool frc) {
+    if (line.empty()) {
+        return "";
+    }
+
+    std::stringstream stream;
+    stream << line[0].to_uci(frc);
     for (auto it = line.begin() + 1; it != line.end(); ++it) {
         Move m = *it;
         if (m == MOVE_NULL) {
             break;
         }
-        stream << ' ' << m.to_uci();
+        stream << ' ' << m.to_uci(frc);
     }
-    return stream;
+    return stream.str();
+
 }
 
 static std::string score_string(Score score) {
@@ -151,7 +226,7 @@ void State::setup_searcher() {
 
         std::cout << "info"
                   << " depth "       << depth
-                  << " currmove "    << move.to_uci()
+                  << " currmove "    << move.to_uci(m_frc)
                   << " currmovenumber " << move_num
                   << std::endl;
     });
@@ -165,9 +240,10 @@ void State::setup_searcher() {
                   << " depth "    << res.depth
                   << " seldepth " << res.sel_depth
                   << " score "    << score_string(res.score)
-                  << bound_type_string(res.bound_type)
-                  << " pv "       << res.line
-                  << " hashfull " << m_searcher.tt().hash_full()
+                  << bound_type_string(res.bound_type);
+        if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
+        std::cout << " pv "       << pv_to_string(res.line, m_frc);
+        std::cout << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
                   << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
                   << " time "     << res.time
@@ -194,10 +270,10 @@ void State::search(SearchSettings settings) {
             m_search_start = Clock::now();
             SearchResults results = m_searcher.search(m_board, settings);
 
-            std::cout << "bestmove " << results.best_move.to_uci();
+            std::cout << "bestmove " << results.best_move.to_uci(m_frc);
 
             if (results.ponder_move != MOVE_NULL) {
-                std::cout << " ponder " << results.ponder_move.to_uci();
+                std::cout << " ponder " << results.ponder_move.to_uci(m_frc);
             }
 
             std::cout << std::endl;
@@ -263,6 +339,11 @@ void State::register_options() {
     m_options.register_option<UCIOptionSpin>("Threads", 1, 1, 1);
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, MAX_PVS);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
+    m_options.register_option<UCIOptionCheck>("UCI_Chess960", false)
+        .add_update_handler([this](const UCIOption& opt) {
+            const auto& check = dynamic_cast<const UCIOptionCheck&>(opt);
+            m_frc = check.value();
+        });
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \

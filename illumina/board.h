@@ -40,7 +40,6 @@ public:
     Bitboard       piece_type_bb(PieceType pt) const;
     Piece          piece_at(Square s) const;
     Square         ep_square() const;
-    bool           frc() const;
     bool           in_check() const;
     bool           in_double_check() const;
     ui64           hash_key() const;
@@ -93,7 +92,7 @@ public:
 
     Board() = default;
     Board(const Board& rhs) = default;
-    explicit Board(std::string_view fen_str, bool force_frc = false);
+    explicit Board(std::string_view fen_str);
     ~Board() = default;
     Board(Board&& rhs) = default;
     Board& operator=(const Board& rhs) = default;
@@ -133,8 +132,6 @@ private:
 
     std::vector<State> m_prev_states;
     State m_state {};
-
-    bool m_frc = false;
 
     Bitboard& piece_bb_ref(Piece piece);
     Bitboard& color_bb_ref(Color color);
@@ -189,10 +186,6 @@ inline Square Board::ep_square() const {
 
 inline int Board::rule50() const {
     return m_state.rule50;
-}
-
-inline bool Board::frc() const {
-    return m_frc;
 }
 
 inline bool Board::in_check() const {
@@ -556,7 +549,7 @@ inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
         Bitboard pawn_targets;
         Bitboard our_pawns = piece_bb(Piece(c, PT_PAWN));
         if constexpr (QUIET_PAWN_MOVES) {
-            pawn_targets = pawn_pushes<true>(s, opposite_color(c), occ & ~(our_pawns));
+            pawn_targets = reverse_pawn_pushes(s, c, occ & ~(our_pawns));
         }
         else {
             pawn_targets = pawn_attacks(s, opposite_color(c));
