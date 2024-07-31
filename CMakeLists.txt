@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Set illumina version.
 set(ILLUMINA_VERSION_MAJOR 1)
-set(ILLUMINA_VERSION_MINOR 0)
+set(ILLUMINA_VERSION_MINOR 1)
 
 # Setup important paths.
 set(ILLUMINA_LIBRARY_SOURCE_DIR ${CMAKE_SOURCE_DIR}/illumina)
@@ -82,9 +82,11 @@ function(apply_arch_options TARGET ARCH)
 endfunction()
 
 # Define Illumina's version numbers/names.
-set(ILLUMINA_VERSION_NAME ${ILLUMINA_VERSION_MAJOR}.${ILLUMINA_VERSION_MINOR})
+
 if (DEVELOPMENT)
-    set(ILLUMINA_VERSION_NAME ${ILLUMINA_VERSION_NAME}-dev-${COMMIT_HASH})
+    set(ILLUMINA_VERSION_NAME dev-${COMMIT_HASH})
+else()
+    set(ILLUMINA_VERSION_NAME ${ILLUMINA_VERSION_MAJOR}.${ILLUMINA_VERSION_MINOR})
 endif()
 
 message("Generating build files for version ${ILLUMINA_VERSION_NAME} on configuration ${CMAKE_BUILD_TYPE}.")
