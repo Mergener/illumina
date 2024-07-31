@@ -27,6 +27,7 @@ struct PVResults {
 struct SearchSettings {
     Score contempt = 0;
     int n_pvs = 1;
+    int n_threads = 1;
     ui64 max_nodes = UINT64_MAX;
     std::optional<Depth> max_depth;
     std::optional<i64>   white_time;

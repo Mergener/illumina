@@ -175,7 +175,9 @@ void State::evaluate() const {
               << std::endl;
 }
 
-static std::string pv_to_string(const std::vector<Move>& line, bool frc) {
+static std::string pv_to_string(const std::vector<Move>& line,
+                                const Board& board,
+                                bool frc) {
     if (line.empty()) {
         return "";
     }
@@ -184,7 +186,7 @@ static std::string pv_to_string(const std::vector<Move>& line, bool frc) {
     stream << line[0].to_uci(frc);
     for (auto it = line.begin() + 1; it != line.end(); ++it) {
         Move m = *it;
-        if (m == MOVE_NULL) {
+        if (!board.is_move_pseudo_legal(m) || !board.is_move_legal(m)) {
             break;
         }
         stream << ' ' << m.to_uci(frc);
@@ -262,8 +264,9 @@ void State::search(SearchSettings settings) {
         delete m_search_thread;
     }
 
-    settings.contempt = m_options.option<UCIOptionSpin>("Contempt").value();
-    settings.n_pvs    = m_options.option<UCIOptionSpin>("MultiPV").value();
+    settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
+    settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
+    settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
 
     m_search_thread = new std::thread([this, settings]() {
         try {
@@ -336,7 +339,7 @@ void State::register_options() {
             m_searcher.tt().resize(spin.value() * 1024 * 1024);
         });
 
-    m_options.register_option<UCIOptionSpin>("Threads", 1, 1, 1);
+    m_options.register_option<UCIOptionSpin>("Threads", 1, 1, UINT16_MAX);
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, MAX_PVS);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
     m_options.register_option<UCIOptionCheck>("UCI_Chess960", false)

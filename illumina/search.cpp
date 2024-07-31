@@ -1,6 +1,7 @@
 #include "search.h"
 
 #include <cmath>
+#include <thread>
 
 #include "endgame.h"
 #include "timemanager.h"
@@ -112,6 +113,7 @@ struct WorkerResults {
     } pv_results[MAX_PVS];
     Depth sel_depth   = 0;
     ui64  nodes       = 0;
+    Depth searched_depth = 0;
 };
 
 class SearchWorker {
@@ -197,8 +199,17 @@ SearchResults Searcher::search(const Board& board,
     m_tt.new_search();
     SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &m_tm);
 
-    SearchWorker worker(true, board, &context, &settings);
+    // Create main worker.
+    SearchWorker main_worker(true, board, &context, &settings);
 
+    // Create secondary workers.
+    int n_helper_threads = std::max(1, settings.n_threads) - 1;
+    std::vector<SearchWorker> secondary_workers;
+    for (int i = 0; i < n_helper_threads; ++i) {
+        secondary_workers.emplace_back(false, board, &context, &settings);
+    }
+
+    // Kickstart our time manager.
     if (settings.move_time.has_value()) {
         m_tm.start_movetime(settings.move_time.value());
     }
@@ -212,9 +223,46 @@ SearchResults Searcher::search(const Board& board,
         m_tm.stop();
     }
 
-    worker.iterative_deepening();
+    // Fire secondary threads.
+    std::vector<std::thread> helper_threads;
+    for (int i = 0; i < n_helper_threads; ++i) {
+        SearchWorker& worker = secondary_workers[i];
+        helper_threads.emplace_back([&worker, i]() {
+            worker.iterative_deepening();
+        });
+    }
 
-    const WorkerResults& worker_results = worker.results();
+    main_worker.iterative_deepening();
+
+    // Wait for secondary threads to stop.
+    for (std::thread& thread: helper_threads) {
+        thread.join();
+    }
+
+    // Save obtained results in vector and vote for the best afterwards.
+    std::vector<WorkerResults> all_results;
+    all_results.push_back(main_worker.results());
+    for (SearchWorker& worker: secondary_workers) {
+        all_results.push_back(worker.results());
+    }
+
+    // Vote for the best results. Prioritize results
+    // with higher scores that reached higher depths.
+    WorkerResults* selected_results;
+    int best_result_score = INT_MIN;
+    for (WorkerResults& results: all_results) {
+        if (results.pv_results[0].best_move == MOVE_NULL) {
+            continue;
+        }
+
+        int result_score = results.searched_depth * 500 +
+            results.pv_results[0].score +
+            (results.pv_results[0].bound_type == BT_EXACT) * 400;
+
+        if (result_score > best_result_score) {
+            selected_results = &results;
+        }
+    }
 
     // Fill in the search results object to be returned.
     // We assume that the best move is the one at MultiPV 1.
@@ -222,9 +270,9 @@ SearchResults Searcher::search(const Board& board,
     // to focus our efforts in improving MultiPV mode since
     // it is already not the one used for playing.
     SearchResults results {};
-    results.score       = worker_results.pv_results[0].score;
-    results.best_move   = worker_results.pv_results[0].best_move;
-    results.ponder_move = worker_results.pv_results[0].ponder_move;
+    results.score       = selected_results->pv_results[0].score;
+    results.best_move   = selected_results->pv_results[0].best_move;
+    results.ponder_move = selected_results->pv_results[0].ponder_move;
 
     return results;
 }
@@ -255,6 +303,7 @@ void SearchWorker::iterative_deepening() {
 
             check_limits();
             aspiration_windows();
+            m_results.searched_depth = m_curr_depth;
             check_limits();
             if (should_stop() || m_context->time_manager().finished_soft()) {
                 // If we finished soft, we don't want to start a new iteration.
@@ -456,7 +505,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Kickstart our curr move counter for later reporting.
-    if (ROOT && m_main) {
+    if constexpr (ROOT) {
         m_curr_move_number = 0;
     }
 
@@ -480,12 +529,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         // Report 'currmove' and 'currmovenumber'.
-        if (ROOT && m_main) {
+        if constexpr (ROOT) {
             m_curr_move_number++;
             m_curr_move = move;
-            m_context->listeners().curr_move_listener(m_curr_depth,
-                                                      m_curr_move,
-                                                      m_curr_move_number);
+
+            if (m_main) {
+                m_context->listeners().curr_move_listener(m_curr_depth,
+                                                          m_curr_move,
+                                                          m_curr_move_number);
+            }
         }
 
         // Late move pruning.
@@ -581,7 +633,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             // Due to aspiration windows, our search may have failed high in the root.
             // Make sure we always have a best_move and a best_score.
-            if (ROOT && m_main && (!should_stop() || depth <= 2)) {
+            if (ROOT && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
                 m_results.pv_results[m_curr_pv_idx].score     = alpha;
             }
@@ -597,7 +649,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             best_move = move;
 
             // Make sure we update our best_move in the root ASAP.
-            if (ROOT && m_main && (!should_stop() || depth <= 2)) {
+            if (ROOT && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
                 m_results.pv_results[m_curr_pv_idx].score     = alpha;
             }
