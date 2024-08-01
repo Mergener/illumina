@@ -429,6 +429,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (!PV        &&
         !SKIP_NULL &&
         !in_check  &&
+        node->skip_move == MOVE_NULL &&
         popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES &&
         static_eval >= beta &&
         depth >= NMP_MIN_DEPTH) {
@@ -519,17 +520,17 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             !in_check &&
             hash_move != MOVE_NULL &&
             tt_entry.bound_type() != BT_UPPERBOUND &&
-            depth >= 8 &&
+            depth >= 8        &&
             move == hash_move &&
             depth - tt_entry.depth() >= 3 &&
             std::abs(tt_entry.score()) < MATE_THRESHOLD) {
             Score se_beta = std::min(beta, tt_entry.score() - depth * 2);
 
             node->skip_move = move;
-            Score score = pvs<PV>((depth - 1) / 2, se_beta - 1, se_beta, node);
+            Score score = pvs<PV>(depth / 2, se_beta - 1, se_beta, node);
             node->skip_move = MOVE_NULL;
 
-            if (score >= se_beta) {
+            if (score <= se_beta) {
                 extensions++;
             }
             else if (score >= beta) {
