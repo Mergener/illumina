@@ -182,14 +182,18 @@ static std::string pv_to_string(const std::vector<Move>& line,
         return "";
     }
 
+    Board repl = board;
+
     std::stringstream stream;
     stream << line[0].to_uci(frc);
+    repl.make_move(line[0]);
     for (auto it = line.begin() + 1; it != line.end(); ++it) {
         Move m = *it;
-        if (!board.is_move_pseudo_legal(m) || !board.is_move_legal(m)) {
+        if (!repl.is_move_pseudo_legal(m) || !repl.is_move_legal(m)) {
             break;
         }
         stream << ' ' << m.to_uci(frc);
+        repl.make_move(m);
     }
     return stream.str();
 
@@ -244,7 +248,7 @@ void State::setup_searcher() {
                   << " score "    << score_string(res.score)
                   << bound_type_string(res.bound_type);
         if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
-        std::cout << " pv "       << pv_to_string(res.line, m_frc);
+        std::cout << " pv "       << pv_to_string(res.line, m_board, m_frc);
         std::cout << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
                   << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
