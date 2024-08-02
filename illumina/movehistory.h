@@ -2,6 +2,7 @@
 #define ILLUMINA_MOVEHISTORY_H
 
 #include <array>
+#include <cstring>
 
 #include "searchdefs.h"
 #include "types.h"
@@ -20,9 +21,13 @@ public:
     int  quiet_history(Move move) const;
     void update_quiet_history(Move move, Depth depth, bool good);
 
+    Move counter_move(Move previous_move) const;
+    void set_counter_move(Move previous_move, Move counter_move);
+
 private:
     std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
     ButterflyHistoryArray m_quiet_history {};
+    std::array<std::array<Move, SQ_COUNT>, SQ_COUNT> m_counter_moves;
 
     static int& history_ref(ButterflyHistoryArray& history,
                             Move move);
@@ -58,6 +63,7 @@ inline void MoveHistory::set_killer(Depth ply, Move killer) {
 
 inline void MoveHistory::reset() {
     std::fill(m_killers.begin(), m_killers.end(), std::array<Move, 2> { MOVE_NULL, MOVE_NULL });
+    std::memset(m_counter_moves.data(), 0, sizeof(m_counter_moves));
 }
 
 inline int MoveHistory::quiet_history(Move move) const {
@@ -88,6 +94,14 @@ inline void MoveHistory::update_history(MoveHistory::ButterflyHistoryArray& hist
     int sign  = good ? 1 : -1;
     int& hist = history_ref(history, move);
     hist     += (sign * delta) - std::min(hist, 16384) * delta / 16384;
+}
+
+inline Move MoveHistory::counter_move(Move previous_move) const {
+    return m_counter_moves[previous_move.source()][previous_move.destination()];
+}
+
+inline void MoveHistory::set_counter_move(Move previous_move, Move counter_move) {
+    m_counter_moves[previous_move.source()][previous_move.destination()] = counter_move;
 }
 
 } // illumina

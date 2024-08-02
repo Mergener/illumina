@@ -570,6 +570,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             alpha     = beta;
             best_move = move;
 
+            // This move refutes the last played move. Update the counter move table
+            // to use it as a move ordering heuristic in the future.
+            Move last_move = m_board.last_move();
+            if (last_move != MOVE_NULL) {
+                m_hist.set_counter_move(last_move, move);
+            }
+
             // Update our history scores and refutation moves.
             if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);

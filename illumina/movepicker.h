@@ -7,6 +7,7 @@
 #include "searchdefs.h"
 #include "movegen.h"
 #include "movehistory.h"
+#include "tunablevalues.h"
 
 #include <iostream>
 
@@ -438,9 +439,21 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         };
 
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
+
+        // If this is a counter move, increase its score.
+        Move last_move = m_board->last_move();
+        if (m_mv_hist->counter_move(last_move) == move) {
+            move.add_value(COUNTER_MOVE_SCORE_NOISY);
+        }
     }
     else {
         move.add_value(m_mv_hist->quiet_history(move));
+
+        // If this is a counter move, increase its score.
+        Move last_move = m_board->last_move();
+        if (m_mv_hist->counter_move(last_move) == move) {
+            move.add_value(COUNTER_MOVE_SCORE_QUIET);
+        }
     }
 }
 
