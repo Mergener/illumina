@@ -535,7 +535,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
                 // and probably don't need unsound sacrifices.
-                bool stable = alpha >= 250;
+                bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
                 reductions -= !stable * (reductions / 2);
             }
 

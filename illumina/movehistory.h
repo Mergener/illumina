@@ -4,9 +4,12 @@
 #include <array>
 
 #include "searchdefs.h"
+#include "tunablevalues.h"
 #include "types.h"
 
 namespace illumina {
+
+static constexpr int MAX_HISTORY = 16384;
 
 class MoveHistory {
     using ButterflyHistoryArray = std::array<std::array<int, SQ_COUNT>, SQ_COUNT>;
@@ -84,10 +87,12 @@ inline void MoveHistory::update_history(MoveHistory::ButterflyHistoryArray& hist
                                         Move move,
                                         Depth depth,
                                         bool good) {
-    int delta = (depth < 12) ? (depth * depth) : (32 * depth * depth);
+    int delta = (depth < MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD)
+              ? (depth * depth)
+              : (MV_HIST_QUIET_HIGH_DEPTH_FACTOR * depth * depth);
     int sign  = good ? 1 : -1;
     int& hist = history_ref(history, move);
-    hist     += (sign * delta) - std::min(hist, 16384) * delta / 16384;
+    hist     += (sign * delta) - std::min(hist, MAX_HISTORY) * delta / MAX_HISTORY;
 }
 
 } // illumina
