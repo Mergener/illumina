@@ -9,11 +9,8 @@
 
 namespace illumina {
 
-Board::Board(std::string_view fen_str, bool force_frc) {
+Board::Board(std::string_view fen_str) {
     ParseHelper parse_helper(fen_str);
-
-    // If force_frc = true, let's already set m_frc here.
-    m_frc = force_frc;
 
     // Read and parse piece list.
     {
@@ -117,7 +114,6 @@ Board::Board(std::string_view fen_str, bool force_frc) {
 
                         // If we're changing the original castle rook squares, we're on a
                         // Fischer Random position.
-                        m_frc = m_frc || (m_castle_rook_squares[king_color][side] != expected_rook_square);
                         m_castle_rook_squares[king_color][side] = expected_rook_square;
 
                         break;
@@ -170,10 +166,6 @@ Board::Board(std::string_view fen_str, bool force_frc) {
                             continue;
                         }
                     }
-
-                    // If we've reached this point, we know that we're definitely on a
-                    // Fischer random position.
-                    m_frc = true;
                 }
             }
         }
@@ -354,6 +346,9 @@ void Board::make_move(Move move) {
 
     if (move.is_capture()) {
         m_state.rule50 = 0;
+
+        // If we're capturing one of the opponent's rooks, we take
+        // away their castling rights on the respective rook's side.
         if (move.captured_piece().type() == PT_ROOK) {
             if (destination == castle_rook_square(opponent, SIDE_KING)) {
                 set_castling_rights(opponent, SIDE_KING, false);
@@ -391,7 +386,9 @@ void Board::make_move(Move move) {
             Side castling_side      = move.castles_side();
 
             // Move the rook.
-            set_piece_at_internal<true, false>(prev_rook_square, PIECE_NULL);
+            if (piece_at(prev_rook_square).type() != PT_KING) {
+                set_piece_at_internal<true, false>(prev_rook_square, PIECE_NULL);
+            }
             set_piece_at_internal<true, false>(castled_rook_square(moving_color, castling_side),
                                                Piece(moving_color, PT_ROOK));
             break;
@@ -434,15 +431,22 @@ void Board::undo_move() {
             break;
 
         case MT_CASTLES: {
-            set_piece_at_internal<true, false>(destination, PIECE_NULL);
+            // FRC castles can sometimes just leave the king on the same
+            // square.
+            if (destination != source) {
+                set_piece_at_internal<true, false>(destination, PIECE_NULL);
+            }
 
             Square prev_rook_square = move.castles_rook_src_square();
             Side castling_side      = move.castles_side();
 
             // Move the rook.
+            Square castled_rook_sq = castled_rook_square(moving_color, castling_side);
+            if (piece_at(castled_rook_sq).type() != PT_KING) {
+                set_piece_at_internal<true, false>(castled_rook_sq,
+                                                   PIECE_NULL);
+            }
             set_piece_at_internal<true, false>(prev_rook_square, Piece(moving_color, PT_ROOK));
-            set_piece_at_internal<true, false>(castled_rook_square(moving_color, castling_side),
-                                               PIECE_NULL);
             break;
         }
 
@@ -669,8 +673,9 @@ bool Board::is_move_pseudo_legal(Move move) const {
     Color dst_piece_color    = dst_piece.color();
     PieceType src_piece_type = src_piece.type();
 
-    if (src == dest) {
-        // Destination can't be equal to source.
+    if (src == dest && move.type() != MT_CASTLES) {
+        // Destination can't be equal to source, except on some
+        // FRC castling moves.
         return false;
     }
 

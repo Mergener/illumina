@@ -449,6 +449,7 @@ TMOVE* generate_king_moves_by_color(const Board& board, TMOVE* moves) {
 
     constexpr bool GEN_SIMPLE_CAPTURES = bit_is_set(MOVE_TYPE_MASK, MT_SIMPLE_CAPTURE);
     constexpr bool GEN_QUIET = bit_is_set(MOVE_TYPE_MASK, MT_NORMAL);
+    constexpr bool GEN_CASTLES = bit_is_set(MOVE_TYPE_MASK, MT_CASTLES);
 
     Square src = board.king_square(C);
     Bitboard attacks = king_attacks(src);
@@ -472,6 +473,9 @@ TMOVE* generate_king_moves_by_color(const Board& board, TMOVE* moves) {
             normal_dsts = unset_lsb(normal_dsts);
         }
 
+    }
+
+    if constexpr (GEN_CASTLES) {
         // Generate castles.
         for (Side side: SIDES) {
             if (!board.has_castling_rights(C, side)) {
@@ -479,14 +483,25 @@ TMOVE* generate_king_moves_by_color(const Board& board, TMOVE* moves) {
             }
 
             Square castle_rook_sq = board.castle_rook_square(C, side);
-            Bitboard between_kr = between_bb(src, castle_rook_sq);
+            Square king_dest = castled_king_square(C, side);
+            Square rook_dest = castled_rook_square(C, side);
 
-            if (between_kr & occ) {
+            Bitboard vacant_path = (between_bb_inclusive(src, king_dest) | between_bb_inclusive(castle_rook_sq, rook_dest));
+            vacant_path &= ~board.piece_bb(KING);
+            vacant_path &= ~BIT(castle_rook_sq);
+
+            if (vacant_path & occ) {
                 // Can't castle, pieces between king and rook.
                 continue;
             }
 
-            Bitboard full_path = between_bb_inclusive(src, castled_king_square(C, side));
+            if (board.is_pinned(castle_rook_sq)) {
+                // Can't castle, rook is pinned to the king.
+                // This can only happen in FRC.
+                continue;
+            }
+
+            Bitboard full_path = between_bb_inclusive(src, king_dest);
             while (full_path) {
                 Square s = lsb(full_path);
 

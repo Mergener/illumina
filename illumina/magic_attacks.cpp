@@ -1,6 +1,6 @@
 #include "attacks.h"
 
-#ifndef USE_PEXT
+#ifndef HAS_PEXT
 
 namespace illumina {
 
@@ -217,4 +217,4 @@ void init_magic_bbs() {
 
 } // illumina
 
-#endif // USE_PEXT
+#endif // HAS_PEXT

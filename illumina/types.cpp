@@ -17,6 +17,7 @@ std::string square_name(Square s) {
 
 int g_chebyshev[SQ_COUNT][SQ_COUNT];
 int g_manhattan[SQ_COUNT][SQ_COUNT];
+int g_center_manhattan[SQ_COUNT];
 
 static void initialize_distances() {
     for (Square a = 0; a < SQ_COUNT; ++a) {
@@ -29,6 +30,13 @@ static void initialize_distances() {
         }
     }
 
+    for (Square s = 0; s < SQ_COUNT; ++s) {
+        int distance = g_manhattan[s][SQ_E4];
+        distance = std::min(distance, g_manhattan[s][SQ_E5]);
+        distance = std::min(distance, g_manhattan[s][SQ_D4]);
+        distance = std::min(distance, g_manhattan[s][SQ_D5]);
+        g_center_manhattan[s] = distance;
+    }
 }
 
 Bitboard g_between[SQ_COUNT][SQ_COUNT];
@@ -144,7 +152,7 @@ std::string Move::to_uci(bool frc) const {
             if (frc) {
                 return square_name(source()) + square_name(castles_rook_src_square());
             }
-            return square_name(source()) + square_name(destination());
+            // Fallthrough
 
         default:
             return square_name(source()) + square_name(destination());

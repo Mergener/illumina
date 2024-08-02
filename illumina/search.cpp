@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "endgame.h"
 #include "timemanager.h"
 #include "tunablevalues.h"
 #include "movepicker.h"
@@ -159,6 +160,7 @@ private:
 
     void report_pv_results(const SearchNode* search_stack);
 
+    Score evaluate() const;
     Score draw_score() const;
 };
 
@@ -407,7 +409,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Compute the static eval. Useful for many heuristics.
-    static_eval    = !in_check ? m_eval.get() : 0;
+    static_eval    = !in_check ? evaluate() : 0;
     bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
 
     // Reverse futility pruning.
@@ -533,7 +535,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
                 // and probably don't need unsound sacrifices.
-                bool stable = alpha >= 250;
+                bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
                 reductions -= !stable * (reductions / 2);
             }
 
@@ -643,7 +645,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 }
 
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
-    Score stand_pat = m_eval.get();
+    Score stand_pat = evaluate();
 
     if (stand_pat >= beta) {
         return beta;
@@ -684,6 +686,18 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     }
 
     return alpha;
+}
+
+Score SearchWorker::evaluate() const {
+    // Check if we're in a known endgame.
+    Endgame eg = identify_endgame(m_board);
+
+    // We're on a known endgame. Use its evaluation.
+    if (eg.type != EG_UNKNOWN) {
+        return eg.evaluation;
+    }
+
+    return m_eval.get();
 }
 
 void SearchWorker::report_pv_results(const SearchNode* search_stack) {
@@ -774,6 +788,7 @@ void SearchWorker::undo_move() {
 void SearchWorker::make_null_move() {
     m_eval.on_make_null_move(m_board);
     m_board.make_null_move();
+    m_results.nodes++;
 }
 
 void SearchWorker::undo_null_move() {
