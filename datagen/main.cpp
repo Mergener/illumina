@@ -14,9 +14,10 @@ constexpr ui64 SEARCH_NODE_LIMIT    = 5128;
 constexpr int  MIN_RANDOM_PLIES     = 5;
 constexpr int  MAX_RANDOM_PLIES     = 12;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
-constexpr Score HI_SCORE            = 500;
+constexpr Score HI_SCORE            = 800;
 constexpr int MAX_HI_SCORE_PLIES    = 6;
-constexpr size_t POSITIONS_PER_GAME = 12;
+constexpr size_t MIN_POSITIONS_PER_GAME = 12;
+constexpr size_t MAX_POSITIONS_PER_GAME = 16;
 
 struct GamePlyData {
     Score white_pov_score;
@@ -113,6 +114,9 @@ Game simulate() {
         ply_data.white_pov_score = board.color_to_move() == CL_WHITE
             ? search_results.score
             : -search_results.score;
+
+        ply_data.white_pov_score = std::clamp(ply_data.white_pov_score, -3000, 3000);
+
         game.ply_data.push_back(ply_data);
 
         // Count how many successive times a position is
@@ -206,7 +210,10 @@ void generate_data(std::string_view out_file) {
             // to not only save data from the beginning of the game.
             std::shuffle(out_tuples.begin(), out_tuples.end(), g);
 
-            for (size_t i = 0; i < std::min(out_tuples.size(), POSITIONS_PER_GAME); ++i) {
+            size_t n_pos = std::min(MIN_POSITIONS_PER_GAME + ply_data_vec.size() / 30,
+                                    MAX_POSITIONS_PER_GAME);
+
+            for (size_t i = 0; i < std::min(out_tuples.size(), n_pos); ++i) {
                 const OutputTuple& out_tuple = out_tuples[i];
 
                 std::stringstream ss;
