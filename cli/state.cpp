@@ -1,7 +1,7 @@
 #include "state.h"
 
 #include <type_traits>
-#include <limits>
+#include <climits>
 #include <iomanip>
 
 #include "cliapplication.h"

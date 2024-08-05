@@ -47,7 +47,6 @@ if (DEVELOPMENT)
 
 endif()
 
-
 # For GCC-derived compilers, we need to specify some flags in order
 # to have <thread> and <filesystem> properly working.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

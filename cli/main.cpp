@@ -31,6 +31,9 @@ int main(int argc, char* argv[]) {
 #ifdef TUNING_BUILD
         std::cout << "This is a tuning build. Engine constants can be changed using UCI options." << std::endl;
 #endif
+#ifdef USE_ASSERTS
+        std::cout << "Assertions are enabled for this build." << std::endl;
+#endif
 
         server.listen();
 

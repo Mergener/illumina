@@ -34,11 +34,13 @@ Board::Board(std::string_view fen_str) {
                     throw std::invalid_argument(std::string("Invalid piece '") + c + "'");
                 }
 
-                set_piece_at(s, p);
+                set_piece_at_internal<true, false>(s, p);
                 file++;
             }
         }
     }
+    compute_pins();
+    compute_checkers();
 
     // Read and parse color to move.
     {
@@ -535,6 +537,9 @@ void Board::compute_pins() {
 
     for (Color c: COLORS) {
         Color them      = opposite_color(c);
+        if (piece_bb(Piece(c, PT_KING)) == 0) {
+            continue;
+        }
         Square our_king = king_square(c);
 
         Bitboard their_bishops = piece_bb(Piece(them, PT_BISHOP));
@@ -609,6 +614,10 @@ BoardResult Board::result() const {
 }
 
 bool Board::legal() const {
+    if (popcount(piece_bb(WHITE_KING)) != 1 || popcount(piece_bb(BLACK_KING)) != 1) {
+        return false;
+    }
+
     return !is_attacked_by(color_to_move(), king_square(opposite_color(color_to_move())));
 }
 
@@ -780,8 +789,14 @@ bool Board::is_move_pseudo_legal(Move move) const {
 }
 
 void Board::compute_checkers() {
-    Color us           = color_to_move();
-    Color them         = opposite_color(us);
+    Color us   = color_to_move();
+    Color them = opposite_color(us);
+    if (piece_bb(Piece(them, PT_KING)) == 0) {
+        // No king, no checkers.
+        m_state.n_checkers = 0;
+        return;
+    }
+
     Square king_sq     = king_square(us);
     Bitboard checkers  = all_attackers_of<false, true>(them, king_sq);
     m_state.n_checkers = popcount(checkers);

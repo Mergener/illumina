@@ -71,7 +71,6 @@ inline int MoveHistory::quiet_history(Move move) const {
 inline void MoveHistory::update_quiet_history(Move move,
                                               Depth depth,
                                               bool good) {
-    ILLUMINA_ASSERT(move.is_quiet());
     update_history(m_quiet_history, move, depth, good);
 }
 
