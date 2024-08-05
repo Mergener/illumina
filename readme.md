@@ -11,6 +11,15 @@ Illumina supports CMake in order to allow cross-platform compiling.
 If you are using an IDE such as Visual Studio or CLion, import Illumina as a CMake project and building should work out of the box.
 Note that if building tests is desired, submodules must have been cloned.
 
+If you are generating the CMake build system by yourself, make sure to select the desired 
+build configuration (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`) by passing `-DCMAKE_BUILD_TYPE=<YourDesiredBuildType>` to 
+the CMake invocation.
+
+Besides the build types CMake offers, Illumina also offers the following CMake options (that can be specified by `-D<OPTION_NAME>=<ON/OFF>`):
+
+- `TUNING`: Specifies that we're creating a tuning build. Tuning build exposes many internal constants as UCI options, such as search and time management constants. `OFF` by default.
+- `DEVELOPMENT`: Specifies that we're creating a development build. This is mainly for displaying the correct version name when the engine starts and/or `uci` is called. `ON` by default.
+
 ## Honorable Mentions
 
 - [Marlinflow](https://github.com/jnlt3/marlinflow): Used to train Illumina's evaluation network.
