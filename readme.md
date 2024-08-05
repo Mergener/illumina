@@ -9,7 +9,8 @@ Illumina is a chess engine that supports the [UCI protocol](https://en.wikipedia
 
 Illumina supports CMake in order to allow cross-platform compiling. 
 If you are using an IDE such as Visual Studio or CLion, import Illumina as a CMake project and building should work out of the box.
-Note that if building tests is desired, submodules must have been cloned.
+Note that if building tests is desired, submodules must have been cloned. This can be done by cloning this repository recursively using
+the `--recursive` flag after the clone command.
 
 If you are generating the CMake build system by yourself through the command line, make sure to select the desired 
 build configuration (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`) by passing `-DCMAKE_BUILD_TYPE=<YourDesiredBuildType>` to 
