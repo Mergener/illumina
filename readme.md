@@ -11,7 +11,7 @@ Illumina supports CMake in order to allow cross-platform compiling.
 If you are using an IDE such as Visual Studio or CLion, import Illumina as a CMake project and building should work out of the box.
 Note that if building tests is desired, submodules must have been cloned.
 
-If you are generating the CMake build system by yourself, make sure to select the desired 
+If you are generating the CMake build system by yourself through the command line, make sure to select the desired 
 build configuration (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`) by passing `-DCMAKE_BUILD_TYPE=<YourDesiredBuildType>` to 
 the CMake invocation.
 
