@@ -11,9 +11,19 @@ namespace illumina {
 
 static constexpr int MAX_HISTORY = 16384;
 
-class MoveHistory {
-    using ButterflyHistoryArray = std::array<std::array<int, SQ_COUNT>, SQ_COUNT>;
+template <typename T>
+struct ButterflyArray : std::array<std::array<T, SQ_COUNT>, SQ_COUNT> {
+    T& get(Move move);
+    const T& get(Move move) const;
+};
 
+template <typename T>
+struct PieceToArray : std::array<std::array<std::array<T, SQ_COUNT>, PT_COUNT>, CL_COUNT> {
+    T& get(Move move);
+    const T& get(Move move) const;
+};
+
+class MoveHistory {
 public:
     const std::array<Move, 2>& killers(Depth ply) const;
     bool is_killer(Depth ply, Move move) const;
@@ -21,25 +31,40 @@ public:
     void reset();
 
     int  quiet_history(Move move) const;
-    void update_quiet_history(Move move, Depth depth, bool good);
+    void update_quiet_history(Move move,
+                              Move last_move,
+                              Depth depth,
+                              bool good);
 
 private:
     std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
-    ButterflyHistoryArray m_quiet_history {};
+    ButterflyArray<int> m_quiet_history {};
+    PieceToArray<int> m_counter_move_history {};
 
-    static int& history_ref(ButterflyHistoryArray& history,
-                            Move move);
-
-    static const int& history_ref(const ButterflyHistoryArray& history,
-                                  Move move);
-
-    static void update_history(ButterflyHistoryArray& history,
-                               Move move,
+    static void update_history(int& history,
                                Depth depth,
                                bool good);
 };
 
+template<typename T>
+T& ButterflyArray<T>::get(Move move) {
+    return (*this)[move.source()][move.destination()];
+}
 
+template<typename T>
+const T& ButterflyArray<T>::get(Move move) const {
+    return (*this)[move.source()][move.destination()];
+}
+
+template<typename T>
+T& PieceToArray<T>::get(Move move) {
+    return (*this)[move.source_piece().color()][move.source_piece().type()][move.destination()];
+}
+
+template<typename T>
+const T& PieceToArray<T>::get(Move move) const {
+    return (*this)[move.source_piece().color()][move.source_piece().type()][move.destination()];
+}
 
 inline const std::array<Move, 2>& MoveHistory::killers(Depth ply) const {
     return m_killers[ply];
@@ -65,34 +90,25 @@ inline void MoveHistory::reset() {
 
 inline int MoveHistory::quiet_history(Move move) const {
     ILLUMINA_ASSERT(move.is_quiet());
-    return history_ref(m_quiet_history, move);
+    return m_quiet_history.get(move);
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
+                                              Move last_move,
                                               Depth depth,
                                               bool good) {
     ILLUMINA_ASSERT(move.is_quiet());
-    update_history(m_quiet_history, move, depth, good);
+    update_history(m_quiet_history.get(move), depth, good);
 }
 
-inline int& MoveHistory::history_ref(ButterflyHistoryArray& history, Move move) {
-    return history[move.source()][move.destination()];
-}
-
-inline const int& MoveHistory::history_ref(const MoveHistory::ButterflyHistoryArray& history, Move move) {
-    return history_ref(const_cast<ButterflyHistoryArray&>(history), move);
-}
-
-inline void MoveHistory::update_history(MoveHistory::ButterflyHistoryArray& history,
-                                        Move move,
+inline void MoveHistory::update_history(int& history,
                                         Depth depth,
                                         bool good) {
     int delta = (depth < MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD)
               ? (depth * depth)
               : (MV_HIST_QUIET_HIGH_DEPTH_FACTOR * depth * depth);
     int sign  = good ? 1 : -1;
-    int& hist = history_ref(history, move);
-    hist     += (sign * delta) - std::min(hist, MAX_HISTORY) * delta / MAX_HISTORY;
+    history  += (sign * delta) - std::min(history, MAX_HISTORY) * delta / MAX_HISTORY;
 }
 
 } // illumina
