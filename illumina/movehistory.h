@@ -2,6 +2,7 @@
 #define ILLUMINA_MOVEHISTORY_H
 
 #include <array>
+#include <memory>
 
 #include "searchdefs.h"
 #include "tunablevalues.h"
@@ -30,7 +31,7 @@ public:
     void set_killer(Depth ply, Move killer);
     void reset();
 
-    int  quiet_history(Move move) const;
+    int  quiet_history(Move move, Move last_move) const;
     void update_quiet_history(Move move,
                               Move last_move,
                               Depth depth,
@@ -39,7 +40,7 @@ public:
 private:
     std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
     ButterflyArray<int> m_quiet_history {};
-    PieceToArray<int> m_counter_move_history {};
+    std::unique_ptr<PieceToArray<PieceToArray<int>>> m_counter_move_history = std::make_unique<PieceToArray<PieceToArray<int>>>();
 
     static void update_history(int& history,
                                Depth depth,
@@ -88,17 +89,18 @@ inline void MoveHistory::reset() {
     std::fill(m_killers.begin(), m_killers.end(), std::array<Move, 2> { MOVE_NULL, MOVE_NULL });
 }
 
-inline int MoveHistory::quiet_history(Move move) const {
-    ILLUMINA_ASSERT(move.is_quiet());
-    return m_quiet_history.get(move);
+inline int MoveHistory::quiet_history(Move move, Move last_move) const {
+    return (m_quiet_history.get(move) * MV_HIST_REGULAR_QHIST_WEIGHT
+         + m_counter_move_history->get(last_move).get(move) * MV_HIST_COUNTER_MOVE_WEIGHT)
+         / 1024;
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
                                               Move last_move,
                                               Depth depth,
                                               bool good) {
-    ILLUMINA_ASSERT(move.is_quiet());
     update_history(m_quiet_history.get(move), depth, good);
+    update_history(m_counter_move_history->get(last_move).get(move), depth, good);
 }
 
 inline void MoveHistory::update_history(int& history,

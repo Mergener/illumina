@@ -33,11 +33,13 @@ Board::Board(std::string_view fen_str) {
                     throw std::invalid_argument(std::string("Invalid piece '") + c + "'");
                 }
 
-                set_piece_at(s, p);
+                set_piece_at_internal<true, false>(s, p);
                 file++;
             }
         }
     }
+    compute_pins();
+    compute_checkers();
 
     // Read and parse color to move.
     {
@@ -534,6 +536,9 @@ void Board::compute_pins() {
 
     for (Color c: COLORS) {
         Color them      = opposite_color(c);
+        if (piece_bb(Piece(c, PT_KING)) == 0) {
+            continue;
+        }
         Square our_king = king_square(c);
 
         Bitboard their_bishops = piece_bb(Piece(them, PT_BISHOP));
@@ -608,6 +613,10 @@ BoardResult Board::result() const {
 }
 
 bool Board::legal() const {
+    if (popcount(piece_bb(WHITE_KING)) != 1 || popcount(piece_bb(BLACK_KING)) != 1) {
+        return false;
+    }
+
     return !is_attacked_by(color_to_move(), king_square(opposite_color(color_to_move())));
 }
 
@@ -779,8 +788,14 @@ bool Board::is_move_pseudo_legal(Move move) const {
 }
 
 void Board::compute_checkers() {
-    Color us           = color_to_move();
-    Color them         = opposite_color(us);
+    Color us   = color_to_move();
+    Color them = opposite_color(us);
+    if (piece_bb(Piece(them, PT_KING)) == 0) {
+        // No king, no checkers.
+        m_state.n_checkers = 0;
+        return;
+    }
+
     Square king_sq     = king_square(us);
     Bitboard checkers  = all_attackers_of<false, true>(them, king_sq);
     m_state.n_checkers = popcount(checkers);
@@ -788,6 +803,98 @@ void Board::compute_checkers() {
 
 Board Board::standard_startpos() {
     return Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+}
+
+template <Color C>
+static void distribute_frc_pieces(Board& board) {
+    // Determine color-specific constants.
+    constexpr BoardRank BACK_RANK = C == CL_WHITE ? RNK_1 : RNK_8;
+    constexpr BoardRank PAWN_RANK = C == CL_WHITE ? RNK_2 : RNK_7;
+
+    // Initialize our back-rank squares with all bits set to 1.
+    Bitboard remaining_squares = rank_bb(BACK_RANK);
+
+    // Determine king position.
+    BoardFile king_file = random(FL_B, FL_G + 1);
+    Square king_square  = make_square(king_file, BACK_RANK);
+    remaining_squares   = unset_bit(remaining_squares, king_square);
+
+    // Determine rook positions.
+    BoardFile q_rook_file = random(FL_A, king_file);
+    Square q_rook_square  = make_square(q_rook_file, BACK_RANK);
+    remaining_squares     = unset_bit(remaining_squares, q_rook_square);
+
+    BoardFile k_rook_file = random(king_file + 1, FL_H + 1);
+    Square k_rook_square  = make_square(k_rook_file, BACK_RANK);
+    remaining_squares     = unset_bit(remaining_squares, k_rook_square);
+
+    // Determine bishop positions.
+    Square bishop_a_square = random_square(remaining_squares);
+    remaining_squares = unset_bit(remaining_squares, bishop_a_square);
+    Square bishop_b_square = random_square(remaining_squares & ~color_complex_of(bishop_a_square));
+    remaining_squares = unset_bit(remaining_squares, bishop_b_square);
+
+    // Determine knight positions.
+    Square knight_a_square = random_square(remaining_squares);
+    remaining_squares = unset_bit(remaining_squares, knight_a_square);
+    Square knight_b_square = random_square(remaining_squares);
+    remaining_squares = unset_bit(remaining_squares, knight_b_square);
+
+    Square queen_square = lsb(remaining_squares);
+
+    // Place pieces.
+    board.set_piece_at(king_square, Piece(C, PT_KING));
+    board.set_piece_at(k_rook_square, Piece(C, PT_ROOK));
+    board.set_piece_at(q_rook_square, Piece(C, PT_ROOK));
+    board.set_piece_at(bishop_a_square, Piece(C, PT_BISHOP));
+    board.set_piece_at(bishop_b_square, Piece(C, PT_BISHOP));
+    board.set_piece_at(knight_a_square, Piece(C, PT_KNIGHT));
+    board.set_piece_at(knight_b_square, Piece(C, PT_KNIGHT));
+    board.set_piece_at(queen_square, Piece(C, PT_QUEEN));
+
+    // Place pawns.
+    for (BoardFile f: FILES) {
+        board.set_piece_at(make_square(f, PAWN_RANK), Piece(C, PT_PAWN));
+    }
+
+    // Set castle rooks and castling rights.
+    board.set_castle_rook_square(C, SIDE_KING, k_rook_square);
+    board.set_castle_rook_square(C, SIDE_QUEEN, q_rook_square);
+    board.set_castling_rights(C, SIDE_KING, true);
+    board.set_castling_rights(C, SIDE_QUEEN, true);
+}
+
+template <Color C>
+static void mirror_frc_pieces(Board& board) {
+    Color THEM = opposite_color(C);
+
+    Bitboard their_pieces = board.color_bb(THEM);
+    while (their_pieces) {
+        Square s = lsb(their_pieces);
+        Square new_square = mirror_vertical(s);
+        board.set_piece_at(new_square, Piece(C, board.piece_at(s).type()));
+        their_pieces = unset_lsb(their_pieces);
+    }
+
+    board.set_castle_rook_square(C, SIDE_KING, mirror_vertical(board.castle_rook_square(THEM, SIDE_KING)));
+    board.set_castle_rook_square(C, SIDE_QUEEN, mirror_vertical(board.castle_rook_square(THEM, SIDE_QUEEN)));
+    board.set_castling_rights(C, SIDE_KING, board.has_castling_rights(THEM, SIDE_KING));
+    board.set_castling_rights(C, SIDE_QUEEN, board.has_castling_rights(THEM, SIDE_KING));
+}
+
+Board Board::random_frc_startpos(bool mirrored) {
+    Board board;
+
+    distribute_frc_pieces<CL_WHITE>(board);
+
+    if (mirrored) {
+        mirror_frc_pieces<CL_BLACK>(board);
+    }
+    else {
+        distribute_frc_pieces<CL_BLACK>(board);
+    }
+
+    return board;
 }
 
 } // illumina
