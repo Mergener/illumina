@@ -8,6 +8,8 @@
 
 namespace illumina {
 
+static constexpr int LAG_MARGIN = 20;
+
 class TimeManager {
 public:
     void start_movetime(ui64 movetime_ms);
@@ -77,7 +79,7 @@ inline void TimeManager::set_starting_bounds(ui64 soft, ui64 hard) {
 
 inline void TimeManager::start_movetime(ui64 movetime_ms) {
     setup(false);
-    ui64 bound = movetime_ms - 25;
+    ui64 bound = movetime_ms - LAG_MARGIN;
     set_starting_bounds(bound, bound);
 }
 
@@ -86,8 +88,8 @@ inline void TimeManager::start_tourney_time(ui64 our_time_ms,
                                             ui64 their_time_ms,
                                             ui64 their_inc_ms,
                                             int moves_to_go) {
-    ui64 max_time = our_time_ms - 25;
-    our_time_ms  += our_inc_ms * 45;
+    ui64 max_time = our_time_ms - LAG_MARGIN;
+    our_time_ms  += our_inc_ms * 45 - LAG_MARGIN;
     setup(true);
 
     if (moves_to_go != 1) {

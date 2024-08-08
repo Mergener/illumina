@@ -256,7 +256,7 @@ SearchResults Searcher::search(const Board& board,
 void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        if (should_stop() || m_context->time_manager().finished_soft()) {
+        if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
             break;
         }
 
@@ -280,7 +280,7 @@ void SearchWorker::iterative_deepening() {
             check_limits();
             aspiration_windows();
             check_limits();
-            if (should_stop() || m_context->time_manager().finished_soft()) {
+            if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
                 break;
             }
