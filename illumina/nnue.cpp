@@ -74,6 +74,17 @@ void NNUE::disable_feature(Square square, Piece piece) {
     }
 }
 
+void NNUE::push_accumulator() {
+    m_accum_stack.push_back(m_accum);
+}
+
+void NNUE::pop_accumulator() {
+    ILLUMINA_ASSERT(!m_accum_stack.empty());
+
+    m_accum = m_accum_stack.back();
+    m_accum_stack.pop_back();
+}
+
 NNUE::NNUE()
     : m_net(s_default_network) {
     clear();
