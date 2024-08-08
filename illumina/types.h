@@ -340,6 +340,12 @@ constexpr Bitboard file_bb(BoardFile file) {
     return FILE_BBS[file];
 }
 
+constexpr Bitboard color_complex_of(Square s) {
+    return bit_is_set(LIGHT_SQUARES, s) != 0
+        ? LIGHT_SQUARES
+        : DARK_SQUARES;
+}
+
 //
 // Directions
 //

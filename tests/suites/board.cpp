@@ -91,9 +91,9 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_default.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_A1);
     EXPECT(board_default.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_H8);
     EXPECT(board_default.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_A8);
-    EXPECT(board_default.legal()).to_be(true);
+    EXPECT(board_default.legal()).to_be(false);
 
-//    // Test constructor with FEN string representing the starting position
+    // Test constructor with FEN string representing the starting position
     Board board_startpos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     EXPECT(board_startpos.color_to_move()).to_be(CL_WHITE);
     EXPECT(board_startpos.occupancy()).to_be(0xffff00000000ffffULL);

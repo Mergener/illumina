@@ -18,6 +18,8 @@ void Evaluation::on_new_board(const Board& board) {
 }
 
 void Evaluation::on_make_move(const Board& board, Move move) {
+    m_nnue.push_accumulator();
+
     m_ctm = opposite_color(m_ctm);
 
     // Store reused values.
@@ -68,52 +70,7 @@ void Evaluation::on_make_move(const Board& board, Move move) {
 
 void Evaluation::on_undo_move(const Board& board, Move move) {
     m_ctm = opposite_color(m_ctm);
-
-    // Store reused values.
-    Square source      = move.source();
-    Square destination = move.destination();
-    Piece source_piece = move.source_piece();
-    Color moving_color = source_piece.color();
-
-    if (source != destination) {
-        // Every move type always removes the source piece from the original square,
-        // unless the piece is moving to the same square (FRC castling).
-        m_nnue.enable_feature(source, source_piece);
-
-        // Activate feature when moved to previously occupied squares (aka captures except en-passants).
-        Piece dest_piece = move.captured_piece();
-        if (move.type() == MT_SIMPLE_CAPTURE || move.type() == MT_PROMOTION_CAPTURE) {
-            m_nnue.enable_feature(destination, dest_piece);
-        }
-
-        // Deactivate the feature that matches the newly positioned piece.
-        m_nnue.disable_feature(destination, !move.is_promotion()
-                                            ? source_piece
-                                            : Piece(moving_color, move.promotion_piece_type()));
-    }
-
-    // Castles need to activate/deactivate the castled rook properly.
-    if (move.type() == MT_CASTLES) {
-        Side side  = move.castles_side();
-        Piece rook = Piece(moving_color, PT_ROOK);
-
-        Square rook_src  = move.castles_rook_src_square();
-        Square rook_dest = castled_rook_square(moving_color, side);
-
-        if (rook_src != rook_dest) {
-            m_nnue.enable_feature(rook_src, rook);
-
-            if (rook_dest != source) {
-                m_nnue.disable_feature(rook_dest, rook);
-            }
-        }
-    }
-
-    // En passants must reactivate the square right behind the moved pawn.
-    if (move.type() == MT_EN_PASSANT) {
-        Square captured_ep_square = move.destination() - pawn_push_direction(moving_color);
-        m_nnue.enable_feature(captured_ep_square, Piece(opposite_color(moving_color), PT_PAWN));
-    }
+    m_nnue.pop_accumulator();
 }
 
 void Evaluation::on_make_null_move(const Board& board) {

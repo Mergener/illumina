@@ -180,6 +180,11 @@ SearchResults Searcher::search(const Board& board,
     RootInfo root_info;
     root_info.color = board.color_to_move();
 
+    // We start by generating the legal moves for two reasons:
+    //  1. Determine which moves must be searched. This is the intersection
+    //  between legal moves and requested searchmoves.
+    //  2. Determine a initial (pseudo) best move, so that we can play it even
+    //  without having searched anything.
     Move legal_moves[MAX_GENERATED_MOVES];
     Move* end = generate_moves(board, &legal_moves[0]);
     for (Move* it = &legal_moves[0]; it != end; ++it) {
@@ -193,6 +198,19 @@ SearchResults Searcher::search(const Board& board,
         }
         root_info.moves.push_back(move);
     }
+
+    // If root moves are empty, we're either in a checkmate, stalemate or
+    // requested searchmoves has no intersection with the position's legal
+    // moves.
+    // Don't even bother searching if that's the case.
+    SearchResults results {};
+    if (root_info.moves.empty()) {
+        results.best_move   = MOVE_NULL;
+        results.ponder_move = MOVE_NULL;
+        results.score       = board.in_check() ? -MATE_SCORE : 0;
+        return results;
+    }
+    results.best_move = root_info.moves[0];
 
     // Create search context.
     m_stop = false;
@@ -252,6 +270,8 @@ SearchResults Searcher::search(const Board& board,
     int best_result_score = INT_MIN;
     for (WorkerResults& results: all_results) {
         if (results.pv_results[0].best_move == MOVE_NULL) {
+            // Ignore threads that couldn't complete the search to a point
+            // where they have a valid move.
             continue;
         }
 
@@ -269,10 +289,17 @@ SearchResults Searcher::search(const Board& board,
     // Although this is not necessarily true, we don't want
     // to focus our efforts in improving MultiPV mode since
     // it is already not the one used for playing.
-    SearchResults results {};
-    results.score       = selected_results->pv_results[0].score;
-    results.best_move   = selected_results->pv_results[0].best_move;
-    results.ponder_move = selected_results->pv_results[0].ponder_move;
+    const auto& main_line_results = selected_results->pv_results[0];
+    results.score = main_line_results.score;
+
+    // Only accept non-null best moves.
+    if (main_line_results.best_move != MOVE_NULL) {
+        results.best_move = main_line_results.best_move;
+    }
+    // Only accept non-null ponder moves.
+    if (main_line_results.best_move != MOVE_NULL) {
+        results.ponder_move = main_line_results.ponder_move;
+    }
 
     return results;
 }
@@ -280,7 +307,7 @@ SearchResults Searcher::search(const Board& board,
 void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        if (should_stop() || m_context->time_manager().finished_soft()) {
+        if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
             break;
         }
 
@@ -305,7 +332,7 @@ void SearchWorker::iterative_deepening() {
             aspiration_windows();
             m_results.searched_depth = m_curr_depth;
             check_limits();
-            if (should_stop() || m_context->time_manager().finished_soft()) {
+            if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
                 break;
             }
@@ -582,12 +609,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 reductions += !improving;
 
                 // Further reduce moves that have been historically very bad.
-                reductions += m_hist.quiet_history(move) <= LMR_BAD_HISTORY_THRESHOLD;
+                reductions += m_hist.quiet_history(move, m_board.last_move()) <= LMR_BAD_HISTORY_THRESHOLD;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
                 // and probably don't need unsound sacrifices.
-                bool stable = alpha >= 250;
+                bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
                 reductions -= !stable * (reductions / 2);
             }
 
@@ -609,6 +636,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 score = -pvs<true>(depth - 1, -beta, -alpha, node + 1);
             }
         }
+
         undo_move();
 
         if (move.is_quiet()) {
@@ -627,7 +655,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 m_hist.set_killer(ply, move);
 
                 for (Move quiet: quiets_played) {
-                    m_hist.update_quiet_history(quiet, depth, quiet == best_move);
+                    m_hist.update_quiet_history(quiet, m_board.last_move(), depth, quiet == best_move);
                 }
             }
 
@@ -749,7 +777,17 @@ Score SearchWorker::evaluate() const {
         return eg.evaluation;
     }
 
-    return m_eval.get();
+    // If we're not in a known endgame, use our regular
+    // static evaluation function.
+    Score score = m_eval.get();
+    if (m_settings->eval_random_margin != 0) {
+        // User has requested evaluation randomness, apply the noise.
+        i32 seed   = Score((m_settings->eval_rand_seed * m_board.hash_key()) & BITMASK(15));
+        i32 margin = m_settings->eval_random_margin;
+        i32 noise  = (seed % (margin * 2)) - margin;
+        score += Score(noise);
+    }
+    return score;
 }
 
 void SearchWorker::report_pv_results(const SearchNode* search_stack) {

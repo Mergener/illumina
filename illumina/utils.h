@@ -89,6 +89,8 @@ inline Square random_square() {
     return random(0, SQ_COUNT);
 }
 
+Square random_square(Bitboard allowed_squares);
+
 inline Color random_color() {
     return random(0, CL_COUNT);
 }

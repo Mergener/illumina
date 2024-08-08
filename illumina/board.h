@@ -44,6 +44,7 @@ public:
     bool           in_double_check() const;
     ui64           hash_key() const;
     Square         castle_rook_square(Color color, Side side) const;
+    void           set_castle_rook_square(Color color, Side side, Square square);
     int            rule50() const;
     bool           legal() const;
     int            ply_count() const;
@@ -98,6 +99,7 @@ public:
     Board& operator=(const Board& rhs) = default;
 
     static Board standard_startpos();
+    static Board random_frc_startpos(bool mirrored = true);
 
 private:
     std::array<Piece, SQ_COUNT> m_pieces {};
@@ -206,6 +208,10 @@ inline int Board::ply_count() const {
 
 inline Square Board::castle_rook_square(Color color, Side side) const {
     return m_castle_rook_squares[color][side];
+}
+
+inline void Board::set_castle_rook_square(Color color, Side side, Square square) {
+    m_castle_rook_squares[color][side] = square;
 }
 
 inline bool Board::has_castling_rights(Color color, Side side) const {
