@@ -92,7 +92,7 @@ inline void TimeManager::start_tourney_time(ui64 our_time_ms,
 
     if (moves_to_go != 1) {
         set_starting_bounds(std::min(max_time, our_time_ms / 12),
-                            std::min(max_time, our_time_ms / 2));
+                            std::min(max_time, our_time_ms / 3));
     }
     else {
         set_starting_bounds(max_time, max_time);
