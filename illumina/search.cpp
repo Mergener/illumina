@@ -557,6 +557,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 score = -pvs<true>(depth - 1, -beta, -alpha, node + 1);
             }
         }
+
         undo_move();
 
         if (move.is_quiet()) {
@@ -697,7 +698,17 @@ Score SearchWorker::evaluate() const {
         return eg.evaluation;
     }
 
-    return m_eval.get();
+    // If we're not in a known endgame, use our regular
+    // static evaluation function.
+    Score score = m_eval.get();
+    if (m_settings->eval_random_margin != 0) {
+        // User has requested evaluation randomness, apply the noise.
+        i32 seed   = Score((m_settings->eval_rand_seed * m_board.hash_key()) & BITMASK(15));
+        i32 margin = m_settings->eval_random_margin;
+        i32 noise  = (seed % (margin * 2)) - margin;
+        score += Score(noise);
+    }
+    return score;
 }
 
 void SearchWorker::report_pv_results(const SearchNode* search_stack) {

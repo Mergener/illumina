@@ -46,6 +46,7 @@ private:
     bool             m_searching = false;
     TimePoint        m_search_start;
     bool             m_frc = false;
+    ui64             m_eval_random_seed = 0;
 
     void setup_searcher();
     void register_options();

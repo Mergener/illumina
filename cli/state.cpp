@@ -41,6 +41,7 @@ State& global_state() {
 
 void State::new_game() {
     m_searcher.tt().clear();
+    m_eval_random_seed = random(ui64(1), UINT64_MAX);
 }
 
 void State::display_board() const {
@@ -264,6 +265,8 @@ void State::search(SearchSettings settings) {
 
     settings.contempt = m_options.option<UCIOptionSpin>("Contempt").value();
     settings.n_pvs    = m_options.option<UCIOptionSpin>("MultiPV").value();
+    settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
+    settings.eval_rand_seed     = m_eval_random_seed;
 
     m_search_thread = new std::thread([this, settings]() {
         try {
@@ -344,6 +347,7 @@ void State::register_options() {
             const auto& check = dynamic_cast<const UCIOptionCheck&>(opt);
             m_frc = check.value();
         });
+    m_options.register_option<UCIOptionSpin>("EvalRandomMargin", 0, 0, 1024);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
@@ -355,6 +359,7 @@ void State::register_options() {
 }
 
 State::State() {
+    m_eval_random_seed = random(ui64(1), UINT64_MAX);
     setup_searcher();
     register_options();
 }
