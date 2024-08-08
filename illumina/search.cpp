@@ -178,6 +178,11 @@ SearchResults Searcher::search(const Board& board,
     RootInfo root_info;
     root_info.color = board.color_to_move();
 
+    // We start by generating the legal moves for two reasons:
+    //  1. Determine which moves must be searched. This is the intersection
+    //  between legal moves and requested searchmoves.
+    //  2. Determine a initial (pseudo) best move, so that we can play it even
+    //  without having searched anything.
     Move legal_moves[MAX_GENERATED_MOVES];
     Move* end = generate_moves(board, &legal_moves[0]);
     for (Move* it = &legal_moves[0]; it != end; ++it) {
@@ -191,6 +196,19 @@ SearchResults Searcher::search(const Board& board,
         }
         root_info.moves.push_back(move);
     }
+
+    // If root moves are empty, we're either in a checkmate, stalemate or
+    // requested searchmoves has no intersection with the position's legal
+    // moves.
+    // Don't even bother searching if that's the case.
+    SearchResults results {};
+    if (root_info.moves.empty()) {
+        results.best_move   = MOVE_NULL;
+        results.ponder_move = MOVE_NULL;
+        results.score       = board.in_check() ? -MATE_SCORE : 0;
+        return results;
+    }
+    results.best_move = root_info.moves[0];
 
     // Create search context.
     m_stop = false;
@@ -214,17 +232,23 @@ SearchResults Searcher::search(const Board& board,
 
     worker.iterative_deepening();
 
-    const WorkerResults& worker_results = worker.results();
-
     // Fill in the search results object to be returned.
     // We assume that the best move is the one at MultiPV 1.
     // Although this is not necessarily true, we don't want
     // to focus our efforts in improving MultiPV mode since
     // it is already not the one used for playing.
-    SearchResults results {};
-    results.score       = worker_results.pv_results[0].score;
-    results.best_move   = worker_results.pv_results[0].best_move;
-    results.ponder_move = worker_results.pv_results[0].ponder_move;
+    const WorkerResults& worker_results = worker.results();
+    const auto& main_line_results       = worker_results.pv_results[0];
+    results.score = main_line_results.score;
+
+    // Only accept non-null best moves.
+    if (main_line_results.best_move != MOVE_NULL) {
+        results.best_move = main_line_results.best_move;
+    }
+    // Only accept non-null ponder moves.
+    if (main_line_results.best_move != MOVE_NULL) {
+        results.ponder_move = main_line_results.ponder_move;
+    }
 
     return results;
 }
@@ -232,7 +256,7 @@ SearchResults Searcher::search(const Board& board,
 void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        if (should_stop() || m_context->time_manager().finished_soft()) {
+        if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
             break;
         }
 
@@ -256,7 +280,7 @@ void SearchWorker::iterative_deepening() {
             check_limits();
             aspiration_windows();
             check_limits();
-            if (should_stop() || m_context->time_manager().finished_soft()) {
+            if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
                 break;
             }
