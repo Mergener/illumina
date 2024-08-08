@@ -28,6 +28,7 @@ static Score tt_score_to_search(Score tt_score, Depth ply) {
 void TranspositionTableEntry::replace(ui64 key,
                                       Move move,
                                       Score score,
+                                      Score static_eval,
                                       Depth depth,
                                       BoundType bound_type,
                                       ui8 generation) {
@@ -35,6 +36,7 @@ void TranspositionTableEntry::replace(ui64 key,
     m_key_hi  = key >> 32;
     m_move  = move;
     m_score = score;
+    m_static_eval = static_eval;
 
     m_info = 1; // Start with 1 for 'valid' bit.
     m_info |= (bound_type & BITMASK(2)) << 1;
@@ -63,18 +65,19 @@ void TranspositionTable::try_store(ui64 key,
                                    Depth ply,
                                    Move move,
                                    Score score,
+                                   Score static_eval,
                                    Depth depth,
                                    BoundType bound_type) {
     TranspositionTableEntry& entry = entry_ref(key);
 
     if (!entry.valid()) {
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
+        entry.replace(key, move, search_score_to_tt(score, ply), static_eval, depth, bound_type, m_gen);
         m_entry_count++;
         return;
     }
 
     if (entry.generation() != m_gen) {
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
+        entry.replace(key, move, search_score_to_tt(score, ply), static_eval, depth, bound_type, m_gen);
         return;
     }
 
@@ -82,13 +85,13 @@ void TranspositionTable::try_store(ui64 key,
         bound_type == BT_EXACT &&
         entry.bound_type() != BT_EXACT) {
         // Replace since we now have an exact score.
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
+        entry.replace(key, move, search_score_to_tt(score, ply), static_eval, depth, bound_type, m_gen);
         return;
     }
 
     if (entry.depth() <= depth) {
         // Higher depth, replace it.
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
+        entry.replace(key, move, search_score_to_tt(score, ply), static_eval, depth, bound_type, m_gen);
         return;
     }
 }

@@ -409,7 +409,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Compute the static eval. Useful for many heuristics.
-    static_eval    = !in_check ? evaluate() : 0;
+    if (!found_in_tt) {
+        static_eval = !in_check ? evaluate() : 0;
+    }
+    else {
+        static_eval = tt_entry.static_eval();
+    }
     bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
 
     // Reverse futility pruning.
@@ -630,15 +635,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Store in transposition table.
     if (alpha >= beta) {
         // Beta-Cutoff, lowerbound score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
+        tt.try_store(board_key, ply, best_move, alpha, static_eval, depth, BT_LOWERBOUND);
     }
     else if (alpha <= original_alpha) {
         // Couldn't raise alpha, score is an upperbound.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
+        tt.try_store(board_key, ply, best_move, alpha, static_eval, depth, BT_UPPERBOUND);
     }
     else {
         // We have an exact score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+        tt.try_store(board_key, ply, best_move, alpha, static_eval, depth, BT_EXACT);
     }
 
     return alpha;
