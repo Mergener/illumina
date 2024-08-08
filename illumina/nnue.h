@@ -2,6 +2,7 @@
 #define ILLUMINA_NNUE_H
 
 #include <array>
+#include <vector>
 
 #include "types.h"
 
@@ -28,6 +29,8 @@ struct Accumulator {
 class NNUE {
 public:
     void clear();
+    void push_accumulator();
+    void pop_accumulator();
 
     void enable_feature(Square square, Piece piece);
     void disable_feature(Square square, Piece piece);
@@ -39,6 +42,7 @@ public:
 private:
     const EvalNetwork* m_net;
     Accumulator m_accum {};
+    std::vector<Accumulator> m_accum_stack;
 };
 
 } // illumina
