@@ -11,7 +11,7 @@
 namespace illumina {
 
 constexpr ui64 SEARCH_NODE_LIMIT    = 5128;
-constexpr int  MIN_RANDOM_PLIES     = 4;
+constexpr int  MIN_RANDOM_PLIES     = 5;
 constexpr int  MAX_RANDOM_PLIES     = 12;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
 constexpr Score HI_SCORE            = 800;
@@ -65,7 +65,7 @@ Game simulate() {
             if (n_moves == 0) {
                 // Oops, we entered a stalemate or checkmate position.
                 // Rewind to the start.
-                board = Board::random_frc_startpos();
+                board = Board::standard_startpos();
                 i = -1;
                 continue;
             }
@@ -88,7 +88,7 @@ Game simulate() {
         if (std::abs(search_results.score) > 160) {
             // Position is excessively imbalanced.
             // Rewind to the start.
-            board = Board::random_frc_startpos();
+            board = Board::standard_startpos();
             continue;
         }
 
