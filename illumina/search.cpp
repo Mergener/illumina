@@ -220,32 +220,40 @@ SearchResults Searcher::search(const Board& board,
     // Create main worker.
     SearchWorker main_worker(true, board, &context, &settings);
 
-    // Create secondary workers.
+    // Kickstart our time manager.
+    ui64 our_time = UINT64_MAX;
+    if (settings.move_time.has_value()) {
+        // 'movetime'
+        our_time = settings.move_time.value();
+        m_tm.start_movetime(our_time);
+    }
+    else if (settings.white_time.has_value() || settings.black_time.has_value()) {
+        // 'wtime/winc/btime/binc'
+        our_time = board.color_to_move() == CL_WHITE
+                 ? settings.white_time.value_or(UINT64_MAX)
+                 : settings.black_time.value_or(UINT64_MAX);
+
+        m_tm.start_tourney_time(our_time, 0, 0, 0);
+    }
+    else {
+        // 'infinite'
+        m_tm.stop();
+    }
+
+    // Determine the number of helper threads to be used.
     int n_helper_threads = std::max(1, settings.n_threads) - 1;
+
+    // Create secondary workers.
     std::vector<SearchWorker> secondary_workers;
     for (int i = 0; i < n_helper_threads; ++i) {
         secondary_workers.emplace_back(false, board, &context, &settings);
-    }
-
-    // Kickstart our time manager.
-    if (settings.move_time.has_value()) {
-        m_tm.start_movetime(settings.move_time.value());
-    }
-    else if (board.color_to_move() == CL_WHITE && settings.white_time.has_value()) {
-        m_tm.start_tourney_time(settings.white_time.value(), 0, 0, 0);
-    }
-    else if (board.color_to_move() == CL_BLACK && settings.black_time.has_value()) {
-        m_tm.start_tourney_time(settings.black_time.value(), 0, 0, 0);
-    }
-    else {
-        m_tm.stop();
     }
 
     // Fire secondary threads.
     std::vector<std::thread> helper_threads;
     for (int i = 0; i < n_helper_threads; ++i) {
         SearchWorker& worker = secondary_workers[i];
-        helper_threads.emplace_back([&worker, i]() {
+        helper_threads.emplace_back([&worker]() {
             worker.iterative_deepening();
         });
     }
@@ -308,6 +316,10 @@ void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
         if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
+            // If we finished soft, we don't want to start a new iteration.
+            if (m_main) {
+                m_context->stop_search();
+            }
             break;
         }
 
@@ -334,6 +346,9 @@ void SearchWorker::iterative_deepening() {
             check_limits();
             if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
+                if (m_main) {
+                    m_context->stop_search();
+                }
                 break;
             }
 
