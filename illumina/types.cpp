@@ -141,6 +141,10 @@ Piece Piece::from_char(char c) {
 }
 
 std::string Move::to_uci(bool frc) const {
+    if (*this == MOVE_NULL) {
+        return "0000";
+    }
+
     switch (type()) {
         case MT_SIMPLE_PROMOTION:
         case MT_PROMOTION_CAPTURE:

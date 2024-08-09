@@ -41,6 +41,7 @@ State& global_state() {
 
 void State::new_game() {
     m_searcher.tt().clear();
+    m_eval_random_seed = random(ui64(1), UINT64_MAX);
 }
 
 void State::display_board() const {
@@ -175,19 +176,25 @@ void State::evaluate() const {
               << std::endl;
 }
 
-static std::string pv_to_string(const std::vector<Move>& line, bool frc) {
+static std::string pv_to_string(const std::vector<Move>& line,
+                                const Board& board,
+                                bool frc) {
     if (line.empty()) {
         return "";
     }
 
+    Board repl = board;
+
     std::stringstream stream;
     stream << line[0].to_uci(frc);
+    repl.make_move(line[0]);
     for (auto it = line.begin() + 1; it != line.end(); ++it) {
         Move m = *it;
-        if (m == MOVE_NULL) {
+        if (!repl.is_move_pseudo_legal(m) || !repl.is_move_legal(m)) {
             break;
         }
         stream << ' ' << m.to_uci(frc);
+        repl.make_move(m);
     }
     return stream.str();
 
@@ -242,7 +249,7 @@ void State::setup_searcher() {
                   << " score "    << score_string(res.score)
                   << bound_type_string(res.bound_type);
         if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
-        std::cout << " pv "       << pv_to_string(res.line, m_frc);
+        std::cout << " pv "       << pv_to_string(res.line, m_board, m_frc);
         std::cout << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
                   << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
@@ -262,8 +269,11 @@ void State::search(SearchSettings settings) {
         delete m_search_thread;
     }
 
-    settings.contempt = m_options.option<UCIOptionSpin>("Contempt").value();
-    settings.n_pvs    = m_options.option<UCIOptionSpin>("MultiPV").value();
+    settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
+    settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
+    settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
+    settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
+    settings.eval_rand_seed     = m_eval_random_seed;
 
     m_search_thread = new std::thread([this, settings]() {
         try {
@@ -336,7 +346,7 @@ void State::register_options() {
             m_searcher.tt().resize(spin.value() * 1024 * 1024);
         });
 
-    m_options.register_option<UCIOptionSpin>("Threads", 1, 1, 1);
+    m_options.register_option<UCIOptionSpin>("Threads", 1, 1, UINT16_MAX);
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, MAX_PVS);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
     m_options.register_option<UCIOptionCheck>("UCI_Chess960", false)
@@ -344,6 +354,7 @@ void State::register_options() {
             const auto& check = dynamic_cast<const UCIOptionCheck&>(opt);
             m_frc = check.value();
         });
+    m_options.register_option<UCIOptionSpin>("EvalRandomMargin", 0, 0, 1024);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
@@ -355,6 +366,7 @@ void State::register_options() {
 }
 
 State::State() {
+    m_eval_random_seed = random(ui64(1), UINT64_MAX);
     setup_searcher();
     register_options();
 }
