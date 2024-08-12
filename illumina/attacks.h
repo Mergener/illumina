@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
 #include <immintrin.h>
 #endif
 
@@ -11,7 +11,7 @@ namespace illumina {
 
 constexpr size_t N_ATTACK_KEYS = 4096;
 
-template <Color C, bool ASSUME_STARTING_RANK = false>
+template <Color C>
 inline Bitboard pawn_pushes(Square s, Bitboard occ = 0) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
@@ -19,20 +19,42 @@ inline Bitboard pawn_pushes(Square s, Bitboard occ = 0) {
 
     Bitboard not_occ = ~occ;
     Bitboard pushes  = shift_bb<PUSH_DIR>(BIT(s)) & not_occ;
-    if (pushes && (ASSUME_STARTING_RANK || square_rank(s) == pawn_starting_rank(C))) {
+    if (pushes && (square_rank(s) == pawn_starting_rank(C))) {
         pushes |= shift_bb<PUSH_DIR>(pushes) & not_occ;
     }
     return pushes;
 }
 
-template <bool ASSUME_STARTING_RANK = false>
 inline Bitboard pawn_pushes(Square s, Color c, Bitboard occ = 0) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
     ILLUMINA_ASSERT_VALID_COLOR(c);
 
     return c == CL_WHITE
-           ? pawn_pushes<CL_WHITE, ASSUME_STARTING_RANK>(s, occ)
-           : pawn_pushes<CL_BLACK, ASSUME_STARTING_RANK>(s, occ);
+           ? pawn_pushes<CL_WHITE>(s, occ)
+           : pawn_pushes<CL_BLACK>(s, occ);
+}
+
+template <Color C>
+inline Bitboard reverse_pawn_pushes(Square s, Bitboard occ = 0) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+    constexpr Direction PUSH_DIR = pawn_push_direction(opposite_color(C));
+
+    Bitboard not_occ = ~occ;
+    Bitboard pushes  = shift_bb<PUSH_DIR>(BIT(s)) & not_occ;
+    if (pushes &&
+        ((C == CL_WHITE && square_rank(s) == RNK_4) || (C == CL_BLACK && square_rank(s) == RNK_5))) {
+        pushes |= shift_bb<PUSH_DIR>(pushes) & not_occ;
+    }
+    return pushes;
+}
+
+inline Bitboard reverse_pawn_pushes(Square s, Color c, Bitboard occ = 0) {
+    ILLUMINA_ASSERT_VALID_SQUARE(s);
+    ILLUMINA_ASSERT_VALID_COLOR(c);
+
+    return c == CL_WHITE
+           ? reverse_pawn_pushes<CL_WHITE>(s, occ)
+           : reverse_pawn_pushes<CL_BLACK>(s, occ);
 }
 
 template <Color C>
@@ -67,7 +89,7 @@ inline Bitboard knight_attacks(Square s) {
 inline Bitboard bishop_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
     extern Bitboard g_bishop_attacks[SQ_COUNT][N_ATTACK_KEYS];
     extern const Bitboard g_bishop_masks[];
     return g_bishop_attacks[s][_pext_u64(occ, g_bishop_masks[s])];
@@ -85,7 +107,7 @@ inline Bitboard bishop_attacks(Square s, Bitboard occ) {
 inline Bitboard rook_attacks(Square s, Bitboard occ) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
     extern Bitboard g_rook_attacks[SQ_COUNT][N_ATTACK_KEYS];
     extern const Bitboard g_rook_masks[];
     return g_rook_attacks[s][_pext_u64(occ, g_rook_masks[s])];

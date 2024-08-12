@@ -40,11 +40,11 @@ public:
     Bitboard       piece_type_bb(PieceType pt) const;
     Piece          piece_at(Square s) const;
     Square         ep_square() const;
-    bool           frc() const;
     bool           in_check() const;
     bool           in_double_check() const;
     ui64           hash_key() const;
     Square         castle_rook_square(Color color, Side side) const;
+    void           set_castle_rook_square(Color color, Side side, Square square);
     int            rule50() const;
     bool           legal() const;
     int            ply_count() const;
@@ -93,12 +93,13 @@ public:
 
     Board() = default;
     Board(const Board& rhs) = default;
-    explicit Board(std::string_view fen_str, bool force_frc = false);
+    explicit Board(std::string_view fen_str);
     ~Board() = default;
     Board(Board&& rhs) = default;
     Board& operator=(const Board& rhs) = default;
 
     static Board standard_startpos();
+    static Board random_frc_startpos(bool mirrored = true);
 
 private:
     std::array<Piece, SQ_COUNT> m_pieces {};
@@ -133,8 +134,6 @@ private:
 
     std::vector<State> m_prev_states;
     State m_state {};
-
-    bool m_frc = false;
 
     Bitboard& piece_bb_ref(Piece piece);
     Bitboard& color_bb_ref(Color color);
@@ -191,10 +190,6 @@ inline int Board::rule50() const {
     return m_state.rule50;
 }
 
-inline bool Board::frc() const {
-    return m_frc;
-}
-
 inline bool Board::in_check() const {
     return m_state.n_checkers > 0;
 }
@@ -213,6 +208,10 @@ inline int Board::ply_count() const {
 
 inline Square Board::castle_rook_square(Color color, Side side) const {
     return m_castle_rook_squares[color][side];
+}
+
+inline void Board::set_castle_rook_square(Color color, Side side, Square square) {
+    m_castle_rook_squares[color][side] = square;
 }
 
 inline bool Board::has_castling_rights(Color color, Side side) const {
@@ -556,7 +555,7 @@ inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
         Bitboard pawn_targets;
         Bitboard our_pawns = piece_bb(Piece(c, PT_PAWN));
         if constexpr (QUIET_PAWN_MOVES) {
-            pawn_targets = pawn_pushes<true>(s, opposite_color(c), occ & ~(our_pawns));
+            pawn_targets = reverse_pawn_pushes(s, c, occ & ~(our_pawns));
         }
         else {
             pawn_targets = pawn_attacks(s, opposite_color(c));

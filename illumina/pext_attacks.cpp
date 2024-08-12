@@ -1,6 +1,6 @@
 #include "attacks.h"
 
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
 
 namespace illumina {
 
@@ -168,4 +168,4 @@ void init_pext_bbs() {
 
 } // illumina
 
-#endif // USE_PEXT
+#endif // HAS_PEXT

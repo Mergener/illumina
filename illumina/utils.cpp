@@ -51,4 +51,25 @@ ui32 random(ui32 min_inclusive, ui32 max_exclusive) {
     return random_integer(min_inclusive, max_exclusive);
 }
 
+Square random_square(Bitboard allowed_squares) {
+    int n_allowed = popcount(allowed_squares);
+    int rnd = random(0, n_allowed);
+    int idx = 0;
+    Square ret = SQ_NULL;
+
+    while (allowed_squares) {
+        Square s = lsb(allowed_squares);
+        if (idx == rnd) {
+            ret = s;
+            break;
+        }
+        else {
+            allowed_squares = unset_lsb(allowed_squares);
+            idx++;
+        }
+    }
+
+    return ret;
+}
+
 } // illumina

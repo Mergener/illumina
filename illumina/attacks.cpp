@@ -70,14 +70,14 @@ const Bitboard g_king_attacks[] = {
     0x507000000000000ULL, 0xa0e000000000000ULL, 0x141c000000000000ULL, 0x2838000000000000ULL, 0x5070000000000000ULL, 0xa0e0000000000000ULL, 0x40c0000000000000ULL,
 };
 
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
 void init_pext_bbs();
 #else
 void init_magic_bbs();
 #endif
 
 void init_attacks() {
-#ifdef USE_PEXT
+#ifdef HAS_PEXT
     init_pext_bbs();
 #else
     init_magic_bbs();

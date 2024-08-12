@@ -180,11 +180,11 @@ void UCIOptionCheck::parse_and_set_handler(std::string_view str) {
 }
 
 std::string UCIOptionCheck::default_value_str() const {
-    return std::to_string(m_default_val);
+    return m_default_val ? "true" : "false";
 }
 
 std::string UCIOptionCheck::current_value_str() const {
-    return std::to_string(m_val);
+    return m_val ? "true" : "false";
 }
 
 std::string UCIOptionCheck::type_name() const {

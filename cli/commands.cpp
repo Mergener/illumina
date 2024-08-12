@@ -41,6 +41,16 @@ void register_commands(CLIApplication& server) {
             board = Board(ctx.all_after("fen"));
             read_only = false;
         }
+        else if (ctx.has_arg("frc")) {
+            board = Board::random_frc_startpos();
+            std::cout << "info string Selected FRC startpos " << board.fen() << std::endl;
+            read_only = false;
+        }
+        else if (ctx.has_arg("dfrc")) {
+            board = Board::random_frc_startpos(false);
+            std::cout << "info string Selected DFRC startpos " << board.fen() << std::endl;
+            read_only = false;
+        }
 
         if (read_only) {
             // User only wants to see the current state of the board.

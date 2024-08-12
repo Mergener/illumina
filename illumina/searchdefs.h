@@ -28,9 +28,10 @@ constexpr int MAX_PVS = MAX_GENERATED_MOVES;
  * Limited by the number of bits dedicated to store the score
  * in a TT entry (currently 22).
  */
-constexpr Score MAX_SCORE        = 32005;
+constexpr Score MAX_SCORE        = 32500;
 constexpr Score MATE_SCORE       = MAX_SCORE - 1;
 constexpr Score MATE_THRESHOLD   = MATE_SCORE - 1024;
+constexpr Score KNOWN_WIN        = 10000;
 
 static_assert(MAX_SCORE        <= INT16_MAX);
 static_assert(MATE_SCORE       < MAX_SCORE);
