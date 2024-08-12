@@ -89,12 +89,12 @@ inline void TimeManager::start_tourney_time(ui64 our_time_ms,
                                             ui64 their_inc_ms,
                                             int moves_to_go) {
     ui64 max_time = our_time_ms - std::min(our_time_ms, ui64(LAG_MARGIN));
-    our_time_ms  += our_inc_ms * 45 - LAG_MARGIN;
+    our_time_ms  += our_inc_ms * TM_INCREMENT_FACTOR - LAG_MARGIN;
     setup(true);
 
     if (moves_to_go != 1) {
-        set_starting_bounds(std::min(max_time, our_time_ms / 12),
-                            std::min(max_time, our_time_ms / 3));
+        set_starting_bounds(std::min(max_time, our_time_ms * TM_SOFT_BOUND_FACTOR / 1024),
+                            std::min(max_time, our_time_ms * TM_HARD_BOUND_FACTOR / 1024));
     }
     else {
         set_starting_bounds(max_time, max_time);
