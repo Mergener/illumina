@@ -1,6 +1,7 @@
 #include "evaluation.h"
 
 #include "endgame.h"
+#include "tunablevalues.h"
 
 namespace illumina {
 
@@ -81,8 +82,19 @@ void Evaluation::on_undo_null_move(const Board& board) {
     m_ctm = opposite_color(m_ctm);
 }
 
+static Score dampen_evaluation(Score score) {
+    if (score < EVAL_DAMPENING_THRESHOLD) {
+        return score;
+    }
+    return EVAL_DAMPENING_THRESHOLD
+         + dampen_evaluation(((score - EVAL_DAMPENING_THRESHOLD) * EVAL_DAMPENING_FACTOR) / 1024);
+}
+
 Score Evaluation::get() const {
-    return std::clamp(m_nnue.forward(m_ctm), -KNOWN_WIN + 1, KNOWN_WIN - 1);
+    Score score = std::clamp(m_nnue.forward(m_ctm), -KNOWN_WIN + 1, KNOWN_WIN - 1);
+    return score > 0
+         ?  dampen_evaluation(score)
+         : -dampen_evaluation(-score);
 }
 
 } // illumina
