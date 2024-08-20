@@ -148,7 +148,7 @@ private:
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
     template <bool PV, bool SKIP_NULL = false, bool ROOT = false>
-    Score pvs(Depth depth,
+    Score pvs(int interest,
               Score alpha,
               Score beta,
               SearchNode* stack_node);
@@ -373,54 +373,12 @@ void SearchWorker::aspiration_windows() {
         node.ply = ply;
     }
 
-    // Prepare aspiration windows.
-    Score prev_score = m_results.pv_results[m_curr_pv_idx].score;
-    Score alpha      = -MAX_SCORE;
-    Score beta       = MAX_SCORE;
-    Score window     = ASP_WIN_WINDOW;
-    Depth depth      = m_curr_depth;
-
-    // Don't use aspiration windows in lower depths since
-    // their results is still too unstable.
-    if (depth >= ASP_WIN_MIN_DEPTH) {
-        alpha = std::max(-MAX_SCORE, prev_score - window);
-        beta  = std::min(MAX_SCORE,  prev_score + window);
-    }
-
     Move best_move = m_results.pv_results[m_curr_pv_idx].best_move;
 
-    // Perform search with aspiration windows.
-    while (!should_stop()) {
-        Score score = pvs<true, false, true>(depth, alpha, beta, &search_stack[0]);
-
-        if (score > alpha && score < beta) {
-            // We found an exact score within our bounds, finish
-            // the current depth search.
-            m_results.pv_results[m_curr_pv_idx].bound_type = BT_EXACT;
-            report_pv_results(search_stack);
-            break;
-        }
-
-        if (score <= alpha) {
-            beta  = (alpha + beta) / 2;
-            alpha = std::max(-MAX_SCORE, alpha - window);
-            depth = m_curr_depth;
-
-            m_results.pv_results[m_curr_pv_idx].score     = prev_score;
-            m_results.pv_results[m_curr_pv_idx].best_move = best_move;
-        }
-        else if (score >= beta) {
-            beta = std::min(MAX_SCORE, beta + window);
-
-            prev_score = score;
-            best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
-            m_results.pv_results[m_curr_pv_idx].bound_type = BT_LOWERBOUND;
-            report_pv_results(search_stack);
-        }
-
-        check_limits();
-
-        window += window / 2;
+    if (!should_stop()) {
+        Score score = pvs<true, false, true>(m_curr_depth * 1024, -MAX_SCORE, MAX_SCORE, &search_stack[0]);
+        m_results.pv_results[m_curr_pv_idx].bound_type = BT_EXACT;
+        report_pv_results(search_stack);
     }
 }
 
@@ -428,7 +386,7 @@ static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<bool PV, bool SKIP_NULL, bool ROOT>
-Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
+Score SearchWorker::pvs(int interest, Score alpha, Score beta, SearchNode* node) {
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
         node->pv[0] = MOVE_NULL;
@@ -474,7 +432,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (found_in_tt) {
         hash_move = tt_entry.move();
 
-        if (!PV && tt_entry.depth() >= depth) {
+        if (!PV && tt_entry.depth() >= (interest * 1024)) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff.
                 return tt_entry.score();
@@ -488,53 +446,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
-    // Check extensions.
-    // Extend positions in check.
-    if (in_check && ply < MAX_DEPTH && depth < MAX_DEPTH) {
-        depth++;
-    }
-
-    // Dive into the quiescence search when depth becomes zero.
-    if (depth <= 0) {
-        return quiescence_search(ply, alpha, beta);
-    }
-
-    // Compute the static eval. Useful for many heuristics.
-    static_eval    = !in_check ? evaluate() : 0;
-    bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
-
-    // Reverse futility pruning.
-    // If our position is too good, by a safe margin and low depth, prune.
-    Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
-    if (!PV        &&
-        !in_check  &&
-        depth <= RFP_MAX_DEPTH &&
-        alpha < MATE_THRESHOLD &&
-        static_eval - rfp_margin > beta) {
-        return static_eval - rfp_margin;
-    }
-
-    // Null move pruning.
-    if (!PV        &&
-        !SKIP_NULL &&
-        !in_check  &&
-        popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES &&
-        static_eval >= beta &&
-        depth >= NMP_MIN_DEPTH) {
-        Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
-
-        make_null_move();
-        Score score = -pvs<false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
-        undo_null_move();
-
-        if (score >= beta) {
-            return beta;
-        }
-    }
-
-    // Internal iterative reductions.
-    if (depth >= IIR_MIN_DEPTH && !found_in_tt) {
-        depth -= IIR_DEPTH_RED;
+    if (interest <= 0) {
+        return evaluate();
     }
 
     // Mate distance pruning.
@@ -551,170 +464,31 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         m_curr_move_number = 0;
     }
 
-    // Store played quiet moves in this list.
-    // Useful for history updates later on.
-    StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
+    SearchMove moves[MAX_GENERATED_MOVES];
+    SearchMove* end = generate_moves(m_board, moves);
+    size_t n_legal_moves = end - &moves[0];
 
-    int move_idx = -1;
+    for (size_t move_idx = 0; move_idx < n_legal_moves; ++move_idx) {
+        Move move = moves[move_idx];
 
-    MovePicker move_picker(m_board, ply, m_hist, hash_move);
-    Move move {};
-    bool has_legal_moves = false;
-    while ((move = move_picker.next()) != MOVE_NULL) {
-        has_legal_moves = true;
-        move_idx++;
-
-        // Skip unrequested moves.
-        if (ROOT &&
-            std::find(m_search_moves.begin(), m_search_moves.end(), move) == m_search_moves.end()) {
-            continue;
-        }
-
-        // Report 'currmove' and 'currmovenumber'.
-        if constexpr (ROOT) {
-            m_curr_move_number++;
-            m_curr_move = move;
-
-            if (m_main) {
-                m_context->listeners().curr_move_listener(m_curr_depth,
-                                                          m_curr_move,
-                                                          m_curr_move_number);
-            }
-        }
-
-        // Late move pruning.
-        if (alpha > -MATE_THRESHOLD &&
-            depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move)) &&
-            move_idx >= s_lmp_count_table[improving][depth] &&
-            move_picker.stage() > MPS_KILLER_MOVES &&
-            !in_check &&
-            move.is_quiet()) {
-            continue;
-        }
-
-        // SEE pruning.
-        if (depth <= SEE_PRUNING_MAX_DEPTH &&
-            !m_board.in_check()            &&
-            move_picker.stage() > MPS_GOOD_CAPTURES &&
-            !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
-            continue;
-        }
+        // Compute move interest.
+        int move_interest = interest - 1024;
 
         make_move(move);
-
-        // Futility pruning.
-        if (depth <= FP_MAX_DEPTH &&
-            !in_check             &&
-            !m_board.in_check()   &&
-            move.is_quiet()       &&
-            (static_eval + FP_MARGIN) < alpha) {
-            undo_move();
-            continue;
-        }
-
-        // Late move reductions.
-        Depth reductions = 0;
-        if (n_searched_moves >= LMR_MIN_MOVE_IDX &&
-            depth >= LMR_MIN_DEPTH &&
-            !in_check              &&
-            !m_board.in_check()) {
-            reductions = s_lmr_table[n_searched_moves - 1][depth];
-            if (move.is_quiet()) {
-                // Further reduce moves that are not improving the static evaluation.
-                reductions += !improving;
-
-                // Further reduce moves that have been historically very bad.
-                reductions += m_hist.quiet_history(move, m_board.last_move()) <= LMR_BAD_HISTORY_THRESHOLD;
-            }
-            else if (move_picker.stage() == MPS_BAD_CAPTURES) {
-                // Further reduce bad captures when we're in a very good position
-                // and probably don't need unsound sacrifices.
-                bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
-                reductions -= !stable * (reductions / 2);
-            }
-
-            // Prevent too high or below zero reductions.
-            reductions = std::clamp(reductions, 0, depth);
-        }
-
-        Score score;
-        if (n_searched_moves == 0) {
-            // Perform PVS. First move of the list is always PVS.
-            score = -pvs<true>(depth - 1, -beta, -alpha, node + 1);
-        }
-        else {
-            // Perform a null window search. Searches after the first move are
-            // performed with a null window. If the search fails high, do a
-            // re-search with the full window.
-            score = -pvs<false>(depth - 1 - reductions, -alpha - 1, -alpha, node + 1);
-            if (score > alpha && score < beta) {
-                score = -pvs<true>(depth - 1, -beta, -alpha, node + 1);
-            }
-        }
-
+        Score score = -pvs<true>(move_interest, -beta, -alpha, node + 1);
         undo_move();
 
-        if (move.is_quiet()) {
-            quiets_played.push_back(move);
-        }
-
-        n_searched_moves++;
-
         if (score >= beta) {
-            // Our search failed high.
-            alpha     = beta;
-            best_move = move;
-
-            // Update our history scores and refutation moves.
-            if (move.is_quiet()) {
-                m_hist.set_killer(ply, move);
-
-                for (Move quiet: quiets_played) {
-                    m_hist.update_quiet_history(quiet, m_board.last_move(), depth, quiet == best_move);
-                }
-            }
-
-            // Due to aspiration windows, our search may have failed high in the root.
-            // Make sure we always have a best_move and a best_score.
-            if (ROOT && (!should_stop() || depth <= 2)) {
-                m_results.pv_results[m_curr_pv_idx].best_move = move;
-                m_results.pv_results[m_curr_pv_idx].score     = alpha;
-            }
-
-            if constexpr (PV && !ROOT) {
-                node->pv[0] = MOVE_NULL;
-            }
+            alpha = score;
             break;
         }
         if (score > alpha) {
-            // We've got a new best move.
-            alpha     = score;
-            best_move = move;
-
-            // Make sure we update our best_move in the root ASAP.
-            if (ROOT && (!should_stop() || depth <= 2)) {
-                m_results.pv_results[m_curr_pv_idx].best_move = move;
-                m_results.pv_results[m_curr_pv_idx].score     = alpha;
-            }
-
-            // Update the PV table.
-            if constexpr (PV) {
-                node->pv[0] = best_move;
-                size_t i;
-                for (i = 0; i < MAX_DEPTH - 2; ++i) {
-                    Move pv_move = (node + 1)->pv[i];
-                    if (pv_move == MOVE_NULL) {
-                        break;
-                    }
-                    node->pv[i + 1] = pv_move;
-                }
-                node->pv[i + 1] = MOVE_NULL;
-            }
+            alpha = score;
         }
     }
 
     // Check if we have a checkmate or stalemate.
-    if (!has_legal_moves) {
+    if (n_legal_moves == 0) {
         return m_board.in_check() ? (-MATE_SCORE + ply) : 0;
     }
 
@@ -725,15 +499,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Store in transposition table.
     if (alpha >= beta) {
         // Beta-Cutoff, lowerbound score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
+        tt.try_store(board_key, ply, best_move, alpha, interest / 1024, BT_LOWERBOUND);
     }
     else if (alpha <= original_alpha) {
         // Couldn't raise alpha, score is an upperbound.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
+        tt.try_store(board_key, ply, best_move, alpha, interest / 1024, BT_UPPERBOUND);
     }
     else {
         // We have an exact score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+        tt.try_store(board_key, ply, best_move, alpha, interest / 1024, BT_EXACT);
     }
 
     return alpha;
