@@ -480,10 +480,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 return tt_entry.score();
             }
             else if (tt_entry.bound_type() == BT_LOWERBOUND) {
-                alpha = tt_entry.score();
+                alpha = std::max(alpha, tt_entry.score());
             }
             else {
-                beta = tt_entry.score();
+                beta = std::min(beta, tt_entry.score());
             }
         }
     }
@@ -528,7 +528,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         undo_null_move();
 
         if (score >= beta) {
-            return beta;
+            return score;
         }
     }
 
@@ -557,6 +557,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     int move_idx = -1;
 
+    Score best_score = -MAX_SCORE;
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     bool has_legal_moves = false;
@@ -660,9 +661,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         n_searched_moves++;
 
+        if (score > best_score) {
+            best_score = score;
+        }
+
         if (score >= beta) {
             // Our search failed high.
-            alpha     = beta;
             best_move = move;
 
             // Update our history scores and refutation moves.
@@ -678,7 +682,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Make sure we always have a best_move and a best_score.
             if (ROOT && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
-                m_results.pv_results[m_curr_pv_idx].score     = alpha;
+                m_results.pv_results[m_curr_pv_idx].score     = score;
             }
 
             if constexpr (PV && !ROOT) {
@@ -688,13 +692,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
         if (score > alpha) {
             // We've got a new best move.
-            alpha     = score;
+            alpha = score;
             best_move = move;
 
             // Make sure we update our best_move in the root ASAP.
             if (ROOT && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
-                m_results.pv_results[m_curr_pv_idx].score     = alpha;
+                m_results.pv_results[m_curr_pv_idx].score     = best_score;
             }
 
             // Update the PV table.
@@ -723,27 +727,27 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Store in transposition table.
-    if (alpha >= beta) {
+    if (best_score >= beta) {
         // Beta-Cutoff, lowerbound score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
+        tt.try_store(board_key, ply, best_move, best_score, depth, BT_LOWERBOUND);
     }
-    else if (alpha <= original_alpha) {
+    else if (best_score <= original_alpha) {
         // Couldn't raise alpha, score is an upperbound.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
+        tt.try_store(board_key, ply, best_move, best_score, depth, BT_UPPERBOUND);
     }
     else {
         // We have an exact score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+        tt.try_store(board_key, ply, best_move, best_score, depth, BT_EXACT);
     }
 
-    return alpha;
+    return best_score;
 }
 
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     Score stand_pat = evaluate();
 
     if (stand_pat >= beta) {
-        return beta;
+        return stand_pat;
     }
     if (stand_pat > alpha) {
         alpha = stand_pat;
@@ -757,7 +761,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     // Finally, start looping over available noisy moves.
     MovePicker<true> move_picker(m_board, ply, m_hist);
     SearchMove move;
-    SearchMove best_move;
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (move_picker.stage() >= MPS_BAD_CAPTURES &&
@@ -770,12 +773,10 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         undo_move();
 
         if (score >= beta) {
-            best_move = move;
-            alpha = beta;
+            alpha = score;
             break;
         }
         if (score > alpha) {
-            best_move = move;
             alpha = score;
         }
     }
