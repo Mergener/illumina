@@ -882,6 +882,7 @@ Score SearchWorker::draw_score() const {
 void SearchWorker::make_move(Move move) {
     m_eval.on_make_move(m_board, move);
     m_board.make_move(move);
+    m_context->tt().prefetch(m_board.hash_key());
     m_results.nodes++;
 }
 

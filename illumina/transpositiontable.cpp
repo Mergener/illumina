@@ -98,10 +98,6 @@ void TranspositionTable::clear() {
     m_entry_count = 0;
 }
 
-inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
-    return m_buf[key % m_max_entry_count];
-}
-
 void TranspositionTable::resize(size_t new_size) {
     try {
         if (new_size == m_size_in_bytes && m_buf != nullptr) {

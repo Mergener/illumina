@@ -47,6 +47,7 @@ public:
     void new_search();
     bool probe(ui64 key, TranspositionTableEntry& entry, Depth ply = 0);
     void try_store(ui64 key, Depth ply, Move move, Score score, Depth depth, BoundType bound_type);
+    void prefetch(ui64 key);
     int hash_full() const;
 
     explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
@@ -97,6 +98,13 @@ inline int TranspositionTable::hash_full() const {
     return int(double(m_entry_count) / double(m_max_entry_count) * 1000);
 }
 
+inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
+    return m_buf[key % m_max_entry_count];
+}
+
+inline void TranspositionTable::prefetch(illumina::ui64 key) {
+    ILLUMINA_PREFETCH(&entry_ref(key));
+}
 
 } // illumina
 

@@ -47,6 +47,18 @@ if (DEVELOPMENT)
 
 endif()
 
+# Check if IPO (i.e LTO) is supported.
+# This adds an extra optimization level by allowing
+# link time optimization.
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT error)
+if (ipo_supported)
+    message("This build supports link time optimization.")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+else()
+    message("This build does not support link time optimization.")
+endif()
+
 # For GCC-derived compilers, we need to specify some flags in order
 # to have <thread> and <filesystem> properly working.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

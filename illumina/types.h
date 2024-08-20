@@ -54,6 +54,15 @@ using MoveType       = ui8;
 // Some useful bit manipulation functions/macros.
 //
 
+#ifdef __GNUC__
+#define ILLUMINA_PREFETCH(mem) __builtin_prefetch(mem)
+#elif defined(_MSC_VER)
+#define ILLUMINA_PREFETCH(mem) _mm_prefetch(mem, _MM_HINT_T2)
+#else
+// No prefetch function.
+#define ILLUMINA_PREFETCH(mem)
+#endif
+
 /**
  * Returns an integer with only the nth bit set.
  * Example: BIT(3) = 0b1000

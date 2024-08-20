@@ -7,6 +7,7 @@ foreach(ARCH ${ARCHS})
     set(TARGET illumina_lib_${ARCH})
 
     add_library(${TARGET} STATIC ${lib_src})
+
     apply_arch_options(${TARGET} ${ARCH})
     set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME illumina_${ARCH})
 
