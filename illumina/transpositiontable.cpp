@@ -67,27 +67,42 @@ void TranspositionTable::try_store(ui64 key,
                                    BoundType bound_type) {
     TranspositionTableEntry& entry = entry_ref(key);
 
+    // Always add when no existing entry is found.
     if (!entry.valid()) {
         entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
+
+        // Since we're adding a completely new entry, update the counter.
         m_entry_count++;
         return;
     }
 
+    // Always replace when current entry has no stored move.
+    if (entry.move() == MOVE_NULL && move != MOVE_NULL) {
+        entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
+        return;
+    }
+
+    // Never replace a tt entry with a move for another without a move.
+    if (entry.move() != MOVE_NULL && move == MOVE_NULL) {
+        return;
+    }
+
+    // Always replace older generations.
     if (entry.generation() != m_gen) {
         entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
         return;
     }
 
-    if (entry.depth() <= depth &&
-        bound_type == BT_EXACT &&
-        entry.bound_type() != BT_EXACT) {
-        // Replace since we now have an exact score.
+    // Always replace when we get a higher depth (with a move assigned).
+    if (depth > entry.depth()) {
         entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
         return;
     }
 
-    if (entry.depth() <= depth) {
-        // Higher depth, replace it.
+    // Replace when we're getting a more accurate score on the same depth.
+    if (depth == entry.depth()        &&
+        ((bound_type == BT_EXACT      && entry.bound_type() != BT_EXACT) ||
+          bound_type != BT_UPPERBOUND && entry.bound_type() == BT_UPPERBOUND)) {
         entry.replace(key, move, search_score_to_tt(score, ply), depth, bound_type, m_gen);
         return;
     }
