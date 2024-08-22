@@ -36,22 +36,44 @@ void NNUE::clear() {
 }
 
 int NNUE::forward(Color color) const {
-    int sum = 0;
+    if constexpr (L1_ACTIVATION == ActivationFunction::CReLU) {
+        int sum = 0;
 
-    auto our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
-    auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+        auto our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
+        auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        int activated = std::clamp(int(our_accum[i]), 0, 255);
-        sum += activated * m_net->output_weights[i];
+        for (size_t i = 0; i < L1_SIZE; ++i) {
+            int activated = std::clamp(int(our_accum[i]), 0, 255);
+            sum += activated * m_net->output_weights[i];
+        }
+
+        for (size_t i = 0; i < L1_SIZE; ++i) {
+            int activated = std::clamp(int(their_accum[i]), 0, 255);
+            sum += activated * m_net->output_weights[L1_SIZE + i];
+        }
+
+        return (sum + m_net->output_bias) * SCALE / Q;
     }
+    else if constexpr (L1_ACTIVATION == ActivationFunction::SCReLU) {
+        int sum = 0;
 
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        int activated = std::clamp(int(their_accum[i]), 0, 255);
-        sum += activated * m_net->output_weights[L1_SIZE + i];
+        auto our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
+        auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+
+        for (size_t i = 0; i < L1_SIZE; ++i) {
+            int activated = std::clamp(int(our_accum[i]), 0, 255);
+            activated *= activated;
+            sum += activated * m_net->output_weights[i];
+        }
+
+        for (size_t i = 0; i < L1_SIZE; ++i) {
+            int activated = std::clamp(int(their_accum[i]), 0, 255);
+            activated *= activated;
+            sum += activated * m_net->output_weights[L1_SIZE + i];
+        }
+
+        return (sum + m_net->output_bias) * SCALE / (Q * Q);
     }
-
-    return (sum + m_net->output_bias) * SCALE / Q;
 }
 
 void NNUE::enable_feature(Square square, Piece piece) {

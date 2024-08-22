@@ -8,7 +8,13 @@
 
 namespace illumina {
 
+enum class ActivationFunction {
+    CReLU,
+    SCReLU
+};
+
 static constexpr size_t N_INPUTS = 768;
+static constexpr ActivationFunction L1_ACTIVATION = ActivationFunction::CReLU;
 static constexpr size_t L1_SIZE  = 128;
 
 struct EvalNetwork {
