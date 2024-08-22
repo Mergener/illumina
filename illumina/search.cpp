@@ -8,6 +8,7 @@
 #include "tunablevalues.h"
 #include "movepicker.h"
 #include "evaluation.h"
+#include "utils.h"
 
 namespace illumina {
 
@@ -142,6 +143,8 @@ private:
     Move        m_curr_move  = MOVE_NULL;
     int         m_curr_move_number = 0;
     int         m_curr_pv_idx = 0;
+    int         m_eval_random_margin = 0;
+    int         m_eval_random_seed = 0;
 
     std::vector<Move> m_search_moves;
 
@@ -795,10 +798,10 @@ Score SearchWorker::evaluate() const {
     // If we're not in a known endgame, use our regular
     // static evaluation function.
     Score score = m_eval.get();
-    if (m_settings->eval_random_margin != 0) {
+    if (m_eval_random_margin != 0) {
         // User has requested evaluation randomness, apply the noise.
-        i32 seed   = Score((m_settings->eval_rand_seed * m_board.hash_key()) & BITMASK(15));
-        i32 margin = m_settings->eval_random_margin;
+        i32 seed   = Score((m_eval_random_seed * m_board.hash_key()) & BITMASK(15));
+        i32 margin = m_eval_random_margin;
         i32 noise  = (seed % (margin * 2)) - margin;
         score += Score(noise);
     }
@@ -910,7 +913,13 @@ SearchWorker::SearchWorker(bool main,
                            SearchContext* context,
                            const SearchSettings* settings)
     : m_main(main), m_board(std::move(board)),
-      m_context(context), m_settings(settings) {
+      m_context(context), m_settings(settings),
+      m_eval_random_margin(m_main
+                           ? settings->eval_random_margin
+                           : std::max(SMP_EVAL_RANDOM_MARGIN, settings->eval_random_margin)),
+      m_eval_random_seed(m_main
+                         ? settings->eval_rand_seed
+                         : random(ui64(1), UINT64_MAX)) {
     m_eval.on_new_board(m_board);
 }
 
