@@ -10,7 +10,11 @@ INCTXT(_default_network, NNUE_PATH);
 static const EvalNetwork* s_default_network = nullptr;
 
 constexpr int SCALE = 400;
-constexpr int Q     = 255 * 64;
+constexpr int Q1    = 255;
+constexpr int Q2    = 64;
+constexpr int Q     = L1_ACTIVATION == ActivationFunction::CReLU
+                      ? (Q1 * Q2)
+                      : (Q1 * Q1 * Q2);
 
 template <Color C>
 static size_t feature_index(Square square, Piece piece) {
@@ -43,12 +47,12 @@ int NNUE::forward(Color color) const {
         auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
         for (size_t i = 0; i < L1_SIZE; ++i) {
-            int activated = std::clamp(int(our_accum[i]), 0, 255);
+            int activated = std::clamp(int(our_accum[i]), 0, Q1);
             sum += activated * m_net->output_weights[i];
         }
 
         for (size_t i = 0; i < L1_SIZE; ++i) {
-            int activated = std::clamp(int(their_accum[i]), 0, 255);
+            int activated = std::clamp(int(their_accum[i]), 0, Q1);
             sum += activated * m_net->output_weights[L1_SIZE + i];
         }
 
@@ -61,18 +65,18 @@ int NNUE::forward(Color color) const {
         auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
         for (size_t i = 0; i < L1_SIZE; ++i) {
-            int activated = std::clamp(int(our_accum[i]), 0, 255);
-            activated *= activated;
+            int activated = std::clamp(int(our_accum[i]), 0, Q1);
+            activated = activated * activated;
             sum += activated * m_net->output_weights[i];
         }
 
         for (size_t i = 0; i < L1_SIZE; ++i) {
-            int activated = std::clamp(int(their_accum[i]), 0, 255);
-            activated *= activated;
+            int activated = std::clamp(int(their_accum[i]), 0, Q1);
+            activated = activated * activated;
             sum += activated * m_net->output_weights[L1_SIZE + i];
         }
 
-        return (sum + m_net->output_bias) * SCALE / (Q * Q);
+        return (sum + m_net->output_bias) * SCALE / Q;
     }
 }
 
