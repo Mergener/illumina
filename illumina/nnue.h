@@ -8,8 +8,14 @@
 
 namespace illumina {
 
+enum class ActivationFunction {
+    CReLU,
+    SCReLU
+};
+
 static constexpr size_t N_INPUTS = 768;
-static constexpr size_t L1_SIZE  = 96;
+static constexpr ActivationFunction L1_ACTIVATION = ActivationFunction::SCReLU;
+static constexpr size_t L1_SIZE  = 128;
 
 struct EvalNetwork {
     alignas(32) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
