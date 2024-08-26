@@ -483,10 +483,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 return tt_entry.score();
             }
             else if (tt_entry.bound_type() == BT_LOWERBOUND) {
-                alpha = tt_entry.score();
+                alpha = std::max(alpha, tt_entry.score());
             }
             else {
-                beta = tt_entry.score();
+                beta = std::min(beta, tt_entry.score());
             }
         }
     }
