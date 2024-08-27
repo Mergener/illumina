@@ -163,6 +163,8 @@ inline void TimeManager::on_new_pv(Depth depth,
         // Our search deviated a bit from what we were expecting.
         // Give it some more thought.
         m_soft_bound = (m_soft_bound + m_orig_soft_bound * TM_STABILITY_SB_EXT_FACTOR) / TM_STABILITY_SB_EXT_DIVISOR;
+        m_last_best_move = best_move;
+        m_last_best_score = score;
     }
 }
 
