@@ -272,6 +272,7 @@ void State::search(SearchSettings settings) {
     settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
     settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
     settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
+    settings.max_nodes = std::min(settings.max_nodes, ui64(m_options.option<UCIOptionSpin>("ForcedNodeLimit").value()));
     settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
     settings.eval_rand_seed     = m_eval_random_seed;
 
@@ -355,6 +356,7 @@ void State::register_options() {
             m_frc = check.value();
         });
     m_options.register_option<UCIOptionSpin>("EvalRandomMargin", 0, 0, 1024);
+    m_options.register_option<UCIOptionSpin>("ForcedNodeLimit", INT32_MAX, 1, INT32_MAX);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
