@@ -103,16 +103,18 @@ void insertion_sort(TIter begin, TIter end, TCompar comp) {
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_promotion_captures() {
     constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE);
+    constexpr ui64 PROM_TYPE_MASK = QUIESCE ? BIT(PT_QUEEN) : BITMASK(PT_COUNT);
     SearchMove* begin = m_moves_end;
-    m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
+    m_moves_end = generate_moves<MASK, false, BITMASK(PT_COUNT), SearchMove, PROM_TYPE_MASK>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_simple_promotions() {
     constexpr ui64 MASK = BIT(MT_SIMPLE_PROMOTION);
+    constexpr ui64 PROM_TYPE_MASK = QUIESCE ? BIT(PT_QUEEN) : BITMASK(PT_COUNT);
     SearchMove* begin = m_moves_end;
-    m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
+    m_moves_end = generate_moves<MASK, false, BITMASK(PT_COUNT), SearchMove, PROM_TYPE_MASK>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 

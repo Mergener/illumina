@@ -9,7 +9,8 @@ namespace illumina {
 template<ui64 MOVE_TYPE_MASK,
     bool LEGAL,
     ui64 PIECE_TYPE_MASK,
-    typename TMOVE>
+    typename TMOVE,
+    ui64 PROMOTION_TYPE_MASK>
 TMOVE* generate_moves(const Board& board, TMOVE* moves) {
     MOVEGEN_ASSERTIONS();
 
@@ -24,10 +25,18 @@ TMOVE* generate_moves(const Board& board, TMOVE* moves) {
     }
 
     if (board.color_to_move() == CL_WHITE) {
-        moves = generate_moves_by_color<CL_WHITE, MOVE_TYPE_MASK, PIECE_TYPE_MASK, TMOVE>(board, moves);
+        moves = generate_moves_by_color<CL_WHITE,
+                                        MOVE_TYPE_MASK,
+                                        PIECE_TYPE_MASK,
+                                        TMOVE,
+                                        PROMOTION_TYPE_MASK>(board, moves);
     }
     else {
-        moves = generate_moves_by_color<CL_BLACK, MOVE_TYPE_MASK, PIECE_TYPE_MASK, TMOVE>(board, moves);
+        moves = generate_moves_by_color<CL_BLACK,
+                                        MOVE_TYPE_MASK,
+                                        PIECE_TYPE_MASK,
+                                        TMOVE,
+                                        PROMOTION_TYPE_MASK>(board, moves);
     }
 
     if constexpr (LEGAL) {
@@ -66,7 +75,8 @@ TMOVE* generate_evasions(const Board& board, TMOVE* moves) {
 template<Color C,
     ui64 MOVE_TYPE_MASK,
     ui64 PIECE_TYPE_MASK,
-    typename TMOVE>
+    typename TMOVE,
+    ui64 PROMOTION_TYPE_MASK>
 TMOVE* generate_moves_by_color(const Board& board, TMOVE* moves) {
     MOVEGEN_ASSERTIONS();
 
@@ -78,7 +88,7 @@ TMOVE* generate_moves_by_color(const Board& board, TMOVE* moves) {
     constexpr bool GEN_KING   = bit_is_set(PIECE_TYPE_MASK, PT_KING);
 
     if constexpr (GEN_PAWN) {
-        moves = generate_pawn_moves_by_color<C, MOVE_TYPE_MASK, TMOVE>(board, moves);
+        moves = generate_pawn_moves_by_color<C, MOVE_TYPE_MASK, TMOVE, PROMOTION_TYPE_MASK>(board, moves);
     }
     if constexpr (GEN_KNIGHT) {
         moves = generate_knight_moves_by_color<C, MOVE_TYPE_MASK, TMOVE>(board, moves);
@@ -101,7 +111,8 @@ TMOVE* generate_moves_by_color(const Board& board, TMOVE* moves) {
 
 template<Color C,
     ui64 MOVE_TYPE_MASK,
-    typename TMOVE>
+    typename TMOVE,
+    ui64 PROMOTION_TYPE_MASK>
 TMOVE* generate_pawn_moves_by_color(const Board& board, TMOVE* moves) {
     MOVEGEN_ASSERTIONS();
 
@@ -134,6 +145,9 @@ TMOVE* generate_pawn_moves_by_color(const Board& board, TMOVE* moves) {
             Square src = dst - LEFT_CAPT_DIR;
 
             for (PieceType pt: PROMOTION_PIECE_TYPES) {
+                if (!bit_is_set(PROMOTION_TYPE_MASK, pt)) {
+                    continue;
+                }
                 *moves++ = Move::new_promotion_capture(src, dst, C, board.piece_at(dst), pt);
             }
 
@@ -151,6 +165,10 @@ TMOVE* generate_pawn_moves_by_color(const Board& board, TMOVE* moves) {
             Square src = dst - RIGHT_CAPT_DIR;
 
             for (PieceType pt: PROMOTION_PIECE_TYPES) {
+                if (!bit_is_set(PROMOTION_TYPE_MASK, pt)) {
+                    continue;
+                }
+
                 *moves++ = Move::new_promotion_capture(src, dst, C, board.piece_at(dst), pt);
             }
 
@@ -168,6 +186,10 @@ TMOVE* generate_pawn_moves_by_color(const Board& board, TMOVE* moves) {
             Square src = lsb(promoting_pawns);
 
             for (PieceType pt: PROMOTION_PIECE_TYPES) {
+                if (!bit_is_set(PROMOTION_TYPE_MASK, pt)) {
+                    continue;
+                }
+
                 Square dst = src + PUSH_DIR;
                 *moves++ = Move::new_simple_promotion(src, dst, C, pt);
             }
