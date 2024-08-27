@@ -8,7 +8,7 @@
 
 namespace illumina {
 
-static constexpr int LAG_MARGIN = 20;
+static constexpr int LAG_MARGIN = 10;
 
 class TimeManager {
 public:
@@ -79,7 +79,7 @@ inline void TimeManager::set_starting_bounds(ui64 soft, ui64 hard) {
 
 inline void TimeManager::start_movetime(ui64 movetime_ms) {
     setup(false);
-    ui64 bound = movetime_ms - LAG_MARGIN;
+    ui64 bound = movetime_ms - std::min(movetime_ms, ui64(LAG_MARGIN));
     set_starting_bounds(bound, bound);
 }
 
@@ -88,7 +88,7 @@ inline void TimeManager::start_tourney_time(ui64 our_time_ms,
                                             ui64 their_time_ms,
                                             ui64 their_inc_ms,
                                             int moves_to_go) {
-    ui64 max_time = our_time_ms - LAG_MARGIN;
+    ui64 max_time = our_time_ms - std::min(our_time_ms, ui64(LAG_MARGIN));
     our_time_ms  += our_inc_ms * 45 - LAG_MARGIN;
     setup(true);
 
@@ -163,6 +163,8 @@ inline void TimeManager::on_new_pv(Depth depth,
         // Our search deviated a bit from what we were expecting.
         // Give it some more thought.
         m_soft_bound = (m_soft_bound + m_orig_soft_bound * TM_STABILITY_SB_EXT_FACTOR) / TM_STABILITY_SB_EXT_DIVISOR;
+        m_last_best_move = best_move;
+        m_last_best_score = score;
     }
 }
 
