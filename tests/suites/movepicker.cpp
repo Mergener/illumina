@@ -25,7 +25,7 @@ static void score_move(MovePicker<QUIESCE>& mp, SearchMove& move, bool check) {
 static MovePickingStage classify_move_stage(Move move,
                                             const Board& board,
                                             Move hash_move,
-                                            MoveHistory mv_hist,
+                                            const MoveHistory& mv_hist,
                                             Depth ply,
                                             bool quiesce) {
     if (move == hash_move) {
@@ -124,7 +124,7 @@ void test_move_picker() {
                     // Save all history.
                     for (auto& h: history) {
                         auto [depth, src, dest] = h;
-                        mv_hist.update_quiet_history(Move::new_normal(src, dest, WHITE_QUEEN), depth, true);
+                        mv_hist.update_quiet_history(Move::new_normal(src, dest, WHITE_QUEEN), MOVE_NULL, depth, true);
                     }
                 }
             }
@@ -161,7 +161,7 @@ void test_move_picker() {
                     for (int i = 0; i < 100; ++i) {
                         // Pick a move.
                         Move move = validation_moves[random(size_t(0), n_expected_moves)];
-                        mv_hist.update_quiet_history(move, random(1, 15), true);
+                        mv_hist.update_quiet_history(move, MOVE_NULL, random(1, 15), true);
                     }
                 }
                 else {
