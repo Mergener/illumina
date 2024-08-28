@@ -630,10 +630,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             move == hash_move &&
             depth - tt_entry.depth() >= 3 &&
             std::abs(tt_entry.score()) < MATE_THRESHOLD) {
-            Score se_beta = std::min(beta, tt_entry.score());
+            Score se_beta = std::min(beta, tt_entry.score() - 60);
 
             node->skip_move = move;
-            Score score = pvs<PV>(depth / 2, se_beta - 1, se_beta, node);
+            Score score = pvs<PV>((depth - 1) / 2, se_beta - 1, se_beta, node);
             node->skip_move = MOVE_NULL;
 
             if (score < se_beta) {
