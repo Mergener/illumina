@@ -638,7 +638,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 reductions += !improving;
 
                 // Further reduce moves that have been historically very bad.
-                reductions += m_hist.quiet_history(move, m_board.last_move()) <= LMR_BAD_HISTORY_THRESHOLD;
+                reductions += m_hist.quiet_history(move,
+                                                   m_board.last_move(),
+                                                   m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
@@ -684,7 +686,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 m_hist.set_killer(ply, move);
 
                 for (Move quiet: quiets_played) {
-                    m_hist.update_quiet_history(quiet, m_board.last_move(), depth, quiet == best_move);
+                    m_hist.update_quiet_history(quiet,
+                                                m_board.last_move(),
+                                                depth,
+                                                m_board.gives_check(quiet),
+                                                quiet == best_move);
                 }
             }
 
