@@ -32,6 +32,8 @@ struct SearchNode {
     Move  pv[MAX_DEPTH];
 };
 
+class SearchWorker;
+
 /**
  * Search context shared among search workers.
  */
@@ -41,6 +43,7 @@ public:
     TranspositionTable&        tt() const;
     const Searcher::Listeners& listeners() const;
     const RootInfo&            root_info() const;
+    const std::vector<SearchWorker>& helper_workers() const;
 
     /**
      * Time, in milliseconds, since this worker started searching.
@@ -55,6 +58,7 @@ public:
                   bool* should_stop,
                   const Searcher::Listeners* listeners,
                   const RootInfo* root_info,
+                  const std::vector<SearchWorker>* helper_workers,
                   TimeManager* time_manager);
 
 private:
@@ -64,6 +68,7 @@ private:
     bool*                      m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
+    const std::vector<SearchWorker>* m_helper_workers;
 };
 
 TranspositionTable& SearchContext::tt() const {
@@ -86,11 +91,13 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              bool* should_stop,
                              const Searcher::Listeners* listeners,
                              const RootInfo* root_info,
+                             const std::vector<SearchWorker>* helper_workers,
                              TimeManager* time_manager)
     : m_stop(should_stop),
       m_tt(tt), m_listeners(listeners),
       m_time_manager(time_manager),
       m_root_info(root_info),
+      m_helper_workers(helper_workers),
       m_search_start(now()) { }
 
 void SearchContext::stop_search() const {
@@ -103,6 +110,10 @@ TimeManager& SearchContext::time_manager() const {
 
 const RootInfo& SearchContext::root_info() const {
     return *m_root_info;
+}
+
+const std::vector<SearchWorker>& SearchContext::helper_workers() const {
+    return *m_helper_workers;
 }
 
 struct WorkerResults {
@@ -216,9 +227,10 @@ SearchResults Searcher::search(const Board& board,
     results.best_move = root_info.moves[0];
 
     // Create search context.
+    std::vector<SearchWorker> secondary_workers;
     m_stop = false;
     m_tt.new_search();
-    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &m_tm);
+    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
 
     // Create main worker.
     SearchWorker main_worker(true, board, &context, &settings);
@@ -247,7 +259,6 @@ SearchResults Searcher::search(const Board& board,
     int n_helper_threads = std::max(1, settings.n_threads) - 1;
 
     // Create secondary workers.
-    std::vector<SearchWorker> secondary_workers;
     for (int i = 0; i < n_helper_threads; ++i) {
         secondary_workers.emplace_back(false, board, &context, &settings);
     }
@@ -826,9 +837,14 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
     pv_results.depth      = m_curr_depth;
     pv_results.sel_depth  = m_results.sel_depth;
     pv_results.score      = m_results.pv_results[m_curr_pv_idx].score;
-    pv_results.nodes      = m_results.nodes;
     pv_results.time       = m_context->elapsed();
     pv_results.bound_type = m_results.pv_results[m_curr_pv_idx].bound_type;
+
+    ui64 total_nodes = m_results.nodes;
+    for (const SearchWorker& worker: m_context->helper_workers()) {
+        total_nodes += worker.results().nodes;
+    }
+    pv_results.nodes = total_nodes;
 
     // Extract the PV line.
     pv_results.line.clear();
