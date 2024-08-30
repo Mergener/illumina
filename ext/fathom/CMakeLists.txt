@@ -1,0 +1,1 @@
+add_library(fathom STATIC src/tbprobe.c src/tbchess.c)

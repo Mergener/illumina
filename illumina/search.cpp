@@ -3,6 +3,8 @@
 #include <cmath>
 #include <thread>
 
+#include <tbprobe.h>
+
 #include "endgame.h"
 #include "timemanager.h"
 #include "tunablevalues.h"

@@ -15,6 +15,9 @@ foreach(ARCH ${ARCHS})
         target_link_libraries(${TARGET} PUBLIC stdc++fs)
     endif()
 
+    target_link_libraries(${TARGET} PRIVATE fathom)
+    target_include_directories(${TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/ext/fathom/src)
+
     target_include_directories(${TARGET} PUBLIC ${CMAKE_SOURCE_DIR}/ext)
 
     target_compile_definitions(${TARGET} PUBLIC NNUE_PATH=\"${NNUE_PATH}\")
