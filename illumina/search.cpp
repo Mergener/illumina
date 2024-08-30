@@ -448,6 +448,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         node->pv[0] = MOVE_NULL;
     }
 
+    // Don't search nodes with closed bounds.
+    if (!ROOT && alpha >= beta) {
+        return beta;
+    }
+
     // Keep track on some stats to report or use later.
     m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
 
