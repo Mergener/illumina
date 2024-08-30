@@ -638,9 +638,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 reductions += !improving;
 
                 // Further reduce moves that have been historically very bad.
-                reductions += m_hist.quiet_history(move,
+                int history = m_hist.quiet_history(move,
                                                    m_board.last_move(),
-                                                   m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
+                                                   m_board.gives_check(move));
+                bool has_bad_history = history <= LMR_BAD_HISTORY_THRESHOLD;
+                reductions += has_bad_history;
+
+                // History leaf pruning.
+                if (reductions >= depth && has_bad_history) {
+                    // Prune moves that suffer excessive reductions and have bad history.
+                    undo_move();
+                    continue;
+                }
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
