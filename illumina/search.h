@@ -4,6 +4,7 @@
 #include <functional>
 #include <optional>
 #include <memory>
+#include <nlohmann/json/json.hpp>
 
 #include "board.h"
 #include "timemanager.h"
@@ -40,10 +41,54 @@ struct SearchSettings {
     std::optional<std::vector<Move>> search_moves;
 };
 
+struct SearchStats {
+    ui64 main_search_nodes {};
+    ui64 qsearch_nodes {};
+    ui64 all_nodes {};
+    ui64 cut_nodes {};
+    ui64 pv_nodes {};
+    ui64 qsearch_best_move_idx_summation {};
+    ui64 null_move_prunes {};
+    ui64 fp_prunes {};
+    ui64 lmp_prunes {};
+    ui64 see_prunes {};
+    ui64 qsee_prunes {};
+    ui64 rfp_prunes {};
+    ui64 mdp_prunes {};
+    std::map<int, ui64> best_move_indexes;
+
+    struct StageData {
+        ui64 reached;
+        ui64 best_move;
+    };
+    std::map<int, StageData> stages_data;
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SearchStats::StageData, reached, best_move);
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SearchStats,
+                                   main_search_nodes,
+                                   qsearch_nodes,
+                                   all_nodes,
+                                   cut_nodes,
+                                   pv_nodes,
+                                   qsearch_best_move_idx_summation,
+                                   null_move_prunes,
+                                   fp_prunes,
+                                   lmp_prunes,
+                                   see_prunes,
+                                   qsee_prunes,
+                                   rfp_prunes,
+                                   mdp_prunes,
+                                   best_move_indexes,
+                                   stages_data);
 struct SearchResults {
     Move  best_move;
     Move  ponder_move;
     Score score;
+
+    // Contains stats from all threads. First index is main thread.
+    std::vector<SearchStats> search_stats;
 };
 
 class Searcher {

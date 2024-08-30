@@ -288,6 +288,8 @@ void State::search(SearchSettings settings) {
 
             std::cout << std::endl;
 
+            std::cout << nlohmann::json(results.search_stats).dump() << std::endl;
+
             m_searching = false;
         }
         catch (const std::exception& e) {

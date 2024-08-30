@@ -126,6 +126,7 @@ struct WorkerResults {
     Depth sel_depth   = 0;
     ui64  nodes       = 0;
     Depth searched_depth = 0;
+    SearchStats stats;
 };
 
 class SearchWorker {
@@ -323,6 +324,11 @@ SearchResults Searcher::search(const Board& board,
         results.ponder_move = main_line_results.ponder_move;
     }
 
+    results.search_stats.push_back(main_worker.results().stats);
+    for (const SearchWorker& worker: secondary_workers) {
+        results.search_stats.push_back(worker.results().stats);
+    }
+
     return results;
 }
 
@@ -443,6 +449,12 @@ static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
+    m_results.stats.main_search_nodes++;
+
+    if (!ROOT && alpha >= beta) {
+        return beta;
+    }
+
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
         node->pv[0] = MOVE_NULL;
@@ -525,6 +537,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         depth <= RFP_MAX_DEPTH &&
         alpha < MATE_THRESHOLD &&
         static_eval - rfp_margin > beta) {
+        m_results.stats.rfp_prunes++;
         return static_eval - rfp_margin;
     }
 
@@ -542,6 +555,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         undo_null_move();
 
         if (score >= beta) {
+            m_results.stats.null_move_prunes++;
             return beta;
         }
     }
@@ -556,6 +570,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (expected_mate_score < beta) {
         beta = expected_mate_score;
         if (alpha >= beta) {
+            m_results.stats.mdp_prunes++;
             return beta;
         }
     }
@@ -570,13 +585,21 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
 
     int move_idx = -1;
+    int best_move_idx = -1;
 
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
+    MovePickingStage prev_stage = MPS_NOT_STARTED;
+    MovePickingStage best_move_stage = move_picker.stage();
     Move move {};
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
         move_idx++;
+
+        if (move_picker.stage() != prev_stage) {
+            prev_stage = move_picker.stage();
+            m_results.stats.stages_data[prev_stage].reached++;
+        }
 
         // Skip unrequested moves.
         if (ROOT &&
@@ -603,6 +626,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             move_picker.stage() > MPS_KILLER_MOVES &&
             !in_check &&
             move.is_quiet()) {
+            m_results.stats.lmp_prunes++;
             continue;
         }
 
@@ -611,6 +635,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             !m_board.in_check()            &&
             move_picker.stage() > MPS_GOOD_CAPTURES &&
             !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
+            m_results.stats.see_prunes++;
             continue;
         }
 
@@ -623,6 +648,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             move.is_quiet()       &&
             (static_eval + FP_MARGIN) < alpha) {
             undo_move();
+            m_results.stats.fp_prunes++;
             continue;
         }
 
@@ -678,6 +704,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         if (score >= beta) {
             // Our search failed high.
+            best_move_idx = move_idx;
+            best_move_stage = move_picker.stage();
             alpha     = beta;
             best_move = move;
 
@@ -708,6 +736,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
         if (score > alpha) {
             // We've got a new best move.
+            best_move_idx = move_idx;
+            best_move_stage = move_picker.stage();
             alpha     = score;
             best_move = move;
 
@@ -746,20 +776,43 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (alpha >= beta) {
         // Beta-Cutoff, lowerbound score.
         tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
+        m_results.stats.cut_nodes++;
+        m_results.stats.best_move_indexes[best_move_idx]++;
+
+        if (!in_check) {
+            m_results.stats.stages_data[best_move_stage].best_move++;
+        }
+
+        if (best_move_idx == -1) {
+            std::cout << "CUT - BESTMOVE: " << best_move << " ALPHA: " << alpha << " BETA: " << beta << " ORIGINAL ALPHA: " << original_alpha << " FEN: " << m_board.fen() << std::endl;
+        }
     }
     else if (alpha <= original_alpha) {
         // Couldn't raise alpha, score is an upperbound.
         tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
+        m_results.stats.all_nodes++;
     }
     else {
         // We have an exact score.
         tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+        m_results.stats.pv_nodes++;
+        m_results.stats.best_move_indexes[best_move_idx]++;
+
+        if (!in_check) {
+            m_results.stats.stages_data[best_move_stage].best_move++;
+        }
+
+        if (best_move_idx == -1) {
+            std::cout << "PV - BESTMOVE: " << best_move << " FEN:" << m_board.fen() << std::endl;
+        }
     }
 
     return alpha;
 }
 
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
+    m_results.stats.qsearch_nodes++;
+
     Score stand_pat = evaluate();
 
     if (stand_pat >= beta) {
@@ -782,6 +835,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         // SEE pruning.
         if (move_picker.stage() >= MPS_BAD_CAPTURES &&
             !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
+            m_results.stats.qsee_prunes++;
             continue;
         }
 
