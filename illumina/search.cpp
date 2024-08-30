@@ -29,6 +29,8 @@ struct RootInfo {
 struct SearchNode {
     Depth ply = 0;
     Score static_eval = 0;
+    Move  current_move = MOVE_NULL;
+    int   current_move_num = 0;
     Move  pv[MAX_DEPTH];
 };
 
@@ -151,8 +153,6 @@ private:
     Board       m_board;
     bool        m_main;
     Depth       m_curr_depth = 1;
-    Move        m_curr_move  = MOVE_NULL;
-    int         m_curr_move_number = 0;
     int         m_curr_pv_idx = 0;
     int         m_eval_random_margin = 0;
     int         m_eval_random_seed = 0;
@@ -480,6 +480,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Depth ply              = node->ply;
     Score& static_eval     = node->static_eval;
 
+    // Get previous move played by this color in the search.
+    // Used later by follow-up move heuristic.
+    Move our_previous_move = (ply >= 2)
+                             ? (node - 2)->current_move
+                             : MOVE_NULL;
+
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
@@ -560,10 +566,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
-    // Kickstart our curr move counter for later reporting.
-    if constexpr (ROOT) {
-        m_curr_move_number = 0;
-    }
+    // Kickstart our curr move counter.
+    node->current_move_num = 0;
 
     // Store played quiet moves in this list.
     // Useful for history updates later on.
@@ -584,15 +588,16 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
+        // Update current move.
+        node->current_move_num++;
+        node->current_move = move;
+
         // Report 'currmove' and 'currmovenumber'.
         if constexpr (ROOT) {
-            m_curr_move_number++;
-            m_curr_move = move;
-
             if (m_main) {
                 m_context->listeners().curr_move_listener(m_curr_depth,
-                                                          m_curr_move,
-                                                          m_curr_move_number);
+                                                          node->current_move,
+                                                          node->current_move_num);
             }
         }
 
@@ -640,6 +645,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 // Further reduce moves that have been historically very bad.
                 reductions += m_hist.quiet_history(move,
                                                    m_board.last_move(),
+                                                   our_previous_move,
                                                    m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
@@ -688,6 +694,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 for (Move quiet: quiets_played) {
                     m_hist.update_quiet_history(quiet,
                                                 m_board.last_move(),
+                                                our_previous_move,
                                                 depth,
                                                 m_board.gives_check(quiet),
                                                 quiet == best_move);

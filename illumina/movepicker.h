@@ -45,7 +45,8 @@ public:
     explicit MovePicker(const Board& board,
                         Depth ply,
                         const MoveHistory& move_hist,
-                        Move hash_move = MOVE_NULL);
+                        Move hash_move = MOVE_NULL,
+                        Move our_previous_move = MOVE_NULL);
 
 private:
     struct MoveRange {
@@ -67,6 +68,7 @@ private:
     const MovePickingStage m_end_stage;
     const Move  m_hash_move;
     const Depth m_ply;
+    const Move  m_our_previous_move;
 
     void advance_stage();
 
@@ -270,12 +272,14 @@ template <bool QUIESCE>
 inline MovePicker<QUIESCE>::MovePicker(const Board& board,
                                        Depth ply,
                                        const MoveHistory& move_hist,
-                                       Move hash_move)
+                                       Move hash_move,
+                                       Move our_previous_move)
     : m_board(&board), m_ply(ply),
       m_hash_move(hash_move), m_mv_hist(&move_hist),
       m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
       m_curr_move_range({ &m_moves[0], &m_moves[0] }), m_moves_end(&m_moves[0]),
-      m_moves_it(&m_moves[0]) {
+      m_moves_it(&m_moves[0]),
+      m_our_previous_move(our_previous_move) {
 }
 
 template<bool QUIESCE>
@@ -440,7 +444,10 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
     }
     else {
-        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move(), m_board->gives_check(move)));
+        move.add_value(m_mv_hist->quiet_history(move,
+                                                m_board->last_move(),
+                                                m_our_previous_move,
+                                                m_board->gives_check(move)));
     }
 }
 
