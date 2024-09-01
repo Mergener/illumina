@@ -11,8 +11,8 @@
 namespace illumina {
 
 constexpr ui64 SEARCH_NODE_LIMIT    = 5128;
-constexpr int  MIN_RANDOM_PLIES     = 5;
-constexpr int  MAX_RANDOM_PLIES     = 12;
+constexpr int  MIN_RANDOM_PLIES     = 3;
+constexpr int  MAX_RANDOM_PLIES     = 8;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
 constexpr Score HI_SCORE            = 800;
 constexpr int MAX_HI_SCORE_PLIES    = 6;
@@ -47,7 +47,7 @@ Game simulate() {
     search_settings.max_nodes = SEARCH_NODE_LIMIT;
     search_settings.move_time = 10000;
 
-    Board board = Board::standard_startpos();
+    Board board = Board::random_frc_startpos(false);;
 
     // Play some random moves to apply variety to the
     // starting positions, but don't add positions that
@@ -65,7 +65,7 @@ Game simulate() {
             if (n_moves == 0) {
                 // Oops, we entered a stalemate or checkmate position.
                 // Rewind to the start.
-                board = Board::standard_startpos();
+                board = Board::random_frc_startpos(false);
                 i = -1;
                 continue;
             }
@@ -88,7 +88,7 @@ Game simulate() {
         if (std::abs(search_results.score) > 160) {
             // Position is excessively imbalanced.
             // Rewind to the start.
-            board = Board::standard_startpos();
+            board = Board::random_frc_startpos(false);
             continue;
         }
 
@@ -201,7 +201,7 @@ void generate_data(std::string_view out_file) {
                     continue;
                 }
 
-                out_tuples.push_back({ board.fen(), ply_data.white_pov_score, game.outcome });
+                out_tuples.push_back({ board.fen(true), ply_data.white_pov_score, game.outcome });
 
                 board.make_move(ply_data.best_move);
             }
