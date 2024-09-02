@@ -264,10 +264,10 @@ std::string Board::fen(bool shredder_fen) const {
     }
     else {
         if (has_castling_rights(CL_WHITE, SIDE_KING)) {
-            stream << (!shredder_fen ? 'K' : std::toupper(file_to_char(square_file(castle_rook_square(CL_WHITE, SIDE_KING)))));
+            stream << (!shredder_fen ? 'K' : char(std::toupper(file_to_char(square_file(castle_rook_square(CL_WHITE, SIDE_KING))))));
         }
         if (has_castling_rights(CL_WHITE, SIDE_QUEEN)) {
-            stream << (!shredder_fen ? 'Q' : std::toupper(file_to_char(square_file(castle_rook_square(CL_WHITE, SIDE_QUEEN)))));
+            stream << (!shredder_fen ? 'Q' : char(std::toupper(file_to_char(square_file(castle_rook_square(CL_WHITE, SIDE_QUEEN))))));
         }
         if (has_castling_rights(CL_BLACK, SIDE_KING)) {
             stream << (!shredder_fen ? 'k' : file_to_char(square_file(castle_rook_square(CL_BLACK, SIDE_KING))));
