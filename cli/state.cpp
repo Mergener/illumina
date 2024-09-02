@@ -46,7 +46,7 @@ void State::new_game() {
 
 void State::display_board() const {
     std::cout << m_board.pretty()         << std::endl;
-    std::cout << "FEN: " << m_board.fen() << std::endl;
+    std::cout << "FEN: " << m_board.fen(m_options.option<UCIOptionCheck>("UCI_Chess960").value()) << std::endl;
 }
 
 const Board& State::board() const {
