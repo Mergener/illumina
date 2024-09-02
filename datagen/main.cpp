@@ -10,9 +10,14 @@
 
 namespace illumina {
 
+constexpr enum {
+    STD,
+    FRC,
+    DFRC
+} STARTPOS_MODE = DFRC;
 constexpr ui64 SEARCH_NODE_LIMIT    = 5128;
-constexpr int  MIN_RANDOM_PLIES     = 5;
-constexpr int  MAX_RANDOM_PLIES     = 12;
+constexpr int  MIN_RANDOM_PLIES     = 4;
+constexpr int  MAX_RANDOM_PLIES     = 10;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
 constexpr Score HI_SCORE            = 800;
 constexpr int MAX_HI_SCORE_PLIES    = 6;
@@ -36,6 +41,12 @@ struct OutputTuple {
     std::string wdl;
 };
 
+Board generate_startpos() {
+    return STARTPOS_MODE == STD
+         ? Board::standard_startpos()
+         : Board::random_frc_startpos(STARTPOS_MODE == FRC);
+}
+
 Game simulate() {
     Game game;
 
@@ -47,7 +58,7 @@ Game simulate() {
     search_settings.max_nodes = SEARCH_NODE_LIMIT;
     search_settings.move_time = 10000;
 
-    Board board = Board::standard_startpos();
+    Board board = generate_startpos();
 
     // Play some random moves to apply variety to the
     // starting positions, but don't add positions that
@@ -65,7 +76,7 @@ Game simulate() {
             if (n_moves == 0) {
                 // Oops, we entered a stalemate or checkmate position.
                 // Rewind to the start.
-                board = Board::standard_startpos();
+                board = generate_startpos();
                 i = -1;
                 continue;
             }
@@ -88,7 +99,7 @@ Game simulate() {
         if (std::abs(search_results.score) > 160) {
             // Position is excessively imbalanced.
             // Rewind to the start.
-            board = Board::standard_startpos();
+            board = generate_startpos();
             continue;
         }
 
@@ -112,8 +123,8 @@ Game simulate() {
         // Save position data.
         ply_data.best_move = best_move;
         ply_data.white_pov_score = board.color_to_move() == CL_WHITE
-            ? search_results.score
-            : -search_results.score;
+                                 ?  search_results.score
+                                 : -search_results.score;
 
         ply_data.white_pov_score = std::clamp(ply_data.white_pov_score, -3000, 3000);
 
@@ -124,14 +135,14 @@ Game simulate() {
         // be used for win adjudications.
         if (ply_data.white_pov_score >= HI_SCORE) {
             hi_score_plies = hi_score_player == CL_WHITE
-                ? hi_score_plies + 1
-                : 1;
+                           ? hi_score_plies + 1
+                           : 1;
             hi_score_player = CL_WHITE;
         }
         else if (ply_data.white_pov_score <= -HI_SCORE) {
             hi_score_plies = hi_score_player == CL_BLACK
-                             ? hi_score_plies + 1
-                             : 1;
+                           ? hi_score_plies + 1
+                           : 1;
             hi_score_player = CL_BLACK;
         }
         else {
@@ -143,7 +154,8 @@ Game simulate() {
         // we can adjudicate a win for the better side.
         if (hi_score_plies >= MAX_HI_SCORE_PLIES) {
             game.outcome = hi_score_player == CL_WHITE
-                ? "1.0" : "0";
+                         ? "1.0"
+                         : "0";
             break;
         }
 
