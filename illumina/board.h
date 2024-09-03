@@ -58,7 +58,7 @@ public:
     bool           is_attacked_by(Color c, Square s) const;
     bool           is_attacked_by(Color c, Square s, Bitboard occ) const;
     bool           gives_check(Move move) const;
-    std::string    fen() const;
+    std::string    fen(bool shredder_fen = false) const;
     std::string    pretty() const;
     bool           is_50_move_rule_draw() const;
     bool           is_repetition_draw(int max_appearances = 3) const;

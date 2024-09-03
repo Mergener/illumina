@@ -220,33 +220,33 @@ Board::Board(std::string_view fen_str) {
     }
 }
 
-std::string Board::fen() const {
+std::string Board::fen(bool shredder_fen) const {
     std::stringstream stream;
 
     // Write piece placements.
     for (BoardRank r: RANKS_REVERSE) {
-        int emptyCount = 0;
+        int n_empty = 0;
 
         for (BoardFile f: FILES) {
             Square s = make_square(f, r);
             Piece p  = piece_at(s);
 
             if (p != PIECE_NULL) {
-                if (emptyCount > 0) {
-                    stream << emptyCount;
-                    emptyCount = 0;
+                if (n_empty > 0) {
+                    stream << n_empty;
+                    n_empty = 0;
                 }
 
                 stream << p.to_char();
             }
             else {
-                emptyCount++;
+                n_empty++;
             }
         }
 
-        if (emptyCount > 0) {
-            stream << emptyCount;
-            emptyCount = 0;
+        if (n_empty > 0) {
+            stream << n_empty;
+            n_empty = 0;
         }
 
         if (r > RNK_1) {
@@ -264,24 +264,24 @@ std::string Board::fen() const {
     }
     else {
         if (has_castling_rights(CL_WHITE, SIDE_KING)) {
-            stream << 'K';
+            stream << (!shredder_fen ? 'K' : char(std::toupper(file_to_char(square_file(castle_rook_square(CL_WHITE, SIDE_KING))))));
         }
         if (has_castling_rights(CL_WHITE, SIDE_QUEEN)) {
-            stream << 'Q';
+            stream << (!shredder_fen ? 'Q' : char(std::toupper(file_to_char(square_file(castle_rook_square(CL_WHITE, SIDE_QUEEN))))));
         }
         if (has_castling_rights(CL_BLACK, SIDE_KING)) {
-            stream << 'k';
+            stream << (!shredder_fen ? 'k' : file_to_char(square_file(castle_rook_square(CL_BLACK, SIDE_KING))));
         }
         if (has_castling_rights(CL_BLACK, SIDE_QUEEN)) {
-            stream << 'q';
+            stream << (!shredder_fen ? 'q' : file_to_char(square_file(castle_rook_square(CL_BLACK, SIDE_QUEEN))));
         }
     }
     stream << ' ';
 
     // Write en-passant square.
-    Square epSquare = ep_square();
-    if (epSquare != SQ_NULL) {
-        stream << square_name(ep_square());
+    Square ep_sq = ep_square();
+    if (ep_sq != SQ_NULL) {
+        stream << square_name(ep_sq);
     }
     else {
         stream << '-';

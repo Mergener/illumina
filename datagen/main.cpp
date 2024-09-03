@@ -16,8 +16,8 @@ constexpr enum {
     DFRC
 } STARTPOS_MODE = DFRC;
 constexpr ui64 SEARCH_NODE_LIMIT    = 5128;
-constexpr int  MIN_RANDOM_PLIES     = 4;
-constexpr int  MAX_RANDOM_PLIES     = 10;
+constexpr int  MIN_RANDOM_PLIES     = 3;
+constexpr int  MAX_RANDOM_PLIES     = 8;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
 constexpr Score HI_SCORE            = 800;
 constexpr int MAX_HI_SCORE_PLIES    = 6;
@@ -213,7 +213,7 @@ void generate_data(std::string_view out_file) {
                     continue;
                 }
 
-                out_tuples.push_back({ board.fen(), ply_data.white_pov_score, game.outcome });
+                out_tuples.push_back({ board.fen(STARTPOS_MODE != STD), ply_data.white_pov_score, game.outcome });
 
                 board.make_move(ply_data.best_move);
             }
