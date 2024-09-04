@@ -122,6 +122,8 @@ struct WorkerResults {
         Move ponder_move = MOVE_NULL;
         Score score = 0;
         BoundType bound_type = BT_EXACT;
+        ui64 best_move_nodes = 0;
+        ui64 pv_nodes = 0;
     } pv_results[MAX_PVS];
     Depth sel_depth   = 0;
     ui64  nodes       = 0;
@@ -354,9 +356,12 @@ void SearchWorker::iterative_deepening() {
                 m_results.pv_results[m_curr_pv_idx].best_move = m_search_moves[0];
             }
 
+            ui64 prev_nodes = m_results.nodes;
+
             check_limits();
             aspiration_windows();
             m_results.searched_depth = m_curr_depth;
+            m_results.pv_results[m_curr_pv_idx].pv_nodes = m_results.nodes - prev_nodes;
             check_limits();
             if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
@@ -443,12 +448,12 @@ static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
-    // Initialize the PV line with a null move. Specially useful for all-nodes.
+    // Initialize the PV line with a null move. Specially useful for all-total_nodes.
     if constexpr (PV) {
         node->pv[0] = MOVE_NULL;
     }
 
-    // Don't search nodes with closed bounds.
+    // Don't search total_nodes with closed bounds.
     if (!ROOT && alpha >= beta) {
         return beta;
     }
@@ -658,6 +663,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             reductions = std::clamp(reductions, 0, depth);
         }
 
+        ui64 nodes_before = m_results.nodes;
+
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
@@ -674,6 +681,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         undo_move();
+
+        ui64 nodes_spent = m_results.nodes - nodes_before;
 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
@@ -720,6 +729,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             if (ROOT && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
                 m_results.pv_results[m_curr_pv_idx].score     = alpha;
+                m_results.pv_results[m_curr_pv_idx].best_move_nodes = nodes_spent;
             }
 
             // Update the PV table.
@@ -844,12 +854,14 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
     pv_results.score      = m_results.pv_results[m_curr_pv_idx].score;
     pv_results.time       = m_context->elapsed();
     pv_results.bound_type = m_results.pv_results[m_curr_pv_idx].bound_type;
+    pv_results.pv_nodes   = m_results.pv_results[m_curr_pv_idx].pv_nodes;
+    pv_results.best_move_nodes = m_results.pv_results[m_curr_pv_idx].best_move_nodes;
 
     ui64 total_nodes = m_results.nodes;
     for (const SearchWorker& worker: m_context->helper_workers()) {
         total_nodes += worker.results().nodes;
     }
-    pv_results.nodes = total_nodes;
+    pv_results.total_nodes = total_nodes;
 
     // Extract the PV line.
     pv_results.line.clear();
@@ -875,9 +887,7 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
 
     // Notify the time manager that we finished a pv iteration.
     if (m_main) {
-        m_context->time_manager().on_new_pv(pv_results.depth,
-                                            pv_results.best_move,
-                                            pv_results.score);
+        m_context->time_manager().on_new_pv(pv_results);
     }
 
     // Notify whoever else needs to know about it.

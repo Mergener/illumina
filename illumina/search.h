@@ -18,7 +18,9 @@ struct PVResults {
     Depth sel_depth;
     Move  best_move;
     Score score;
-    ui64  nodes;
+    ui64  total_nodes;
+    ui64  pv_nodes;
+    ui64  best_move_nodes;
     ui64  time;
     BoundType bound_type;
     std::vector<Move> line;

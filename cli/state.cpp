@@ -251,8 +251,8 @@ void State::setup_searcher() {
         if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
         std::cout << " pv "       << pv_to_string(res.line, m_board, m_frc);
         std::cout << " hashfull " << m_searcher.tt().hash_full()
-                  << " nodes "    << res.nodes
-                  << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
+                  << " nodes "    << res.total_nodes
+                  << " nps "      << ui64((double(res.total_nodes) / (double(res.time) / 1000.0)))
                   << " time "     << res.time
                   << std::endl;
     });
