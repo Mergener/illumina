@@ -24,6 +24,8 @@ private:
     Color m_ctm;
 };
 
+Score normalize_eval(const Board& board, Score eval);
+
 } // illumina
 
 #endif // ILLUMINA_EVALUATION_H

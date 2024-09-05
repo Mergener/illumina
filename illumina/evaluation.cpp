@@ -2,6 +2,8 @@
 
 #include "endgame.h"
 
+#include <cmath>
+
 namespace illumina {
 
 void Evaluation::on_new_board(const Board& board) {
@@ -83,6 +85,23 @@ void Evaluation::on_undo_null_move(const Board& board) {
 
 Score Evaluation::get() const {
     return std::clamp(m_nnue.forward(m_ctm), -KNOWN_WIN + 1, KNOWN_WIN - 1);
+}
+
+Score normalize_eval(const Board& board, Score eval) {
+    // Evaluation model based on Stockfish's evaluation model.
+    // Reference: https://github.com/official-stockfish/WDL_model
+    constexpr double AS[] = {-37.45051876, 121.19101539, -132.78783573, 420.70576692};
+
+    Score material = popcount(board.piece_type_bb(PT_PAWN))   * 1
+                   + popcount(board.piece_type_bb(PT_KNIGHT)) * 3
+                   + popcount(board.piece_type_bb(PT_BISHOP)) * 3
+                   + popcount(board.piece_type_bb(PT_ROOK))   * 5
+                   + popcount(board.piece_type_bb(PT_QUEEN))  * 9;
+
+    double m = std::clamp(material, 17, 78) / 58.0;
+    double a = (((AS[0] * m + AS[1]) * m + AS[2]) * m) + AS[3];
+
+    return std::round(200.0 * double(eval) / a);
 }
 
 } // illumina
