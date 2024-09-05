@@ -61,6 +61,9 @@ static MovePickingStage classify_move_stage(Move move,
         if (!quiesce && mv_hist.is_killer(ply, move)) {
             return std::min(MovePickingStage(MPS_KILLER_MOVES), expected_stage);
         }
+        if (!quiesce && move == mv_hist.counter_move(board.last_move())) {
+            return std::min(MovePickingStage(MPS_COUNTER_MOVES), expected_stage);
+        }
         return expected_stage;
     }
     MovePickingStage expected_stage;
@@ -124,7 +127,8 @@ void test_move_picker() {
                     // Save all history.
                     for (auto& h: history) {
                         auto [depth, src, dest] = h;
-                        mv_hist.update_quiet_history(Move::new_normal(src, dest, WHITE_QUEEN), MOVE_NULL, depth, true);
+                        Move move = Move::new_normal(src, dest, WHITE_QUEEN);
+                        mv_hist.update_quiet_history(move, MOVE_NULL, depth, board.gives_check(move), true);
                     }
                 }
             }
@@ -161,7 +165,7 @@ void test_move_picker() {
                     for (int i = 0; i < 100; ++i) {
                         // Pick a move.
                         Move move = validation_moves[random(size_t(0), n_expected_moves)];
-                        mv_hist.update_quiet_history(move, MOVE_NULL, random(1, 15), true);
+                        mv_hist.update_quiet_history(move, MOVE_NULL, random(1, 15), board.gives_check(move), true);
                     }
                 }
                 else {

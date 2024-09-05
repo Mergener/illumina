@@ -23,6 +23,7 @@ enum {
     MPS_EP,
     MPS_KILLER_MOVES,
     MPS_BAD_CAPTURES,
+    MPS_COUNTER_MOVES,
     MPS_QUIET,
     MPS_END_NOT_CHECK,
 
@@ -78,6 +79,7 @@ private:
     void generate_quiet_evasions();
     void generate_noisy_evasions();
     void generate_killer_moves();
+    void generate_counter_moves();
     void generate_hash_move();
 };
 
@@ -242,6 +244,19 @@ void MovePicker<QUIESCE>::generate_killer_moves() {
 }
 
 template<bool QUIESCE>
+void MovePicker<QUIESCE>::generate_counter_moves() {
+    SearchMove* begin = m_moves_end;
+
+    Move counter_move = m_mv_hist->counter_move(m_board->last_move());
+    if (m_board->is_move_pseudo_legal(counter_move)) {
+        *begin = counter_move;
+        m_moves_end++;
+    }
+
+    m_curr_move_range = { begin, m_moves_end };
+}
+
+template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_quiets() {
     constexpr ui64 MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH) | BIT(MT_CASTLES);
     SearchMove* begin = m_moves_end;
@@ -321,6 +336,17 @@ void MovePicker<QUIESCE>::advance_stage() {
                 }
 
                 generate_killer_moves();
+                break;
+            }
+
+            case MPS_COUNTER_MOVES: {
+                if (QUIESCE) {
+                    // Skip this stage on quiescence search.
+                    advance_stage();
+                    return;
+                }
+
+                generate_counter_moves();
                 break;
             }
 
@@ -406,7 +432,15 @@ inline Move MovePicker<QUIESCE>::next() {
     if (!QUIESCE &&
         m_mv_hist->is_killer(m_ply, move) &&
         (m_stage != MPS_KILLER_MOVES      &&
-        m_stage != MPS_KILLER_EVASIONS)) {
+         m_stage != MPS_KILLER_EVASIONS)) {
+        return next();
+    }
+
+    // Prevent counter move revisits.
+    bool is_counter_move = move == m_mv_hist->counter_move(m_board->last_move());
+    if (!QUIESCE &&
+        is_counter_move &&
+        (m_stage > MPS_COUNTER_MOVES)) {
         return next();
     }
 

@@ -32,6 +32,8 @@ public:
     void set_killer(Depth ply, Move killer);
     void reset();
 
+    Move counter_move(Move previous_move) const;
+
     int  quiet_history(Move move, Move last_move, bool gives_check) const;
     void update_quiet_history(Move move,
                               Move last_move,
@@ -50,6 +52,7 @@ private:
         ButterflyArray<int> m_quiet_history {};
         PieceToArray<PieceToArray<int>> m_counter_move_history {};
         PieceToArray<int> m_check_history {};
+        PieceToArray<Move> counter_moves {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
@@ -121,6 +124,10 @@ inline void MoveHistory::update_quiet_history(Move move,
     if (gives_check) {
         update_history(m_data->m_check_history.get(move), depth, good);
     }
+
+    if (good) {
+        m_data->counter_moves.get(last_move) = move;
+    }
 }
 
 inline void MoveHistory::update_history(int& history,
@@ -131,6 +138,10 @@ inline void MoveHistory::update_history(int& history,
               : (MV_HIST_QUIET_HIGH_DEPTH_FACTOR * depth * depth);
     int sign  = good ? 1 : -1;
     history  += (sign * delta) - std::min(history, MAX_HISTORY) * delta / MAX_HISTORY;
+}
+
+inline Move MoveHistory::counter_move(Move previous_move) const {
+    return m_data->counter_moves.get(previous_move);
 }
 
 inline MoveHistory::MoveHistory() {
