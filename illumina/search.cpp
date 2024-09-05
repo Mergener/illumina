@@ -636,7 +636,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         if (n_searched_moves >= LMR_MIN_MOVE_IDX &&
             depth >= LMR_MIN_DEPTH &&
             !in_check              &&
-            !m_board.in_check()) {
+            (!m_board.in_check() || !has_good_see(m_board, move.source(), move.destination(), 0))) {
             reductions = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
                 // Further reduce moves that are not improving the static evaluation.
@@ -645,7 +645,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 // Further reduce moves that have been historically very bad.
                 reductions += m_hist.quiet_history(move,
                                                    m_board.last_move(),
-                                                   m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
+                                                   m_board.in_check()) <= LMR_BAD_HISTORY_THRESHOLD;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
