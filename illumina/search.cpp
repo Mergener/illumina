@@ -631,11 +631,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             !in_check &&
             hash_move != MOVE_NULL &&
             tt_entry.bound_type() != BT_UPPERBOUND &&
-            depth >= 8 &&
+            depth >= 6 &&
             move == hash_move &&
             depth - tt_entry.depth() >= 3 &&
             std::abs(tt_entry.score()) < MATE_THRESHOLD) {
-            Score se_beta = std::min(beta, tt_entry.score() - 60);
+            Score se_beta = std::min(beta, tt_entry.score() - depth);
 
             node->skip_move = move;
             Score score = pvs<PV>((depth - 1) / 2, se_beta - 1, se_beta, node);
@@ -653,6 +653,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Futility pruning.
         if (depth <= FP_MAX_DEPTH &&
+            move != hash_move     &&
             !in_check             &&
             !m_board.in_check()   &&
             move.is_quiet()       &&
@@ -778,17 +779,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Store in transposition table.
-    if (alpha >= beta) {
-        // Beta-Cutoff, lowerbound score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
-    }
-    else if (alpha <= original_alpha) {
-        // Couldn't raise alpha, score is an upperbound.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
-    }
-    else {
-        // We have an exact score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+    // Don't store in singular searches.
+    if (node->skip_move == MOVE_NULL) {
+        if (alpha >= beta) {
+            // Beta-Cutoff, lowerbound score.
+            tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
+        } else if (alpha <= original_alpha) {
+            // Couldn't raise alpha, score is an upperbound.
+            tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
+        } else {
+            // We have an exact score.
+            tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+        }
     }
 
     return alpha;
