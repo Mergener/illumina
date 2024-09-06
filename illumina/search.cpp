@@ -505,6 +505,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             else {
                 beta = std::min(beta, tt_entry.score());
             }
+
+            if (alpha >= beta) {
+                return alpha;
+            }
         }
     }
 
