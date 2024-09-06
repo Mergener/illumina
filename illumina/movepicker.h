@@ -248,7 +248,7 @@ void MovePicker<QUIESCE>::generate_counter_moves() {
     SearchMove* begin = m_moves_end;
 
     Move counter_move = m_mv_hist->counter_move(m_board->last_move());
-    if (m_board->is_move_pseudo_legal(counter_move)) {
+    if (counter_move.is_quiet() && m_board->is_move_pseudo_legal(counter_move)) {
         *begin = counter_move;
         m_moves_end++;
     }
@@ -440,6 +440,7 @@ inline Move MovePicker<QUIESCE>::next() {
     bool is_counter_move = move == m_mv_hist->counter_move(m_board->last_move());
     if (!QUIESCE &&
         is_counter_move &&
+        !m_board->in_check() &&
         (m_stage > MPS_COUNTER_MOVES)) {
         return next();
     }

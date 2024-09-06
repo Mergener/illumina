@@ -52,7 +52,7 @@ private:
         ButterflyArray<int> m_quiet_history {};
         PieceToArray<PieceToArray<int>> m_counter_move_history {};
         PieceToArray<int> m_check_history {};
-        PieceToArray<Move> counter_moves {};
+        ButterflyArray<Move> counter_moves {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
