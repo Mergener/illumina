@@ -544,7 +544,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         !in_check  &&
         popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES &&
         static_eval >= beta &&
-        depth >= NMP_MIN_DEPTH) {
+        depth >= NMP_MIN_DEPTH &&
+        node->skip_move == MOVE_NULL) {
         Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
 
         make_null_move();
@@ -595,6 +596,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         if (move == node->skip_move) {
+//            std::cout << "Skipping expected singular " << move.to_uci() << " at " << m_board.fen() << std::endl;
             continue;
         }
 
@@ -635,20 +637,22 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             !in_check &&
             hash_move != MOVE_NULL &&
             tt_entry.bound_type() != BT_UPPERBOUND &&
-            depth >= 6 &&
+            depth >= 8 &&
             move == hash_move &&
-            depth - tt_entry.depth() >= 3 &&
+            (depth - tt_entry.depth()) >= 3 &&
             std::abs(tt_entry.score()) < MATE_THRESHOLD) {
-            Score se_beta = std::min(beta, tt_entry.score() - depth);
+            Score se_beta = std::min(beta, tt_entry.score() - 50);
 
             node->skip_move = move;
-            Score score = pvs<PV>((depth - 1) / 2, se_beta - 1, se_beta, node);
+            Score score = pvs<false>((depth - 1) / 2, se_beta - 1, se_beta, node);
             node->skip_move = MOVE_NULL;
 
             if (score < se_beta) {
+//                std::cout << "Got singular move " << move.to_uci() << " at depth " << depth << " in FEN " << m_board.fen() << std::endl;
                 extensions++;
             }
             else if (score >= beta) {
+//                std::cout << "******** MULTICUT **********" << std::endl;
                 return score;
             }
         }
