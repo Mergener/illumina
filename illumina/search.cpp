@@ -494,7 +494,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (found_in_tt) {
         hash_move = tt_entry.move();
 
-        if (!PV && tt_entry.depth() >= depth) {
+        if (!PV && node->skip_move == MOVE_NULL && tt_entry.depth() >= depth) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff.
                 return tt_entry.score();
@@ -532,6 +532,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
     if (!PV        &&
         !in_check  &&
+        node->skip_move == MOVE_NULL &&
         depth <= RFP_MAX_DEPTH &&
         alpha < MATE_THRESHOLD &&
         static_eval - rfp_margin > beta) {
@@ -587,16 +588,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
+        if (move == node->skip_move) {
+            continue;
+        }
+
         move_idx++;
 
         // Skip unrequested moves.
         if (ROOT &&
             std::find(m_search_moves.begin(), m_search_moves.end(), move) == m_search_moves.end()) {
-            continue;
-        }
-
-        if (move == node->skip_move) {
-//            std::cout << "Skipping expected singular " << move.to_uci() << " at " << m_board.fen() << std::endl;
             continue;
         }
 
@@ -641,19 +641,17 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             move == hash_move &&
             (depth - tt_entry.depth()) >= 3 &&
             std::abs(tt_entry.score()) < MATE_THRESHOLD) {
-            Score se_beta = std::min(beta, tt_entry.score() - 50);
+            Score se_beta = std::min(beta, tt_entry.score() - depth * 2);
 
             node->skip_move = move;
             Score score = pvs<false>((depth - 1) / 2, se_beta - 1, se_beta, node);
             node->skip_move = MOVE_NULL;
 
             if (score < se_beta) {
-//                std::cout << "Got singular move " << move.to_uci() << " at depth " << depth << " in FEN " << m_board.fen() << std::endl;
                 extensions++;
             }
             else if (score >= beta) {
-//                std::cout << "******** MULTICUT **********" << std::endl;
-                return score;
+                return beta;
             }
         }
 
