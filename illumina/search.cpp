@@ -624,17 +624,16 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
-        make_move(move);
-
         // Futility pruning.
-        if (depth <= FP_MAX_DEPTH &&
-            !in_check             &&
-            !m_board.in_check()   &&
-            move.is_quiet()       &&
-            (static_eval + FP_MARGIN) < alpha) {
-            undo_move();
+        if (depth <= FP_MAX_DEPTH      &&
+            !in_check                  &&
+            move.is_quiet()            &&
+            (static_eval + FP_MARGIN) < alpha &&
+            !m_board.gives_check(move)) {
             continue;
         }
+
+        make_move(move);
 
         // Late move reductions.
         Depth reductions = 0;
