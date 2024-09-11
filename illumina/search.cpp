@@ -441,6 +441,10 @@ void SearchWorker::aspiration_windows() {
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
+static bool is_close_to_promotion(Square s, Color pawn_color) {
+    return square_rank(s) == (promotion_rank(pawn_color) - pawn_push_direction(pawn_color));
+}
+
 template<bool PV, bool SKIP_NULL, bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
     // Initialize the PV line with a null move. Specially useful for all-nodes.
@@ -615,12 +619,23 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
-        // SEE pruning.
+        Depth reductions = 0;
+
+        // SEE pruning/reductions.
         if (depth <= SEE_PRUNING_MAX_DEPTH &&
             !m_board.in_check()            &&
             move_picker.stage() > MPS_GOOD_CAPTURES &&
             !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
-            continue;
+
+            // SEE pruning might yield some tactical blindness.
+            // Check for special conditions to circumvent that.
+            Color them = opposite_color(move.source_piece().color());
+            if (!m_board.gives_check(move)) {
+                continue;
+            }
+
+            // Potentially tactical position. Reduce instead of pruning.
+            reductions = std::max(depth - 2, 0);
         }
 
         make_move(move);
@@ -636,7 +651,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         // Late move reductions.
-        Depth reductions = 0;
         if (n_searched_moves >= LMR_MIN_MOVE_IDX &&
             depth >= LMR_MIN_DEPTH &&
             !in_check              &&
