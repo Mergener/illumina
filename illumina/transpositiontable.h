@@ -38,7 +38,7 @@ private:
                  ui8 generation);
 };
 
-constexpr size_t TT_DEFAULT_SIZE_MB = 8;
+constexpr size_t TT_DEFAULT_SIZE_MB = 32;
 
 class TranspositionTable {
 public:
