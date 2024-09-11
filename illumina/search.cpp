@@ -303,6 +303,7 @@ SearchResults Searcher::search(const Board& board,
 
         if (result_score > best_result_score) {
             selected_results = &results;
+            best_result_score = result_score;
         }
     }
 
