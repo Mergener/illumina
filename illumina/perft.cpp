@@ -83,7 +83,7 @@ ui64 perft(const Board& board, int depth, PerftArgs args) {
 }
 
 template <bool ROOT = false, bool LOG = false>
-static ui64 move_picker_perft_internal(MoveHistory& mv_hist, Board& board, int depth) {
+static ui64 move_picker_perft_internal(History& mv_hist, Board& board, int depth) {
     if (depth <= 0) {
         return 1;
     }
@@ -109,7 +109,7 @@ static ui64 move_picker_perft_internal(MoveHistory& mv_hist, Board& board, int d
 
 ui64 move_picker_perft(const Board& board, int depth, PerftArgs args) {
     Board replica = board;
-    MoveHistory mv_hist;
+    History mv_hist;
     if (args.log) {
         log_init();
         TimePoint before = now();

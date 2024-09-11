@@ -6,7 +6,7 @@
 #include "staticlist.h"
 #include "searchdefs.h"
 #include "movegen.h"
-#include "movehistory.h"
+#include "history.h"
 
 #include <iostream>
 
@@ -44,7 +44,7 @@ public:
 
     explicit MovePicker(const Board& board,
                         Depth ply,
-                        const MoveHistory& move_hist,
+                        const History& move_hist,
                         Move hash_move = MOVE_NULL);
 
 private:
@@ -63,7 +63,7 @@ private:
 
     // Context-related fields
     const Board* m_board;
-    const MoveHistory* m_mv_hist;
+    const History* m_mv_hist;
     const MovePickingStage m_end_stage;
     const Move  m_hash_move;
     const Depth m_ply;
@@ -269,7 +269,7 @@ void MovePicker<QUIESCE>::generate_hash_move() {
 template <bool QUIESCE>
 inline MovePicker<QUIESCE>::MovePicker(const Board& board,
                                        Depth ply,
-                                       const MoveHistory& move_hist,
+                                       const History& move_hist,
                                        Move hash_move)
     : m_board(&board), m_ply(ply),
       m_hash_move(hash_move), m_mv_hist(&move_hist),

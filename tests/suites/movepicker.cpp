@@ -25,7 +25,7 @@ static void score_move(MovePicker<QUIESCE>& mp, SearchMove& move, bool check) {
 static MovePickingStage classify_move_stage(Move move,
                                             const Board& board,
                                             Move hash_move,
-                                            const MoveHistory& mv_hist,
+                                            const History& mv_hist,
                                             Depth ply,
                                             bool quiesce) {
     if (move == hash_move) {
@@ -107,7 +107,7 @@ void test_move_picker() {
             size_t n_expected_moves = validation_moves_end - validation_moves;
 
             Move hash_move;
-            MoveHistory mv_hist;
+            History mv_hist;
 
             if constexpr (!METAMORPHIC) {
                 if (n_expected_moves > 0) {

@@ -146,7 +146,7 @@ private:
     const SearchContext*  m_context;
     WorkerResults         m_results;
 
-    MoveHistory m_hist;
+    History m_hist;
     Evaluation  m_eval {};
     Board       m_board;
     bool        m_main;
