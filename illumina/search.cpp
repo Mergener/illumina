@@ -304,6 +304,7 @@ SearchResults Searcher::search(const Board& board,
 
         if (result_score > best_result_score) {
             selected_results = &results;
+            best_result_score = result_score;
         }
     }
 
@@ -630,6 +631,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
+        // Futility pruning.
+        if (depth <= FP_MAX_DEPTH      &&
+            !in_check                  &&
+            move.is_quiet()            &&
+            (static_eval + FP_MARGIN) < alpha &&
+            !m_board.gives_check(move)) {
+            continue;
+        }
+
         // Singular extensions.
         Depth extensions = 0;
         if (!ROOT &&
@@ -656,17 +666,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         make_move(move);
-
-        // Futility pruning.
-        if (depth <= FP_MAX_DEPTH &&
-            move != hash_move     &&
-            !in_check             &&
-            !m_board.in_check()   &&
-            move.is_quiet()       &&
-            (static_eval + FP_MARGIN) < alpha) {
-            undo_move();
-            continue;
-        }
 
         // Late move reductions.
         Depth reductions = 0;
