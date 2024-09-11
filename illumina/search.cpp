@@ -642,26 +642,23 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Singular extensions.
         Depth extensions = 0;
-        if (!ROOT &&
-            node->skip_move == MOVE_NULL &&
+        if (!ROOT     &&
             !in_check &&
-            hash_move != MOVE_NULL &&
+            hash_move != MOVE_NULL       &&
+            node->skip_move == MOVE_NULL &&
             tt_entry.bound_type() != BT_UPPERBOUND &&
-            depth >= 8 &&
+            depth >= 8        &&
             move == hash_move &&
-            (depth - tt_entry.depth()) >= 3 &&
+            tt_entry.depth() >= (depth - 3) &&
             std::abs(tt_entry.score()) < MATE_THRESHOLD) {
             Score se_beta = std::min(beta, tt_entry.score() - depth * 2);
 
             node->skip_move = move;
-            Score score = pvs<false>((depth - 1) / 2, se_beta - 1, se_beta, node);
+            Score score = pvs<false>(depth / 2, se_beta - 1, se_beta, node);
             node->skip_move = MOVE_NULL;
 
             if (score < se_beta) {
                 extensions++;
-            }
-            else if (score >= beta) {
-                return beta;
             }
         }
 
