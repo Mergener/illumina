@@ -28,7 +28,8 @@ public:
     bool running() const;
     void stop();
 
-    void on_new_pv(const PVResults& pv_results);
+    void on_new_pv(const PVResults& pv_results,
+                   const Board& board);
 
     TimeManager();
 
@@ -36,11 +37,12 @@ private:
     TimePoint m_time_start {};
     ui64 m_soft_bound = 0;
     ui64 m_hard_bound = 0;
-    ui64 m_last_search_duration = 0;
+    ui64 m_last_search_duration = 1;
     bool m_running = false;
     bool m_tourney_time = false;
 
     ui64 m_last_depth_elapsed_time = 1;
+    Move m_last_best_move = MOVE_NULL;
 
     void setup(bool tourney_time);
     void set_starting_bounds(ui64 soft, ui64 hard);
@@ -72,9 +74,6 @@ inline void TimeManager::stop() {
 inline void TimeManager::set_starting_bounds(ui64 soft, ui64 hard) {
     m_soft_bound = soft;
     m_hard_bound = hard;
-
-    std::cout << m_soft_bound << std::endl;
-    std::cout << m_hard_bound << std::endl;
 }
 
 inline void TimeManager::start_movetime(ui64 movetime_ms) {
@@ -110,11 +109,11 @@ inline ui64 TimeManager::hard_bound() const {
 }
 
 inline bool TimeManager::finished_soft() const {
-    return !m_running || (m_running && delta_ms(now(), m_time_start) >= m_soft_bound);
+    return m_running && delta_ms(now(), m_time_start) >= m_soft_bound;
 }
 
 inline bool TimeManager::finished_hard() const {
-    return !m_running || (m_running &  delta_ms(now(), m_time_start) >= m_hard_bound);
+    return m_running && delta_ms(now(), m_time_start) >= m_hard_bound;
 }
 
 inline TimeManager::TimeManager() {
