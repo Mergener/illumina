@@ -6,6 +6,7 @@
 #include <string_view>
 #include <iostream>
 
+#include "tunablevalues.h"
 #include "debug.h"
 
 //
@@ -603,6 +604,12 @@ constexpr char piece_type_to_char(PieceType pt) {
 
     return "-pnbrqk"[pt];
 }
+
+constexpr int PIECE_VALUES[] = {
+    0, PAWN_VALUE, KNIGHT_VALUE,
+    BISHOP_VALUE, ROOK_VALUE, QUEEN_VALUE,
+    10000000
+};
 
 class Piece {
 public:
