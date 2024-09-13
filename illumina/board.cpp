@@ -411,7 +411,7 @@ void Board::undo_move() {
     set_color_to_move(opposite_color(color_to_move()));
     Color moving_color = color_to_move();
 
-    Move move = last_move();
+    Move move = previous_move();
 
     Square source       = move.source();
     Square destination  = move.destination();

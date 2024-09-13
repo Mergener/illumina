@@ -648,7 +648,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
                 // Further reduce moves that have been historically very bad.
                 reductions += m_hist.quiet_history(move,
-                                                   m_board.last_move(),
+                                                   m_board.previous_move(1),
+                                                   m_board.previous_move(2),
                                                    m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
@@ -696,7 +697,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
                 for (Move quiet: quiets_played) {
                     m_hist.update_quiet_history(quiet,
-                                                m_board.last_move(),
+                                                m_board.previous_move(1),
+                                                m_board.previous_move(2),
                                                 depth,
                                                 m_board.gives_check(quiet),
                                                 quiet == best_move);
@@ -920,7 +922,7 @@ void SearchWorker::make_move(Move move) {
 }
 
 void SearchWorker::undo_move() {
-    m_eval.on_undo_move(m_board, m_board.last_move());
+    m_eval.on_undo_move(m_board, m_board.previous_move());
     m_board.undo_move();
 }
 

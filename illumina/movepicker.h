@@ -440,7 +440,10 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
     }
     else {
-        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move(), m_board->gives_check(move)));
+        move.add_value(m_mv_hist->quiet_history(move,
+                                                m_board->previous_move(1),
+                                                m_board->previous_move(2),
+                                                m_board->gives_check(move)));
     }
 }
 
