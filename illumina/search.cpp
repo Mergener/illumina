@@ -357,12 +357,10 @@ void SearchWorker::iterative_deepening() {
                 m_results.pv_results[m_curr_pv_idx].best_move = m_search_moves[0];
             }
 
-            ui64 prev_nodes = m_results.nodes;
 
             check_limits();
             aspiration_windows();
             m_results.searched_depth = m_curr_depth;
-            m_results.pv_results[m_curr_pv_idx].pv_nodes = m_results.nodes - prev_nodes;
             check_limits();
             if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
@@ -411,7 +409,9 @@ void SearchWorker::aspiration_windows() {
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
+        ui64 prev_nodes = m_results.nodes;
         Score score = pvs<true, false, true>(depth, alpha, beta, &search_stack[0]);
+        m_results.pv_results[m_curr_pv_idx].pv_nodes = m_results.nodes - prev_nodes;
 
         if (score > alpha && score < beta) {
             // We found an exact score within our bounds, finish
@@ -511,6 +511,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 beta = std::min(beta, tt_entry.score());
             }
 
+            // Our bounds have closed. Return.
             if (alpha >= beta) {
                 return alpha;
             }
@@ -638,6 +639,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
+        // Compute nodes before we search the move to compute the delta afterwards.
+        ui64 nodes_before = m_results.nodes;
+
         make_move(move);
 
         // Late move reductions.
@@ -667,8 +671,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             reductions = std::clamp(reductions, 0, depth);
         }
 
-        ui64 nodes_before = m_results.nodes;
-
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
@@ -686,7 +688,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         undo_move();
 
+        // Compute the total number of nodes spent for this move.
+        // Used by time management.
         ui64 nodes_spent = m_results.nodes - nodes_before;
+
+        // Update best move node count for time management.
+        if (ROOT && (score > alpha || score >= beta)) {
+            m_results.pv_results[m_curr_pv_idx].best_move_nodes = nodes_spent;
+        }
 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
@@ -732,13 +741,17 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Make sure we update our best_move in the root ASAP.
             if (ROOT && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
-                m_results.pv_results[m_curr_pv_idx].score     = alpha;
-                m_results.pv_results[m_curr_pv_idx].best_move_nodes = nodes_spent;
+                m_results.pv_results[m_curr_pv_idx].score = alpha;
             }
 
             // Update the PV table.
             if constexpr (PV) {
+                // Set the best move as the first move in the PV.
                 node->pv[0] = best_move;
+
+                // Subsequent moves are extracted from the PV stored
+                // in the child node (which, in turn, was recursively
+                // filled by moves in its subsequent descendants).
                 size_t i;
                 for (i = 0; i < MAX_DEPTH - 2; ++i) {
                     Move pv_move = (node + 1)->pv[i];
@@ -747,6 +760,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                     }
                     node->pv[i + 1] = pv_move;
                 }
+
+                // Set last PV move to MOVE_NULL to signal PV termination.
                 node->pv[i + 1] = MOVE_NULL;
             }
         }
