@@ -44,6 +44,7 @@ struct SearchResults {
     Move  best_move;
     Move  ponder_move;
     Score score;
+    ui64 total_nodes = 0;
 };
 
 class Searcher {

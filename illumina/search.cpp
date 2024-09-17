@@ -222,6 +222,7 @@ SearchResults Searcher::search(const Board& board,
         results.best_move   = MOVE_NULL;
         results.ponder_move = MOVE_NULL;
         results.score       = board.in_check() ? -MATE_SCORE : 0;
+        results.total_nodes = 1;
         return results;
     }
     results.best_move = root_info.moves[0];
@@ -290,19 +291,20 @@ SearchResults Searcher::search(const Board& board,
     // with higher scores that reached higher depths.
     WorkerResults* selected_results;
     int best_result_score = INT_MIN;
-    for (WorkerResults& results: all_results) {
-        if (results.pv_results[0].best_move == MOVE_NULL) {
+    for (WorkerResults& worker_results: all_results) {
+        results.total_nodes += worker_results.nodes;
+        if (worker_results.pv_results[0].best_move == MOVE_NULL) {
             // Ignore threads that couldn't complete the search to a point
             // where they have a valid move.
             continue;
         }
 
-        int result_score = results.searched_depth * 500 +
-            results.pv_results[0].score +
-            (results.pv_results[0].bound_type == BT_EXACT) * 400;
+        int result_score = worker_results.searched_depth * 500 +
+                           worker_results.pv_results[0].score +
+                           (worker_results.pv_results[0].bound_type == BT_EXACT) * 400;
 
         if (result_score > best_result_score) {
-            selected_results = &results;
+            selected_results = &worker_results;
             best_result_score = result_score;
         }
     }
