@@ -94,6 +94,10 @@ void register_commands(CLIApplication& server) {
         global_state().set_board(board);
     });
 
+    server.register_command("bench", [](const CommandContext& ctx) {
+        global_state().bench();
+    });
+
     server.register_command("perft", [](const CommandContext& ctx) {
         global_state().perft(int(ctx.int_after("")));
     });
