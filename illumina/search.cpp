@@ -290,7 +290,7 @@ SearchResults Searcher::search(const Board& board,
     // Vote for the best results. Prioritize results
     // with higher scores that reached higher depths.
     WorkerResults* selected_results;
-    int best_result_score = INT_MIN;
+    i64 best_result_score = INT_MIN;
     for (WorkerResults& worker_results: all_results) {
         results.total_nodes += worker_results.nodes;
         if (worker_results.pv_results[0].best_move == MOVE_NULL) {
@@ -299,9 +299,9 @@ SearchResults Searcher::search(const Board& board,
             continue;
         }
 
-        int result_score = worker_results.searched_depth * 500 +
-                           worker_results.pv_results[0].score +
-                           (worker_results.pv_results[0].bound_type == BT_EXACT) * 400;
+        i64 result_score = i64(worker_results.searched_depth * 500) +
+                           i64(worker_results.pv_results[0].score)  +
+                           i64((worker_results.pv_results[0].bound_type == BT_EXACT)) * 400;
 
         if (result_score > best_result_score) {
             selected_results = &worker_results;
