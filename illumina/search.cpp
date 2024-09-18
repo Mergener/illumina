@@ -654,7 +654,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             Score se_beta = std::min(beta, tt_entry.score() - depth * 2);
 
             node->skip_move = move;
-            Score score = pvs<false>(depth / 2, se_beta - 1, se_beta, node);
+            Score score = pvs<false>((depth - 1) / 2, se_beta - 1, se_beta, node);
             node->skip_move = MOVE_NULL;
 
             if (score < se_beta) {
