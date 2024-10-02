@@ -30,6 +30,7 @@ struct SearchNode {
     Depth ply = 0;
     Score static_eval = 0;
     Move  pv[MAX_DEPTH];
+    Move  skip_move = MOVE_NULL;
 };
 
 class SearchWorker;
@@ -501,7 +502,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (found_in_tt) {
         hash_move = tt_entry.move();
 
-        if (!PV && tt_entry.depth() >= depth) {
+        if (!PV && node->skip_move == MOVE_NULL && tt_entry.depth() >= depth) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff.
                 return tt_entry.score();
@@ -539,6 +540,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
     if (!PV        &&
         !in_check  &&
+        node->skip_move == MOVE_NULL &&
         depth <= RFP_MAX_DEPTH &&
         alpha < MATE_THRESHOLD &&
         static_eval - rfp_margin > beta) {
@@ -551,7 +553,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         !in_check  &&
         popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES &&
         static_eval >= beta &&
-        depth >= NMP_MIN_DEPTH) {
+        depth >= NMP_MIN_DEPTH &&
+        node->skip_move == MOVE_NULL) {
         Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
 
         make_null_move();
@@ -564,7 +567,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Internal iterative reductions.
-    if (depth >= IIR_MIN_DEPTH && !found_in_tt) {
+    if (depth >= IIR_MIN_DEPTH && !found_in_tt && node->skip_move == MOVE_NULL) {
         depth -= IIR_DEPTH_RED;
     }
 
@@ -593,6 +596,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     bool has_legal_moves = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
+        if (move == node->skip_move) {
+            continue;
+        }
+
         move_idx++;
 
         // Skip unrequested moves.
@@ -640,6 +647,29 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
+        // Singular extensions.
+        Depth extensions = 0;
+        if (!ROOT     &&
+            !in_check &&
+            hash_move != MOVE_NULL       &&
+            node->skip_move == MOVE_NULL &&
+            tt_entry.bound_type() != BT_UPPERBOUND &&
+            depth >= 8        &&
+            move == hash_move &&
+            tt_entry.depth() >= (depth - 3) &&
+            std::abs(tt_entry.score()) < MATE_THRESHOLD &&
+            !m_board.gives_check(move)) {
+            Score se_beta = tt_entry.score() - depth * 3;
+
+            node->skip_move = move;
+            Score score = pvs<false>(depth / 2, se_beta - 1, se_beta, node);
+            node->skip_move = MOVE_NULL;
+
+            if (score < se_beta) {
+                extensions++;
+            }
+        }
+
         m_board.make_move(move);
 
         // Late move reductions.
@@ -672,15 +702,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
-            score = -pvs<true>(depth - 1, -beta, -alpha, node + 1);
+            score = -pvs<true>(depth - 1 + extensions, -beta, -alpha, node + 1);
         }
         else {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -pvs<false>(depth - 1 - reductions, -alpha - 1, -alpha, node + 1);
+            score = -pvs<false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
             if (score > alpha && score < beta) {
-                score = -pvs<true>(depth - 1, -beta, -alpha, node + 1);
+                score = -pvs<true>(depth - 1 + extensions, -beta, -alpha, node + 1);
             }
         }
 
@@ -759,17 +789,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Store in transposition table.
-    if (alpha >= beta) {
-        // Beta-Cutoff, lowerbound score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
-    }
-    else if (alpha <= original_alpha) {
-        // Couldn't raise alpha, score is an upperbound.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
-    }
-    else {
-        // We have an exact score.
-        tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+    // Don't store in singular searches.
+    if (node->skip_move == MOVE_NULL) {
+        if (alpha >= beta) {
+            // Beta-Cutoff, lowerbound score.
+            tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
+        } else if (alpha <= original_alpha) {
+            // Couldn't raise alpha, score is an upperbound.
+            tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
+        } else {
+            // We have an exact score.
+            tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+        }
     }
 
     return alpha;
