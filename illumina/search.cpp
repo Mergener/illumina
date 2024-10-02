@@ -170,8 +170,6 @@ private:
 
     void aspiration_windows();
 
-    void make_move(Move move);
-    void undo_move();
     void make_null_move();
     void undo_null_move();
 
@@ -179,6 +177,13 @@ private:
 
     Score evaluate() const;
     Score draw_score() const;
+
+    void on_make_move(const Board& board, Move move);
+    void on_undo_move(const Board& board, Move move);
+    void on_make_null_move(const Board& board);
+    void on_undo_null_move(const Board& board);
+    void on_piece_added(const Board& board, Piece p, Square s);
+    void on_piece_removed(const Board& board, Piece p, Square s);
 };
 
 void Searcher::stop() {
@@ -223,6 +228,7 @@ SearchResults Searcher::search(const Board& board,
         results.best_move   = MOVE_NULL;
         results.ponder_move = MOVE_NULL;
         results.score       = board.in_check() ? -MATE_SCORE : 0;
+        results.total_nodes = 1;
         return results;
     }
     results.best_move = root_info.moves[0];
@@ -290,20 +296,21 @@ SearchResults Searcher::search(const Board& board,
     // Vote for the best results. Prioritize results
     // with higher scores that reached higher depths.
     WorkerResults* selected_results;
-    int best_result_score = INT_MIN;
-    for (WorkerResults& results: all_results) {
-        if (results.pv_results[0].best_move == MOVE_NULL) {
+    i64 best_result_score = INT_MIN;
+    for (WorkerResults& worker_results: all_results) {
+        results.total_nodes += worker_results.nodes;
+        if (worker_results.pv_results[0].best_move == MOVE_NULL) {
             // Ignore threads that couldn't complete the search to a point
             // where they have a valid move.
             continue;
         }
 
-        int result_score = results.searched_depth * 500 +
-            results.pv_results[0].score +
-            (results.pv_results[0].bound_type == BT_EXACT) * 400;
+        i64 result_score = i64(worker_results.searched_depth * 500) +
+                           i64(worker_results.pv_results[0].score)  +
+                           i64((worker_results.pv_results[0].bound_type == BT_EXACT)) * 400;
 
         if (result_score > best_result_score) {
-            selected_results = &results;
+            selected_results = &worker_results;
             best_result_score = result_score;
         }
     }
@@ -662,7 +669,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             }
         }
 
-        make_move(move);
+        m_board.make_move(move);
 
         // Late move reductions.
         Depth reductions = 0;
@@ -706,7 +713,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             }
         }
 
-        undo_move();
+        m_board.undo_move();
 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
@@ -824,9 +831,9 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             continue;
         }
 
-        make_move(move);
+        m_board.make_move(move);
         Score score = -quiescence_search(ply + 1, -beta, -alpha);
-        undo_move();
+        m_board.undo_move();
 
         if (score >= beta) {
             best_move = move;
@@ -943,26 +950,39 @@ Score SearchWorker::draw_score() const {
            :  m_settings->contempt;
 }
 
-void SearchWorker::make_move(Move move) {
-    m_eval.on_make_move(m_board, move);
-    m_board.make_move(move);
+void SearchWorker::on_make_move(const illumina::Board &board, illumina::Move move) {
     m_results.nodes++;
+    m_eval.on_make_move(m_board, move);
 }
 
-void SearchWorker::undo_move() {
-    m_eval.on_undo_move(m_board, m_board.last_move());
-    m_board.undo_move();
+void SearchWorker::on_undo_move(const illumina::Board &board, illumina::Move move) {
+    m_eval.on_undo_move(m_board, move);
+}
+
+void SearchWorker::on_make_null_move(const illumina::Board &board) {
+    m_results.nodes++;
+    m_eval.on_make_null_move(board);
+}
+
+void SearchWorker::on_undo_null_move(const illumina::Board &board) {
+    m_eval.on_undo_null_move(board);
 }
 
 void SearchWorker::make_null_move() {
-    m_eval.on_make_null_move(m_board);
     m_board.make_null_move();
     m_results.nodes++;
 }
 
 void SearchWorker::undo_null_move() {
-    m_eval.on_undo_null_move(m_board);
     m_board.undo_null_move();
+}
+
+void SearchWorker::on_piece_added(const Board &board, Piece p, Square s) {
+    m_eval.on_piece_added(board, p , s);
+}
+
+void SearchWorker::on_piece_removed(const Board &board, Piece p, Square s) {
+    m_eval.on_piece_removed(board, p , s);
 }
 
 bool SearchWorker::should_stop() const {
@@ -982,6 +1002,16 @@ SearchWorker::SearchWorker(bool main,
                          ? settings->eval_rand_seed
                          : random(ui64(1), UINT64_MAX)) {
     m_eval.on_new_board(m_board);
+
+    // Dispatch board callbacks to Worker's methods.
+    BoardListener board_listener {};
+    board_listener.on_make_null_move = [this](const Board& board) { on_make_null_move(m_board); };
+    board_listener.on_undo_null_move = [this](const Board& board) { on_undo_null_move(m_board); };
+    board_listener.on_make_move      = [this](const Board& board, Move move) { on_make_move(m_board, move); };
+    board_listener.on_undo_move      = [this](const Board& board, Move move) { on_undo_move(m_board, move); };
+    board_listener.on_add_piece      = [this](const Board& board, Piece p, Square s) { on_piece_added(m_board, p, s); };
+    board_listener.on_remove_piece   = [this](const Board& board, Piece p, Square s) { on_piece_removed(m_board, p, s); };
+    m_board.set_listener(board_listener);
 }
 
 const WorkerResults& SearchWorker::results() const {
