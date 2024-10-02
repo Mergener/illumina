@@ -930,7 +930,8 @@ Board::Board(const illumina::Board &rhs)
           m_base_ply_count(rhs.m_base_ply_count),
           m_castle_rook_squares(rhs.m_castle_rook_squares),
           m_prev_states(rhs.m_prev_states),
-          m_state(rhs.m_state) { }
+          m_state(rhs.m_state),
+          m_listener({}) { }
 
 Board& Board::operator=(const illumina::Board &rhs) {
     if (this != &rhs) {
@@ -944,8 +945,26 @@ Board& Board::operator=(const illumina::Board &rhs) {
         m_base_ply_count      = rhs.m_base_ply_count;
         m_castle_rook_squares = rhs.m_castle_rook_squares;
         m_prev_states         = rhs.m_prev_states;
+
+        m_listener = {};
     }
     return *this;
+}
+
+Board::Board(Board&& rhs) noexcept {
+    m_pieces              = rhs.m_pieces;
+    m_bbs                 = rhs.m_bbs;
+    m_ctm                 = rhs.m_ctm;
+    m_occ                 = rhs.m_occ;
+    m_pinners             = rhs.m_pinners;
+    m_pinned_bb           = rhs.m_pinned_bb;
+    m_state               = rhs.m_state;
+    m_base_ply_count      = rhs.m_base_ply_count;
+    m_castle_rook_squares = rhs.m_castle_rook_squares;
+    m_prev_states         = std::move(rhs.m_prev_states);
+
+    rhs.m_listener = {};
+    rhs.m_prev_states = {};
 }
 
 } // illumina

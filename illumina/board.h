@@ -109,7 +109,7 @@ public:
     Board() = default;
     Board(const Board& rhs);
     explicit Board(std::string_view fen_str);
-    Board(Board&& rhs) = default;
+    Board(Board&& rhs) noexcept;
     Board& operator=(const Board& rhs);
     ~Board() = default;
 

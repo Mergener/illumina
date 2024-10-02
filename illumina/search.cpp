@@ -975,12 +975,12 @@ SearchWorker::SearchWorker(bool main,
 
     // Dispatch board callbacks to Worker's methods.
     BoardListener board_listener {};
-    board_listener.on_make_null_move = [this](const Board& board) { on_make_null_move(board); };
-    board_listener.on_undo_null_move = [this](const Board& board) { on_undo_null_move(board); };
-    board_listener.on_make_move      = [this](const Board& board, Move move) { on_make_move(board, move); };
-    board_listener.on_undo_move      = [this](const Board& board, Move move) { on_undo_move(board, move); };
-    board_listener.on_add_piece      = [this](const Board& board, Piece p, Square s) { on_piece_added(board, p, s); };
-    board_listener.on_remove_piece   = [this](const Board& board, Piece p, Square s) { on_piece_removed(board, p, s); };
+    board_listener.on_make_null_move = [this](const Board& board) { on_make_null_move(m_board); };
+    board_listener.on_undo_null_move = [this](const Board& board) { on_undo_null_move(m_board); };
+    board_listener.on_make_move      = [this](const Board& board, Move move) { on_make_move(m_board, move); };
+    board_listener.on_undo_move      = [this](const Board& board, Move move) { on_undo_move(m_board, move); };
+    board_listener.on_add_piece      = [this](const Board& board, Piece p, Square s) { on_piece_added(m_board, p, s); };
+    board_listener.on_remove_piece   = [this](const Board& board, Piece p, Square s) { on_piece_removed(m_board, p, s); };
     m_board.set_listener(board_listener);
 }
 
