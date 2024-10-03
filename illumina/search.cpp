@@ -671,6 +671,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             if (score < se_beta) {
                 extensions++;
             }
+            // Multi-cut pruning.
+            else if (score > beta) {
+                return score;
+            }
         }
 
         m_board.make_move(move);
@@ -791,6 +795,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         return m_board.in_check() ? (-MATE_SCORE + ply) : 0;
     }
 
+    if (n_searched_moves == 0) {
+        best_score = alpha;
+    }
+
     if (should_stop()) {
         return alpha;
     }
@@ -800,13 +808,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
+            tt.try_store(board_key, ply, best_move, best_score, depth, BT_LOWERBOUND);
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
-            tt.try_store(board_key, ply, best_move, n_searched_moves > 0 ? best_score : alpha, depth, BT_UPPERBOUND);
+            tt.try_store(board_key, ply, best_move, best_score, depth, BT_UPPERBOUND);
         } else {
             // We have an exact score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+            tt.try_store(board_key, ply, best_move, best_score, depth, BT_EXACT);
         }
     }
 
@@ -831,7 +839,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     // Finally, start looping over available noisy moves.
     MovePicker<true> move_picker(m_board, ply, m_hist);
     SearchMove move;
-    SearchMove best_move;
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
@@ -844,12 +851,10 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         m_board.undo_move();
 
         if (score >= beta) {
-            best_move = move;
             alpha = score;
             break;
         }
         if (score > alpha) {
-            best_move = move;
             alpha = score;
         }
     }
