@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <thread>
+#include <sstream>
 
 #include "endgame.h"
 #include "timemanager.h"
@@ -169,9 +170,6 @@ private:
               SearchNode* stack_node);
 
     void aspiration_windows();
-
-    void make_null_move();
-    void undo_null_move();
 
     void report_pv_results(const SearchNode* search_stack);
 
@@ -459,7 +457,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Don't search nodes with closed bounds.
     if (!ROOT && alpha >= beta) {
-        return beta;
+        return alpha;
     }
 
     // Keep track on some stats to report or use later.
@@ -502,7 +500,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (found_in_tt) {
         hash_move = tt_entry.move();
 
-        if (!PV && node->skip_move == MOVE_NULL && tt_entry.depth() >= depth) {
+        if (   !PV
+            && node->skip_move == MOVE_NULL
+            && tt_entry.depth() >= depth) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff.
                 return tt_entry.score();
@@ -557,12 +557,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         && node->skip_move == MOVE_NULL) {
         Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
 
-        make_null_move();
+        m_board.make_null_move();
         Score score = -pvs<false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
-        undo_null_move();
+        m_board.undo_null_move();
 
         if (score >= beta) {
-            return beta;
+            return score;
         }
     }
 
@@ -596,6 +596,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     Move move {};
     bool has_legal_moves = false;
+    Score best_score = -MATE_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
         if (move == node->skip_move) {
@@ -724,9 +725,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         n_searched_moves++;
 
+        if (score >= best_score) {
+            best_score = score;
+        }
+
         if (score >= beta) {
             // Our search failed high.
-            alpha     = beta;
+            alpha     = score;
             best_move = move;
 
             // Update our history scores and refutation moves.
@@ -798,7 +803,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
-            tt.try_store(board_key, ply, best_move, alpha, depth, BT_UPPERBOUND);
+            tt.try_store(board_key, ply, best_move, n_searched_moves > 0 ? best_score : alpha, depth, BT_UPPERBOUND);
         } else {
             // We have an exact score.
             tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
@@ -840,7 +845,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
         if (score >= beta) {
             best_move = move;
-            alpha = beta;
+            alpha = score;
             break;
         }
         if (score > alpha) {
@@ -953,38 +958,29 @@ Score SearchWorker::draw_score() const {
            :  m_settings->contempt;
 }
 
-void SearchWorker::on_make_move(const illumina::Board &board, illumina::Move move) {
+void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
     m_results.nodes++;
-    m_eval.on_make_move(m_board, move);
+    m_eval.on_make_move(board, move);
 }
 
-void SearchWorker::on_undo_move(const illumina::Board &board, illumina::Move move) {
-    m_eval.on_undo_move(m_board, move);
+void SearchWorker::on_undo_move(const illumina::Board& board, illumina::Move move) {
+    m_eval.on_undo_move(board, move);
 }
 
-void SearchWorker::on_make_null_move(const illumina::Board &board) {
+void SearchWorker::on_make_null_move(const illumina::Board& board) {
     m_results.nodes++;
     m_eval.on_make_null_move(board);
 }
 
-void SearchWorker::on_undo_null_move(const illumina::Board &board) {
+void SearchWorker::on_undo_null_move(const illumina::Board& board) {
     m_eval.on_undo_null_move(board);
 }
 
-void SearchWorker::make_null_move() {
-    m_board.make_null_move();
-    m_results.nodes++;
-}
-
-void SearchWorker::undo_null_move() {
-    m_board.undo_null_move();
-}
-
-void SearchWorker::on_piece_added(const Board &board, Piece p, Square s) {
+void SearchWorker::on_piece_added(const Board& board, Piece p, Square s) {
     m_eval.on_piece_added(board, p , s);
 }
 
-void SearchWorker::on_piece_removed(const Board &board, Piece p, Square s) {
+void SearchWorker::on_piece_removed(const Board& board, Piece p, Square s) {
     m_eval.on_piece_removed(board, p , s);
 }
 
@@ -1008,12 +1004,12 @@ SearchWorker::SearchWorker(bool main,
 
     // Dispatch board callbacks to Worker's methods.
     BoardListener board_listener {};
-    board_listener.on_make_null_move = [this](const Board& board) { on_make_null_move(m_board); };
-    board_listener.on_undo_null_move = [this](const Board& board) { on_undo_null_move(m_board); };
-    board_listener.on_make_move      = [this](const Board& board, Move move) { on_make_move(m_board, move); };
-    board_listener.on_undo_move      = [this](const Board& board, Move move) { on_undo_move(m_board, move); };
-    board_listener.on_add_piece      = [this](const Board& board, Piece p, Square s) { on_piece_added(m_board, p, s); };
-    board_listener.on_remove_piece   = [this](const Board& board, Piece p, Square s) { on_piece_removed(m_board, p, s); };
+    board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move(b); };
+    board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move(b); };
+    board_listener.on_make_move      = [this](const Board& b, Move m) { on_make_move(b, m); };
+    board_listener.on_undo_move      = [this](const Board& b, Move m) { on_undo_move(b, m); };
+    board_listener.on_add_piece      = [this](const Board& b, Piece p, Square s) { on_piece_added(b, p, s); };
+    board_listener.on_remove_piece   = [this](const Board& b, Piece p, Square s) { on_piece_removed(b, p, s); };
     m_board.set_listener(board_listener);
 }
 
