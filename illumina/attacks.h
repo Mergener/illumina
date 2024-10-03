@@ -41,8 +41,8 @@ inline Bitboard reverse_pawn_pushes(Square s, Bitboard occ = 0) {
 
     Bitboard not_occ = ~occ;
     Bitboard pushes  = shift_bb<PUSH_DIR>(BIT(s)) & not_occ;
-    if (pushes &&
-        ((C == CL_WHITE && square_rank(s) == RNK_4) || (C == CL_BLACK && square_rank(s) == RNK_5))) {
+    if (   pushes
+        && ((C == CL_WHITE && square_rank(s) == RNK_4) || (C == CL_BLACK && square_rank(s) == RNK_5))) {
         pushes |= shift_bb<PUSH_DIR>(pushes) & not_occ;
     }
     return pushes;

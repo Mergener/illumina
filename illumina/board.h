@@ -725,8 +725,8 @@ inline bool BoardResult::is_finished() const {
 }
 
 inline bool BoardResult::is_draw() const {
-    return outcome != BoardOutcome::UNFINISHED &&
-           outcome != BoardOutcome::CHECKMATE;
+    return    outcome != BoardOutcome::UNFINISHED
+           && outcome != BoardOutcome::CHECKMATE;
 }
 
 } // illumina

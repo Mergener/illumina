@@ -82,8 +82,8 @@ bool has_good_see(const Board& board,
 
         // Prevent pinned attackers from trying to capture, unless 'dest' is between
         // them and their pinner.
-        if (board.is_pinned(attacker_sq) &&
-            !bit_is_set(between_bb_inclusive(attacker_sq, board.pinner_square(attacker_sq)), dest)) {
+        if (   board.is_pinned(attacker_sq)
+            && !bit_is_set(between_bb_inclusive(attacker_sq, board.pinner_square(attacker_sq)), dest)) {
             occ = unset_bit(occ, attacker_sq);
             continue;
         }

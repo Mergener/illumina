@@ -403,10 +403,10 @@ inline Move MovePicker<QUIESCE>::next() {
         return next();
     }
     // Prevent killer move revisits.
-    if (!QUIESCE &&
-        m_mv_hist->is_killer(m_ply, move) &&
-        (m_stage != MPS_KILLER_MOVES      &&
-        m_stage != MPS_KILLER_EVASIONS)) {
+    if (!QUIESCE
+         &&  m_mv_hist->is_killer(m_ply, move)
+         && (m_stage != MPS_KILLER_MOVES
+         &&  m_stage != MPS_KILLER_EVASIONS)) {
         return next();
     }
 
