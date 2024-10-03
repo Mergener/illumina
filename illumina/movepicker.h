@@ -441,6 +441,9 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     }
     else {
         move.add_value(m_mv_hist->quiet_history(move, m_board->last_move(), m_board->gives_check(move)));
+
+        // Add bonus to moves towards the center.
+        move.add_value(12 / (center_manhattan_distance(move.destination()) + 1));
     }
 }
 
