@@ -3,6 +3,7 @@
 #include <string>
 
 #include "board.h"
+#include "parsehelper.h"
 
 namespace illumina {
 
@@ -194,6 +195,12 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
     Piece src_piece = board.piece_at(src);
     Piece dst_piece = board.piece_at(dst);
 
+    // Prevent no-piece movements.
+    if (src_piece.type() == PT_NULL) {
+        m_data = 0;
+        return;
+    }
+
     if (src_piece.type() == PT_PAWN) {
         // For pawn moves, we'll assume every capture is a diagonal move and
         // every vertical move is a push.
@@ -268,6 +275,102 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
         // No pieces on destination, normal move.
         m_data = new_normal(src, dst, src_piece).raw();
     }
+}
+
+struct SanMoveData {
+    Square source = SQ_NULL;
+    Square destination = SQ_NULL;
+    PieceType prom_piece_type = PT_NULL;
+    bool simple_check = false;
+    bool checkmate = false;
+};
+
+static SanMoveData get_san_move_data(const Board& board, std::string_view& san_move) {
+    // Setup.
+    Color color = board.color_to_move();
+
+    // Check if move is a simple pawn move.
+    Square s = parse_square(san_move);
+    Piece pawn = Piece(color, PT_PAWN);
+    if (s != SQ_NULL) {
+        Square push_source = s - pawn_push_direction(color);
+        if (push_source < 0 || push_source >= 64) {
+            // Invalid pawn square.
+            return {};
+        }
+        if (board.piece_at(push_source) == pawn) {
+            return { push_source, s };
+        }
+
+        Square double_push_source = s - pawn_push_direction(color) * 2;
+        if (double_push_source < 0 || double_push_source >= 64) {
+            // Invalid pawn square.
+            return {};
+        }
+        if (board.piece_at(double_push_source) == pawn) {
+            return { double_push_source, s };
+        }
+    }
+
+    // Check if move is a pawn capture.
+    if (std::islower(san_move[0])) {
+        BoardFile f = file_from_char(san_move[0]);
+        san_move = san_move.substr(1);
+
+        if (f != FL_NULL) {
+            // Check if it contains the capture 'x'.
+            if (san_move[0] != 'x') {
+                return {};
+            }
+            san_move = san_move.substr(1);
+
+            // Get destination square.
+            Square destination = parse_square(san_move);
+            if (destination == SQ_NULL) {
+                return {};
+            }
+
+            // Check if there's a pawn on the left.
+            Square left_source = destination - pawn_left_capture_direction(color);
+            if (board.piece_at(left_source) == pawn) {
+                return { left_source, destination };
+            }
+            // Pawn is assumed to be on the right.
+            return { destination - pawn_right_capture_direction(color), destination };
+        }
+    }
+
+
+}
+
+static bool valid_square(Square s) {
+    return s >= 0 && s < 64;
+}
+
+Move Move::parse_san(const Board& board,
+                     std::string_view move_str,
+                     bool validate_checks_and_mates) {
+    std::string_view curr_str = move_str;
+    SanMoveData move_data = get_san_move_data(board, curr_str);
+
+    // Sanitize invalid (and potentially dangerous) input.
+    if (   !valid_square(move_data.source)
+        || !valid_square(move_data.destination)) {
+        return MOVE_NULL;
+    }
+
+    return Move(board,
+                move_data.source,
+                move_data.destination,
+                move_data.prom_piece_type);
+}
+
+Move Move::parse(const illumina::Board &board, std::string_view str) {
+    Move move = parse_uci(board, str);
+    if (move != MOVE_NULL) {
+        return move;
+    }
+    return parse_san(board, str);
 }
 
 void init_types() {

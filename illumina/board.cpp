@@ -619,7 +619,7 @@ BoardResult Board::result() const {
                 result.winner  = opposite_color(color_to_move());
             }
             else {
-                result.outcome = BoardOutcome::STALEMATE;
+                result.outcome = BoardOutcome::DRAW_BY_STALEMATE;
             }
         }
     }

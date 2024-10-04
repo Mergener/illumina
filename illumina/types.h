@@ -730,6 +730,7 @@ public:
     constexpr bool      is_promotion() const;
     constexpr bool      makes_progress() const;
     std::string         to_uci(bool frc = false) const;
+    std::string         to_san(const Board& board) const;
 
     bool operator==(Move other) const;
     bool operator!=(Move other) const;
@@ -776,6 +777,12 @@ public:
                                                PieceType prom_piece_type);
 
     static Move parse_uci(const Board& board, std::string_view move_str);
+
+    static Move parse_san(const Board& board,
+                          std::string_view move_str,
+                          bool validate_checks_and_mates = false);
+
+    static Move parse(const Board& board, std::string_view str);
 };
 
 constexpr Move MOVE_NULL(0);

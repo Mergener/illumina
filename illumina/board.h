@@ -29,11 +29,19 @@ constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
 
 enum class BoardOutcome {
     UNFINISHED,
-    STALEMATE,
     CHECKMATE,
+    RESIGNATION,
+    TIMEOUT,
+    DRAW_BY_STALEMATE,
     DRAW_BY_REPETITION,
     DRAW_BY_50_MOVES_RULE,
-    DRAW_BY_INSUFFICIENT_MATERIAL
+    DRAW_BY_INSUFFICIENT_MATERIAL,
+    DRAW_BY_TIMEOUT,
+
+    WIN_FIRST = CHECKMATE,
+    WIN_LAST = TIMEOUT,
+    DRAW_FIRST = DRAW_BY_STALEMATE,
+    DRAW_LAST = DRAW_BY_TIMEOUT
 };
 
 struct BoardResult {
@@ -725,8 +733,8 @@ inline bool BoardResult::is_finished() const {
 }
 
 inline bool BoardResult::is_draw() const {
-    return    outcome != BoardOutcome::UNFINISHED
-           && outcome != BoardOutcome::CHECKMATE;
+    return    outcome >= BoardOutcome::DRAW_FIRST
+           && outcome <= BoardOutcome::DRAW_LAST;
 }
 
 } // illumina
