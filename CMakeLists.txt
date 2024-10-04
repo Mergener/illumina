@@ -101,5 +101,6 @@ add_subdirectory(ext)
 # Add Illumina's modules.
 add_subdirectory(illumina)
 add_subdirectory(cli)
+add_subdirectory(selfplay)
 add_subdirectory(tests)
 

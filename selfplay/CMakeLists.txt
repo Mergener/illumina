@@ -1,0 +1,10 @@
+set(selfplay_src main.cpp pgn.cpp)
+
+foreach(ARCH ${ARCHS})
+    set(TARGET illumina_selfplay_${ARCH})
+    add_executable(${TARGET} ${selfplay_src})
+    apply_arch_options(${TARGET} ${ARCH})
+    set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME illumina-selfplay_${ARCH})
+    target_link_libraries(${TARGET} PRIVATE illumina_lib_${ARCH})
+    target_include_directories(${TARGET} PRIVATE ${ILLUMINA_LIBRARY_SOURCE_DIR})
+endforeach()
