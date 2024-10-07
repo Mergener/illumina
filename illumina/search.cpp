@@ -152,7 +152,7 @@ private:
     Evaluation  m_eval {};
     Board       m_board;
     bool        m_main;
-    Depth       m_curr_depth = 1;
+    Depth       m_root_depth = 1;
     Move        m_curr_move  = MOVE_NULL;
     int         m_curr_move_number = 0;
     int         m_curr_pv_idx = 0;
@@ -335,8 +335,8 @@ SearchResults Searcher::search(const Board& board,
 
 void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
-    for (m_curr_depth = 1; m_curr_depth <= max_depth; ++m_curr_depth) {
-        if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
+    for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
+        if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
             // If we finished soft, we don't want to start a new iteration.
             if (m_main) {
                 m_context->stop_search();
@@ -363,9 +363,9 @@ void SearchWorker::iterative_deepening() {
 
             check_limits();
             aspiration_windows();
-            m_results.searched_depth = m_curr_depth;
+            m_results.searched_depth = m_root_depth;
             check_limits();
-            if (should_stop() || (m_curr_depth > 2 && m_context->time_manager().finished_soft())) {
+            if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
                 if (m_main) {
                     m_context->stop_search();
@@ -399,7 +399,7 @@ void SearchWorker::aspiration_windows() {
     Score alpha      = -MAX_SCORE;
     Score beta       = MAX_SCORE;
     Score window     = ASP_WIN_WINDOW;
-    Depth depth      = m_curr_depth;
+    Depth depth      = m_root_depth;
 
     // Don't use aspiration windows in lower depths since
     // their results is still too unstable.
@@ -425,7 +425,7 @@ void SearchWorker::aspiration_windows() {
         if (score <= alpha) {
             beta  = (alpha + beta) / 2;
             alpha = std::max(-MAX_SCORE, alpha - window);
-            depth = m_curr_depth;
+            depth = m_root_depth;
 
             m_results.pv_results[m_curr_pv_idx].score     = prev_score;
             m_results.pv_results[m_curr_pv_idx].best_move = best_move;
@@ -522,9 +522,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Check extensions.
     // Extend positions in check.
-    if (in_check && ply < MAX_DEPTH && depth < MAX_DEPTH) {
-        depth++;
-    }
+    depth += in_check;
+
+    // Clamp excessive depths.
+    depth = std::min(std::min(MAX_DEPTH, depth), m_root_depth * 2 - ply);
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
@@ -617,7 +618,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             m_curr_move = move;
 
             if (m_main) {
-                m_context->listeners().curr_move_listener(m_curr_depth,
+                m_context->listeners().curr_move_listener(m_root_depth,
                                                           m_curr_move,
                                                           m_curr_move_number);
             }
@@ -705,7 +706,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
-            score = -pvs<true>(depth - 1 + extensions, -beta, -alpha, node + 1);
+            score = -pvs<PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
         }
         else {
             // Perform a null window search. Searches after the first move are
@@ -713,7 +714,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // re-search with the full window.
             score = -pvs<false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
             if (score > alpha && score < beta) {
-                score = -pvs<true>(depth - 1 + extensions, -beta, -alpha, node + 1);
+                score = -pvs<PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
             }
         }
 
@@ -888,7 +889,7 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
 
     PVResults pv_results;
     pv_results.pv_idx     = m_curr_pv_idx;
-    pv_results.depth      = m_curr_depth;
+    pv_results.depth      = m_root_depth;
     pv_results.sel_depth  = m_results.sel_depth;
     pv_results.score      = m_results.pv_results[m_curr_pv_idx].score;
     pv_results.time       = m_context->elapsed();
