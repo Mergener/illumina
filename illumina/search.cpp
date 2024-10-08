@@ -635,7 +635,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         // SEE pruning.
-        if (   depth <= SEE_PRUNING_MAX_DEPTH
+        if (   (!PV || m_root_depth > SEE_PRUNING_MAX_DEPTH)
+            && depth <= SEE_PRUNING_MAX_DEPTH
             && !m_board.in_check()
             && move_picker.stage() > MPS_GOOD_CAPTURES
             && !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
@@ -643,8 +644,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         // Futility pruning.
-        if (   depth <= FP_MAX_DEPTH
+        if (   (!PV || m_root_depth > FP_MAX_DEPTH)
+            && depth <= FP_MAX_DEPTH
             && !in_check
+            && move != hash_move
             && move.is_quiet()
             && (static_eval + FP_MARGIN) < alpha
             && !m_board.gives_check(move)) {
