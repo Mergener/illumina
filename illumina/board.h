@@ -100,7 +100,7 @@ public:
     bool is_move_pseudo_legal(Move move) const;
     bool is_move_legal(Move move) const;
 
-    void set_listener(const BoardListener& listener);
+    void set_listener(BoardListener listener);
 
     template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
     Square first_attacker_of(Color c, Square s) const;

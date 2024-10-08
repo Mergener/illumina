@@ -108,7 +108,7 @@ inline int MoveHistory::quiet_history(Move move, Move last_move, bool gives_chec
     return int(
                i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->m_quiet_history.get(move))
              + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->m_counter_move_history.get(last_move).get(move))
-             + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? (m_data->m_check_history.get(move) + MV_HIST_CHECK_QHIST_BASE) : 0))
+             + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? m_data->m_check_history.get(move) : 0))
              ) / weight_sum;
 }
 
