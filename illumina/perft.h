@@ -7,6 +7,7 @@ namespace illumina {
 
 struct PerftArgs {
     bool log = false;
+    bool san = false;
     bool sort_output = false;
 };
 

@@ -92,11 +92,11 @@ void State::bench() const {
 }
 
 void State::perft(int depth) const {
-    illumina::perft(m_board, depth, { true });
+    illumina::perft(m_board, depth, { true, m_options.option<UCIOptionCheck>("SANMoves").value() });
 }
 
 void State::mperft(int depth) const {
-    illumina::move_picker_perft(m_board, depth, { true });
+    illumina::move_picker_perft(m_board, depth, { true, m_options.option<UCIOptionCheck>("SANMoves").value() });
 }
 
 void State::uci() {
@@ -212,7 +212,8 @@ void State::evaluate() const {
 
 static std::string pv_to_string(const std::vector<Move>& line,
                                 const Board& board,
-                                bool frc) {
+                                bool frc,
+                                bool san) {
     if (line.empty()) {
         return "";
     }
@@ -220,14 +221,24 @@ static std::string pv_to_string(const std::vector<Move>& line,
     Board repl = board;
 
     std::stringstream stream;
-    stream << line[0].to_uci(frc);
+    if (!san) {
+        stream << line[0].to_uci(frc);
+    }
+    else {
+        stream << line[0].to_san(repl);
+    }
     repl.make_move(line[0]);
     for (auto it = line.begin() + 1; it != line.end(); ++it) {
         Move m = *it;
         if (!repl.is_move_pseudo_legal(m) || !repl.is_move_legal(m)) {
             break;
         }
-        stream << ' ' << m.to_uci(frc);
+        if (!san) {
+            stream << ' ' << m.to_uci(frc);
+        }
+        else {
+            stream << ' ' << m.to_san(repl);
+        }
         repl.make_move(m);
     }
     return stream.str();
@@ -268,6 +279,9 @@ void State::setup_searcher() {
         // Check if we need to log multipv.
         UCIOptionSpin& opt_multi_pv = m_options.option<UCIOptionSpin>("MultiPV");
 
+        // Check if we want to log moves in SAN.
+        bool san = m_options.option<UCIOptionCheck>("SANMoves").value();
+
         std::cout << "info"
                   << multipv_string(opt_multi_pv.value() > 1, res.pv_idx)
                   << " depth "    << res.depth
@@ -275,7 +289,7 @@ void State::setup_searcher() {
                   << " score "    << score_string(res.score)
                   << bound_type_string(res.bound_type);
         if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
-        std::cout << " pv "       << pv_to_string(res.line, m_board, m_frc);
+        std::cout << " pv "       << pv_to_string(res.line, m_board, m_frc, san);
         std::cout << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
                   << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
@@ -306,10 +320,12 @@ void State::search(SearchSettings settings) {
             m_search_start = Clock::now();
             SearchResults results = m_searcher.search(m_board, settings);
 
-            std::cout << "bestmove " << results.best_move.to_uci(m_frc);
+            bool san = m_options.option<UCIOptionCheck>("SANMoves").value();
+
+            std::cout << "bestmove " << (!san ? results.best_move.to_uci(m_frc) : results.best_move.to_san(board()));
 
             if (results.ponder_move != MOVE_NULL) {
-                std::cout << " ponder " << results.ponder_move.to_uci(m_frc);
+                std::cout << " ponder " << (!san ? results.ponder_move.to_uci(m_frc) : results.ponder_move.to_san(board()));
             }
 
             std::cout << std::endl;
@@ -381,6 +397,7 @@ void State::register_options() {
             m_frc = check.value();
         });
     m_options.register_option<UCIOptionSpin>("EvalRandomMargin", 0, 0, 1024);
+    m_options.register_option<UCIOptionCheck>("SANMoves", false);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \

@@ -1,8 +1,10 @@
 #include "types.h"
 
 #include <string>
+#include <sstream>
 
 #include "board.h"
+#include "movegen.h"
 #include "parsehelper.h"
 
 namespace illumina {
@@ -164,6 +166,77 @@ std::string Move::to_uci(bool frc) const {
     }
 }
 
+std::string Move::to_san(const Board& board) const {
+    std::stringstream ss;
+    Piece piece = source_piece();
+    Square src  = source();
+    Square dst  = destination();
+
+    if (piece.type() == PT_PAWN) {
+        if (is_capture()) {
+            ss << file_to_char(square_file(src))
+               << 'x';
+        }
+        ss << square_name(dst);
+        if (is_promotion()) {
+            ss << '='
+               << char(std::toupper(piece_type_to_char(promotion_piece_type())));
+        }
+    }
+    else if (type() == MT_CASTLES) {
+        ss << (castles_side() == SIDE_KING ? "O-O" : "O-O-O");
+    }
+    else {
+        ss << char(std::toupper(piece_type_to_char(piece.type())));
+
+        // Check if we need to disambiguate the piece.
+        Bitboard piece_bb = board.piece_bb(piece);
+        Bitboard attacks_from_dest = piece_attacks(piece, dst, board.occupancy());
+        Bitboard candidates = piece_bb & attacks_from_dest;
+        int n_candidates = popcount(candidates);
+
+        if (n_candidates > 1) {
+            // Try to disambiguate using the file.
+            BoardFile file = square_file(src);
+            Bitboard file_candidates = candidates & file_bb(file);
+            if (file_candidates < candidates) {
+                // File did disambiguate at least a bit.
+                ss << file_to_char(file);
+            }
+
+            int n_file_candidates = popcount(file_candidates);
+            if (n_file_candidates > 1) {
+                // We still need to disambiguate with the rank.
+                ss << rank_to_char(square_rank(src));
+            }
+        }
+
+        if (is_capture()) {
+            ss << 'x';
+        }
+
+        ss << square_name(dst);
+    }
+
+    if (board.gives_check(*this)) {
+        // Check if move is checkmate.
+        Board repl = board;
+        repl.make_move(*this);
+        Move moves[MAX_GENERATED_MOVES];
+        Move* end = generate_moves(repl, moves);
+        if (end == &moves[0]) {
+            // Checkmate.
+            ss << '#';
+        }
+        else {
+            // Simple check.
+            ss << '+';
+        }
+    }
+
+    return ss.str();
+}
+
 Move Move::parse_uci(const Board& board, std::string_view move_str) {
     if (move_str.size() < 4) {
         return MOVE_NULL;
@@ -276,101 +349,8 @@ Move::Move(const Board& board, Square src, Square dst, PieceType prom_piece_type
         m_data = new_normal(src, dst, src_piece).raw();
     }
 }
-
-struct SanMoveData {
-    Square source = SQ_NULL;
-    Square destination = SQ_NULL;
-    PieceType prom_piece_type = PT_NULL;
-    bool simple_check = false;
-    bool checkmate = false;
-};
-
-static SanMoveData get_san_move_data(const Board& board, std::string_view& san_move) {
-    // Setup.
-    Color color = board.color_to_move();
-
-    // Check if move is a simple pawn move.
-    Square s = parse_square(san_move);
-    Piece pawn = Piece(color, PT_PAWN);
-    if (s != SQ_NULL) {
-        Square push_source = s - pawn_push_direction(color);
-        if (push_source < 0 || push_source >= 64) {
-            // Invalid pawn square.
-            return {};
-        }
-        if (board.piece_at(push_source) == pawn) {
-            return { push_source, s };
-        }
-
-        Square double_push_source = s - pawn_push_direction(color) * 2;
-        if (double_push_source < 0 || double_push_source >= 64) {
-            // Invalid pawn square.
-            return {};
-        }
-        if (board.piece_at(double_push_source) == pawn) {
-            return { double_push_source, s };
-        }
-    }
-
-    // Check if move is a pawn capture.
-    if (std::islower(san_move[0])) {
-        BoardFile f = file_from_char(san_move[0]);
-        san_move = san_move.substr(1);
-
-        if (f != FL_NULL) {
-            // Check if it contains the capture 'x'.
-            if (san_move[0] != 'x') {
-                return {};
-            }
-            san_move = san_move.substr(1);
-
-            // Get destination square.
-            Square destination = parse_square(san_move);
-            if (destination == SQ_NULL) {
-                return {};
-            }
-
-            // Check if there's a pawn on the left.
-            Square left_source = destination - pawn_left_capture_direction(color);
-            if (board.piece_at(left_source) == pawn) {
-                return { left_source, destination };
-            }
-            // Pawn is assumed to be on the right.
-            return { destination - pawn_right_capture_direction(color), destination };
-        }
-    }
-
-
-}
-
 static bool valid_square(Square s) {
     return s >= 0 && s < 64;
-}
-
-Move Move::parse_san(const Board& board,
-                     std::string_view move_str,
-                     bool validate_checks_and_mates) {
-    std::string_view curr_str = move_str;
-    SanMoveData move_data = get_san_move_data(board, curr_str);
-
-    // Sanitize invalid (and potentially dangerous) input.
-    if (   !valid_square(move_data.source)
-        || !valid_square(move_data.destination)) {
-        return MOVE_NULL;
-    }
-
-    return Move(board,
-                move_data.source,
-                move_data.destination,
-                move_data.prom_piece_type);
-}
-
-Move Move::parse(const illumina::Board &board, std::string_view str) {
-    Move move = parse_uci(board, str);
-    if (move != MOVE_NULL) {
-        return move;
-    }
-    return parse_san(board, str);
 }
 
 void init_types() {

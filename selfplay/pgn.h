@@ -20,8 +20,6 @@ struct PGNGame {
     std::vector<PGNNode> main_line;
     std::map<std::string, std::string> tags;
     BoardResult result;
-
-    void load_from(std::istream& stream);
 };
 
 class PGN {
@@ -31,11 +29,7 @@ public:
 
     std::string serialize() const;
     void serialize(std::ostream& stream) const;
-    void deserialize(std::string_view str, bool append = true);
-    void deserialize(std::istream& stream, bool append = true);
 
-    explicit PGN(std::istream& stream);
-    PGN(std::string_view str);
     PGN() = default;
 
 private:
