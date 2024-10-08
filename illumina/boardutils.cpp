@@ -102,4 +102,95 @@ bool has_good_see(const Board& board,
     return gain >= threshold;
 }
 
+static Bitboard get_defenders(const Board& board,
+                              Square s,
+                              Color c,
+                              Bitboard occ) {
+    return
+          (queen_attacks(s, occ)  & board.piece_bb(Piece(c, PT_QUEEN)))
+        | (rook_attacks(s, occ)   & board.piece_bb(Piece(c, PT_ROOK)))
+        | (bishop_attacks(s, occ) & board.piece_bb(Piece(c, PT_BISHOP)))
+        | (knight_attacks(s)      & board.piece_bb(Piece(c, PT_KNIGHT)))
+        | (pawn_attacks(s, opposite_color(c)) & board.piece_bb(Piece(c, PT_PAWN)));
+
+}
+
+bool has_good_see_simple(const Board& board,
+                         Square source,
+                         Square destination) {
+    Piece source_piece = board.piece_at(source);
+
+    Bitboard occ = unset_bit(board.occupancy(), source);
+    Color us     = source_piece.color();
+    Color them   = opposite_color(us);
+
+    // Get all opponent potential attackers.
+    Bitboard opponent_attackers = get_defenders(board, destination, them, occ);
+
+    bool defenders_computed = false;
+    bool has_defenders; // Will be calculated lazily.
+
+    while (opponent_attackers) {
+        Square attacker_sq   = lsb(opponent_attackers);
+        Piece attacker_piece = board.piece_at(attacker_sq);
+
+        if (attacker_piece.type() < source_piece.type()) {
+            // Attacker is of lesser value. Bad SEE.
+            return false;
+        }
+
+        // Attacker is of higher value.
+        // Compute our defenders.
+        if (!defenders_computed) {
+            defenders_computed = true;
+
+            Bitboard our_defenders = get_defenders(board, destination, us, occ);
+
+            // Remove moving piece from defenders.
+            our_defenders = unset_bit(our_defenders, source);
+
+            has_defenders = our_defenders != 0;
+        }
+
+        // If there are no defenders, bad shallow SEE.
+        if (!has_defenders) {
+            return false;
+        }
+
+        opponent_attackers = unset_lsb(opponent_attackers);
+    }
+    return true;
+}
+
+bool attacks_vulnerable_pieces(const Board& board,
+                               Square source,
+                               Square dest) {
+    Piece source_piece = board.piece_at(source);
+    Bitboard occ       = unset_bit(board.occupancy(), source);
+    Color us     = source_piece.color();
+    Color them   = opposite_color(us);
+    Bitboard their_pieces = board.color_bb(them);
+
+    Bitboard targets = their_pieces;
+    targets &= piece_attacks(source_piece, dest, occ);
+
+    // Ignore kings.
+    targets &= ~board.piece_bb(Piece(them, PT_KING));
+
+    // Equal type pieces can attack the piece itself.
+    targets &= ~board.piece_bb(Piece(them, source_piece.type()));
+
+    while (targets) {
+        Square target = lsb(targets);
+
+        if (  board.piece_at(target).type() > source_piece.type()
+            || get_defenders(board, target, them, occ) == 0) {
+            return true;
+        }
+
+        targets = unset_lsb(targets);
+    }
+    return false;
+}
+
 } // illumina
