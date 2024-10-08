@@ -453,7 +453,7 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
             move.add_value(-MV_PICKER_QUIET_DANGER_MALUS);
         }
 
-        // Decrease score of moves that move away from the center.
+        // Slightly decrease score of moves that move away from the center.
         Color us = move.source_piece().color();
         Square destination = move.destination();
         BoardFile file = square_file(destination);
