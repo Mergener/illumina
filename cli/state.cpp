@@ -301,6 +301,12 @@ void State::search(SearchSettings settings) {
     settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
     settings.eval_rand_seed     = m_eval_random_seed;
 
+    // User might want to override number of search nodes.
+    ui64 node_option = m_options.option<UCIOptionSpin>("OverrideNodesLimit").value();
+    if (node_option != 0) {
+        settings.max_nodes = node_option;
+    }
+
     m_search_thread = new std::thread([this, settings]() {
         try {
             m_search_start = Clock::now();
@@ -381,6 +387,7 @@ void State::register_options() {
             m_frc = check.value();
         });
     m_options.register_option<UCIOptionSpin>("EvalRandomMargin", 0, 0, 1024);
+    m_options.register_option<UCIOptionSpin>("OverrideNodesLimit", 0, 0, INT32_MAX);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
