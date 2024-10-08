@@ -17,24 +17,19 @@ struct PGNNode {
 };
 
 struct PGNGame {
+    Board start_pos = Board::standard_startpos();
     std::vector<PGNNode> main_line;
     std::map<std::string, std::string> tags;
+    int first_move_number = 1;
     BoardResult result;
 };
 
-class PGN {
-public:
-    PGNGame& push_game();
-    PGNGame pop_game();
-
-    std::string serialize() const;
-    void serialize(std::ostream& stream) const;
-
-    PGN() = default;
-
-private:
-    std::vector<PGNGame> m_games;
+struct PGN {
+    std::vector<PGNGame> games;
 };
+
+std::ostream& operator<<(std::ostream& stream, const PGN& pgn);
+std::ostream& operator<<(std::ostream& stream, const PGNGame& game);
 
 } // illumina
 

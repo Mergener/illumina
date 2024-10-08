@@ -268,9 +268,12 @@ void State::setup_searcher() {
             return;
         }
 
+        // Check if we want to log moves in SAN.
+        bool san = m_options.option<UCIOptionCheck>("SANMoves").value();
+
         std::cout << "info"
                   << " depth "       << depth
-                  << " currmove "    << move.to_uci(m_frc)
+                  << " currmove "    << (!san ? move.to_uci(m_frc) : move.to_san(m_board))
                   << " currmovenumber " << move_num
                   << std::endl;
     });
