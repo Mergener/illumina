@@ -107,7 +107,8 @@ static Bitboard get_defenders(const Board& board,
                               Color c,
                               Bitboard occ) {
     return
-          (queen_attacks(s, occ)  & board.piece_bb(Piece(c, PT_QUEEN)))
+          (king_attacks(s)        & board.piece_bb(Piece(c, PT_KING)))
+        | (queen_attacks(s, occ)  & board.piece_bb(Piece(c, PT_QUEEN)))
         | (rook_attacks(s, occ)   & board.piece_bb(Piece(c, PT_ROOK)))
         | (bishop_attacks(s, occ) & board.piece_bb(Piece(c, PT_BISHOP)))
         | (knight_attacks(s)      & board.piece_bb(Piece(c, PT_KNIGHT)))
