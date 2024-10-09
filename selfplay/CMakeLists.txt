@@ -1,4 +1,4 @@
-set(selfplay_src pgn.cpp)
+set(selfplay_src pgn.cpp main.cpp)
 
 foreach(ARCH ${ARCHS})
     set(TARGET illumina_selfplay_${ARCH})
