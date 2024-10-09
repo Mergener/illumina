@@ -140,7 +140,7 @@ public:
     const WorkerResults& results() const;
 
     SearchWorker(bool main,
-                 const Board& board,
+                 Board  board,
                  SearchContext* context,
                  const SearchSettings* settings);
     Board       m_board;
@@ -994,11 +994,11 @@ bool SearchWorker::should_stop() const {
 }
 
 SearchWorker::SearchWorker(bool main,
-                           const Board& board,
+                           Board board,
                            SearchContext* context,
                            const SearchSettings* settings)
     : m_main(main),
-      m_board(board),
+      m_board(std::move(board)),
       m_context(context),
       m_settings(settings),
       m_eval_random_margin(m_main
@@ -1011,12 +1011,12 @@ SearchWorker::SearchWorker(bool main,
 
     // Dispatch board callbacks to Worker's methods.
     BoardListener board_listener {};
-    board_listener.on_make_null_move = [this](const Board& b) { this->on_make_null_move(b); };
-    board_listener.on_undo_null_move = [this](const Board& b) { this->on_undo_null_move(b); };
-    board_listener.on_make_move      = [this](const Board& b, Move m) { this->on_make_move(b, m); };
-    board_listener.on_undo_move      = [this](const Board& b, Move m) { this->on_undo_move(b, m); };
-    board_listener.on_add_piece      = [this](const Board& b, Piece p, Square s) { this->on_piece_added(b, p, s); };
-    board_listener.on_remove_piece   = [this](const Board& b, Piece p, Square s) { this->on_piece_removed(b, p, s); };
+    board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move(b); };
+    board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move(b); };
+    board_listener.on_make_move      = [this](const Board& b, Move m) { on_make_move(b, m); };
+    board_listener.on_undo_move      = [this](const Board& b, Move m) { on_undo_move(b, m); };
+    board_listener.on_add_piece      = [this](const Board& b, Piece p, Square s) { on_piece_added(b, p, s); };
+    board_listener.on_remove_piece   = [this](const Board& b, Piece p, Square s) { on_piece_removed(b, p, s); };
     m_board.set_listener(board_listener);
 }
 
