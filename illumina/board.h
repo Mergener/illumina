@@ -118,9 +118,8 @@ public:
 
 private:
     // If any fields are added to this class, make sure to properly update
-    // Board(const Board& rhs) and operator=(const Board& rhs) -- these
-    // methods were manually written to prevent copying m_listeners to board
-    // copies.
+    // the copy, assignment and move constructors -- these were manually written
+    // to prevent copying m_listeners to board copies.
 
     std::array<Piece, SQ_COUNT> m_pieces {};
     std::array<std::array<Bitboard, PT_COUNT>, CL_COUNT> m_bbs {};
