@@ -3,6 +3,7 @@
 #include <cmath>
 #include <thread>
 #include <sstream>
+#include <utility>
 
 #include "endgame.h"
 #include "timemanager.h"
@@ -45,7 +46,7 @@ public:
     TranspositionTable&        tt() const;
     const Searcher::Listeners& listeners() const;
     const RootInfo&            root_info() const;
-    const std::vector<SearchWorker>& helper_workers() const;
+    const std::vector<std::unique_ptr<SearchWorker>>& helper_workers() const;
 
     /**
      * Time, in milliseconds, since this worker started searching.
@@ -60,7 +61,7 @@ public:
                   bool* should_stop,
                   const Searcher::Listeners* listeners,
                   const RootInfo* root_info,
-                  const std::vector<SearchWorker>* helper_workers,
+                  const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
                   TimeManager* time_manager);
 
 private:
@@ -70,7 +71,7 @@ private:
     bool*                      m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
-    const std::vector<SearchWorker>* m_helper_workers;
+    const std::vector<std::unique_ptr<SearchWorker>>* m_helper_workers;
 };
 
 TranspositionTable& SearchContext::tt() const {
@@ -93,7 +94,7 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              bool* should_stop,
                              const Searcher::Listeners* listeners,
                              const RootInfo* root_info,
-                             const std::vector<SearchWorker>* helper_workers,
+                             const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
                              TimeManager* time_manager)
     : m_stop(should_stop),
       m_tt(tt), m_listeners(listeners),
@@ -114,7 +115,7 @@ const RootInfo& SearchContext::root_info() const {
     return *m_root_info;
 }
 
-const std::vector<SearchWorker>& SearchContext::helper_workers() const {
+const std::vector<std::unique_ptr<SearchWorker>>& SearchContext::helper_workers() const {
     return *m_helper_workers;
 }
 
@@ -139,9 +140,10 @@ public:
     const WorkerResults& results() const;
 
     SearchWorker(bool main,
-                 Board board,
+                 Board  board,
                  SearchContext* context,
                  const SearchSettings* settings);
+    Board       m_board;
 
 private:
     const SearchSettings* m_settings;
@@ -150,7 +152,6 @@ private:
 
     MoveHistory m_hist;
     Evaluation  m_eval {};
-    Board       m_board;
     bool        m_main;
     Depth       m_root_depth = 1;
     Move        m_curr_move  = MOVE_NULL;
@@ -232,7 +233,7 @@ SearchResults Searcher::search(const Board& board,
     results.best_move = root_info.moves[0];
 
     // Create search context.
-    std::vector<SearchWorker> secondary_workers;
+    std::vector<std::unique_ptr<SearchWorker>> secondary_workers;
     m_stop = false;
     m_tt.new_search();
     SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
@@ -265,15 +266,15 @@ SearchResults Searcher::search(const Board& board,
 
     // Create secondary workers.
     for (int i = 0; i < n_helper_threads; ++i) {
-        secondary_workers.emplace_back(false, board, &context, &settings);
+        secondary_workers.emplace_back(std::make_unique<SearchWorker>(false, board, &context, &settings));
     }
 
     // Fire secondary threads.
     std::vector<std::thread> helper_threads;
     for (int i = 0; i < n_helper_threads; ++i) {
-        SearchWorker& worker = secondary_workers[i];
-        helper_threads.emplace_back([&worker]() {
-            worker.iterative_deepening();
+        SearchWorker* worker = secondary_workers[i].get();
+        helper_threads.emplace_back([worker]() {
+            worker->iterative_deepening();
         });
     }
 
@@ -287,8 +288,8 @@ SearchResults Searcher::search(const Board& board,
     // Save obtained results in vector and vote for the best afterwards.
     std::vector<WorkerResults> all_results;
     all_results.push_back(main_worker.results());
-    for (SearchWorker& worker: secondary_workers) {
-        all_results.push_back(worker.results());
+    for (std::unique_ptr<SearchWorker>& worker: secondary_workers) {
+        all_results.push_back(worker->results());
     }
 
     // Vote for the best results. Prioritize results
@@ -899,8 +900,8 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
     pv_results.bound_type = m_results.pv_results[m_curr_pv_idx].bound_type;
 
     ui64 total_nodes = m_results.nodes;
-    for (const SearchWorker& worker: m_context->helper_workers()) {
-        total_nodes += worker.results().nodes;
+    for (const std::unique_ptr<SearchWorker>& worker: m_context->helper_workers()) {
+        total_nodes += worker->results().nodes;
     }
     pv_results.nodes = total_nodes;
 
@@ -996,8 +997,10 @@ SearchWorker::SearchWorker(bool main,
                            Board board,
                            SearchContext* context,
                            const SearchSettings* settings)
-    : m_main(main), m_board(std::move(board)),
-      m_context(context), m_settings(settings),
+    : m_main(main),
+      m_board(std::move(board)),
+      m_context(context),
+      m_settings(settings),
       m_eval_random_margin(m_main
                            ? settings->eval_random_margin
                            : std::max(SMP_EVAL_RANDOM_MARGIN, settings->eval_random_margin)),

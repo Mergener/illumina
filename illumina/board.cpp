@@ -951,21 +951,17 @@ Board& Board::operator=(const illumina::Board &rhs) {
     return *this;
 }
 
-Board::Board(Board&& rhs) noexcept {
-    if (this == &rhs) {
-        return;
-    }
-
-    m_pieces              = rhs.m_pieces;
-    m_bbs                 = rhs.m_bbs;
-    m_ctm                 = rhs.m_ctm;
-    m_occ                 = rhs.m_occ;
-    m_pinners             = rhs.m_pinners;
-    m_pinned_bb           = rhs.m_pinned_bb;
-    m_base_ply_count      = rhs.m_base_ply_count;
-    m_castle_rook_squares = rhs.m_castle_rook_squares;
-    m_prev_states         = std::move(rhs.m_prev_states);
-    m_state               = rhs.m_state;
-}
+Board::Board(Board&& rhs) noexcept
+    : m_pieces(rhs.m_pieces),
+      m_bbs(rhs.m_bbs),
+      m_ctm(rhs.m_ctm),
+      m_occ(rhs.m_occ),
+      m_pinners(rhs.m_pinners),
+      m_pinned_bb(rhs.m_pinned_bb),
+      m_base_ply_count(rhs.m_base_ply_count),
+      m_castle_rook_squares(rhs.m_castle_rook_squares),
+      m_prev_states(std::move(rhs.m_prev_states)),
+      m_state(rhs.m_state),
+      m_listener(std::move(rhs.m_listener)) { }
 
 } // illumina
