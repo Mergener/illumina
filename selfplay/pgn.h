@@ -29,16 +29,6 @@ struct PGNGame {
 
     void set_start_pos(const Board& board,
                        bool shredder_fen = false);
-
-    PGNNode& push_moves(Move move);
-
-    template <typename... TArgs>
-    PGNNode& push_moves(Move move, TArgs... other_moves);
-
-    PGNNode& push_moves(Board& board, Move move);
-
-    template <typename... TArgs>
-    PGNNode& push_moves(Board& board, Move move, TArgs... other_moves);
 };
 
 struct PGN {

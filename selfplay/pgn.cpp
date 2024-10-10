@@ -165,16 +165,4 @@ std::ostream& operator<<(std::ostream& stream, const PGNGame& game) {
     return stream;
 }
 
-PGNNode& PGNGame::push_moves(Move move) {
-    PGNNode& node = main_line.emplace_back();
-    node.move = move;
-    return node;
-}
-
-template<typename... TArgs>
-PGNNode& PGNGame::push_moves(Move move, TArgs... other_moves) {
-    push_moves(move);
-    return push_moves(other_moves...);
-}
-
 } // illumina
