@@ -23,6 +23,10 @@ bool attacks_vulnerable_pieces(const Board& board,
                                Square source,
                                Square dest);
 
+Bitboard discovered_attacks(const Board& board,
+                            Square source,
+                            Square dest);
+
 } // illumina
 
 #endif // ILLUMINA_BOARDUTILS_H

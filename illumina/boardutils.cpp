@@ -194,4 +194,57 @@ bool attacks_vulnerable_pieces(const Board& board,
     return false;
 }
 
+static Bitboard line_attackers(const Board& board,
+                               Square s,
+                               Bitboard occ,
+                               Color c) {
+    Bitboard queens = board.piece_bb(Piece(c, PT_QUEEN));
+    Bitboard rooks  = board.piece_bb(Piece(c, PT_ROOK));
+    return rook_attacks(s, occ) & (queens | rooks);
+}
+
+static Bitboard diagonal_attackers(const Board& board,
+                                   Square s,
+                                   Bitboard occ,
+                                   Color c) {
+    Bitboard queens  = board.piece_bb(Piece(c, PT_QUEEN));
+    Bitboard bishops = board.piece_bb(Piece(c, PT_BISHOP));
+    return bishop_attacks(s, occ) & (queens | bishops);
+}
+
+Bitboard discovered_attacks(const Board& board,
+                            Square source,
+                            Square destination) {
+    Color us   = board.color_to_move();
+    Color them = opposite_color(us);
+    Bitboard their_pieces = board.color_bb(them);
+    Bitboard occ_before = board.occupancy();
+    Bitboard occ_after  = set_bit(unset_bit(occ_before, source), destination);
+
+    // Check all pieces this piece was blocking.
+    Bitboard diagonal_atks = diagonal_attackers(board, source, occ_before, us);
+    Bitboard line_atks     = line_attackers(board, source, occ_before, us);
+
+    Bitboard released = 0;
+
+    if (square_file(source) != square_file(destination)) {
+        released |= line_atks;
+    }
+    if (square_rank(source) != square_rank(destination)) {
+        released |= diagonal_atks;
+    }
+
+    Bitboard revealed = 0;
+    while (released != 0) {
+        Square s = lsb(released);
+        Piece  p = board.piece_at(s);
+
+        revealed |= piece_attacks(p, s, occ_after) & their_pieces;
+
+        released = unset_lsb(released);
+    }
+
+    return revealed;
+}
+
 } // illumina
