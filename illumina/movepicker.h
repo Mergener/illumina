@@ -448,13 +448,22 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         // Increase score of moves that give check.
         move.add_value(MV_PICKER_QUIET_CHECK_BONUS * gives_check);
 
-        if (!has_good_see_simple(*m_board, move.source(), move.destination())) {
-            // Decrease score of moves that put a piece in potential danger.
+        Color us = move.source_piece().color();
+        Color them = opposite_color(us);
+
+        Bitboard discovered_atks = discovered_attacks(*m_board, move.source(), move.destination());
+        Bitboard their_valuable_pieces = m_board->piece_bb(Piece(them, PT_KING))
+                                       | m_board->piece_bb(Piece(them, PT_QUEEN))
+                                       | m_board->piece_bb(Piece(them, PT_ROOK));
+
+        if (   (discovered_atks & their_valuable_pieces) != 0
+            && !has_good_see_simple(*m_board, move.source(), move.destination())) {
+            // Decrease score of moves that put a piece in potential danger for
+            // no clear reason.
             move.add_value(-MV_PICKER_QUIET_DANGER_MALUS);
         }
 
         // Slightly decrease score of moves that move away from the center.
-        Color us = move.source_piece().color();
         Square destination = move.destination();
         BoardFile file = square_file(destination);
         BoardRank rank = us == CL_WHITE

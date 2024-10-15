@@ -32,3 +32,25 @@ TEST_CASE(HasGoodSee) {
         test.run();
     }
 }
+
+TEST_CASE(RevealedAttacks) {
+    struct {
+        std::string board_fen;
+        Square source;
+        Square destination;
+        Bitboard expected;
+
+        void run() const {
+            Board board(board_fen);
+
+            Bitboard revealed_atks = discovered_attacks(board, source, destination);
+            EXPECT(revealed_atks).to_be(expected);
+        }
+    } tests[] = {
+        {"1k6/8/8/1q2n3/2n5/8/1P2P3/1K2RB2 w - - 0 1", SQ_E2, SQ_E4, 0x4000000 }
+    };
+
+    for (const auto& test: tests) {
+        test.run();
+    }
+}
