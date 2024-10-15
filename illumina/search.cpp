@@ -682,6 +682,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Late move reductions.
         Depth reductions = 0;
+        int move_history = m_hist.quiet_history(move,
+                                                m_board.last_move(),
+                                                m_board.gives_check(move));
         if (   n_searched_moves >= LMR_MIN_MOVE_IDX
             && depth >= LMR_MIN_DEPTH
             && !in_check
@@ -692,9 +695,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 reductions += !improving;
 
                 // Further reduce moves that have been historically very bad.
-                reductions += m_hist.quiet_history(move,
-                                                   m_board.last_move(),
-                                                   m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
+                reductions += move_history <= LMR_BAD_HISTORY_THRESHOLD;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
@@ -705,6 +706,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             // Prevent too high or below zero reductions.
             reductions = std::clamp(reductions, 0, depth);
+        }
+
+        // History Leaf Pruning.
+        if (   !PV
+            && n_searched_moves > 0
+            && (depth - reductions + extensions) == 0
+            && move_history < HISTORY_LEAF_PRUNING_THRESHOLD) {
+            m_board.undo_move();
+            continue;
         }
 
         Score score;

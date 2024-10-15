@@ -63,6 +63,9 @@ TUNABLE_VALUE(QSEE_PRUNING_THRESHOLD, int, -1);
 // Lazy SMP
 TUNABLE_VALUE(SMP_EVAL_RANDOM_MARGIN, int, 4);
 
+// History Leaf Pruning
+TUNABLE_VALUE(HISTORY_LEAF_PRUNING_THRESHOLD, 12288);
+
 //
 // Time manager constants
 //
