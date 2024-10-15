@@ -110,17 +110,16 @@ inline int MoveHistory::quiet_history(Move move,
                                       Move last_move,
                                       Move followed_up_move,
                                       bool gives_check) const {
-    int history_weight_sum = MV_HIST_MAIN_WEIGHT
-                           + MV_HIST_COUNTER_MOVE_WEIGHT
-                           + MV_HIST_FOLLOW_UP_MOVE_WEIGHT
-                           + MV_HIST_CHECK_WEIGHT;
+    int weight_sum = MV_HIST_REGULAR_QHIST_WEIGHT
+                   + MV_HIST_COUNTER_MOVE_WEIGHT
+                   + MV_HIST_CHECK_QHIST_WEIGHT;
 
     return int(
-               i64(MV_HIST_MAIN_WEIGHT           * m_data->main_history.get(move))
+               i64(MV_HIST_REGULAR_QHIST_WEIGHT  * m_data->main_history.get(move))
              + i64(MV_HIST_COUNTER_MOVE_WEIGHT   * m_data->counter_move_history.get(last_move).get(move))
              + i64(MV_HIST_FOLLOW_UP_MOVE_WEIGHT * m_data->follow_up_history.get(followed_up_move).get(move))
-             + i64(MV_HIST_CHECK_WEIGHT          * (gives_check ? m_data->check_history.get(move) : 0))
-             ) / history_weight_sum;
+             + i64(MV_HIST_CHECK_QHIST_WEIGHT    * (gives_check ? m_data->check_history.get(move) : 0))
+             ) / weight_sum;
 }
 
 inline void MoveHistory::update_quiet_history(Move move,

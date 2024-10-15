@@ -4,6 +4,7 @@
 #include <climits>
 #include <iomanip>
 
+#include "bench.h"
 #include "cliapplication.h"
 #include "evaluation.h"
 #include "endgame.h"
@@ -39,6 +40,14 @@ State& global_state() {
 // State methods
 //
 
+static std::string score_string(Score score) {
+    if (!is_mate_score(score)) {
+        return "cp " + std::to_string(score);
+    }
+    int n_moves = moves_to_mate(score);
+    return "mate " + std::to_string(score > 0 ? n_moves : -n_moves);
+}
+
 void State::new_game() {
     m_searcher.tt().clear();
     m_eval_random_seed = random(ui64(1), UINT64_MAX);
@@ -55,6 +64,31 @@ const Board& State::board() const {
 
 void State::set_board(const Board& board) {
     m_board = board;
+}
+
+void State::bench() const {
+    BenchSettings settings = default_bench_settings();
+
+    std::cout << "Starting bench...\n" << std::endl;
+    std::cout << "Bench hash size is " << settings.hash_size_mb << " MiB (" << settings.hash_size_mb * 1024 * 1024 << " bytes)" << std::endl;
+    std::cout << "Bench search depth is " << settings.search_settings.max_depth.value() << std::endl;
+    std::cout << std::endl;
+
+    settings.on_board_searched = [](const Board& board,
+                                    Score score,
+                                    Move move) {
+        std::cout << "position " << board.fen()
+                  << " bestmove " << move.to_uci()
+                  << " score " << score_string(score)
+                  << std::endl;
+    };
+    BenchResults results = illumina::bench(settings);
+
+    std::cout << "\nBench finished." << std::endl;
+    std::cout << "\tTotal bench time:     "  << results.bench_time_ms << " ms" << std::endl;
+    std::cout << "\tTotal search time:    "  << results.search_time_ms << " ms" << std::endl;
+    std::cout << "\tTotal searched nodes: "  << results.total_nodes << std::endl;
+    std::cout << "\tNodes/sec:            "  << results.nps << std::endl;
 }
 
 void State::perft(int depth) const {
@@ -200,14 +234,6 @@ static std::string pv_to_string(const std::vector<Move>& line,
 
 }
 
-static std::string score_string(Score score) {
-    if (!is_mate_score(score)) {
-        return "cp " + std::to_string(score);
-    }
-    int n_moves = moves_to_mate(score);
-    return "mate " + std::to_string(score > 0 ? n_moves : -n_moves);
-}
-
 static std::string bound_type_string(BoundType boundType) {
     switch (boundType) {
         case BT_EXACT:      return "";
@@ -274,6 +300,12 @@ void State::search(SearchSettings settings) {
     settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
     settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
     settings.eval_rand_seed     = m_eval_random_seed;
+
+    // User might want to override number of search nodes.
+    ui64 node_option = m_options.option<UCIOptionSpin>("OverrideNodesLimit").value();
+    if (node_option != 0) {
+        settings.max_nodes = node_option;
+    }
 
     m_search_thread = new std::thread([this, settings]() {
         try {
@@ -355,6 +387,7 @@ void State::register_options() {
             m_frc = check.value();
         });
     m_options.register_option<UCIOptionSpin>("EvalRandomMargin", 0, 0, 1024);
+    m_options.register_option<UCIOptionSpin>("OverrideNodesLimit", 0, 0, INT32_MAX);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
