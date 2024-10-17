@@ -712,7 +712,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         if (   !PV
             && n_searched_moves > 0
             && (depth - reductions + extensions) == 0
-            && move_history < HISTORY_LEAF_PRUNING_THRESHOLD) {
+            && move_history < HISTORY_LEAF_PRUNING_THRESHOLD
+            && move_picker.stage() >= MPS_QUIET
+            && move.is_quiet()) {
             m_board.undo_move();
             continue;
         }
