@@ -620,8 +620,8 @@ TMOVE* generate_evasions_by_color(const Board& board, TMOVE* moves) {
                             else if (std::abs(s - blocker_sq) == DIR_NORTH) {
                                 *moves++ = Move::new_normal(blocker_sq, s, blocker_piece);
                             }
-                            else if (square_rank(blocker_sq) == pawn_starting_rank(C) &&
-                                    (between_bb(blocker_sq, s) & occ) == 0) {
+                            else if (    square_rank(blocker_sq) == pawn_starting_rank(C)
+                                     && (between_bb(blocker_sq, s) & occ) == 0) {
                                 *moves++ = Move::new_double_push(blocker_sq, C);
                             }
                         }

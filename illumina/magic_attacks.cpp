@@ -117,15 +117,15 @@ static Bitboard generate_slider_attacks(Square s, Direction dir, Bitboard occ) {
         int file_delta = std::abs(square_file(s) - prev_file);
         int rank_delta = std::abs(square_rank(s) - prev_rank);
 
-        if ((dir == DIR_EAST || dir == DIR_WEST) &&
-            rank_delta != 0) {
+        if (   (dir == DIR_EAST || dir == DIR_WEST)
+            && rank_delta != 0) {
             // Rank moved.
             break;
         }
 
-        if ((dir == DIR_NORTHWEST || dir == DIR_NORTHEAST ||
-             dir == DIR_SOUTHEAST || dir == DIR_SOUTHWEST) && // diagonal
-            (file_delta != 1 || rank_delta != 1)) {
+        if ((   dir == DIR_NORTHWEST || dir == DIR_NORTHEAST
+             || dir == DIR_SOUTHEAST || dir == DIR_SOUTHWEST) // diagonal
+            && (file_delta != 1 || rank_delta != 1)) {
             // Out of diagonal.
             break;
         }

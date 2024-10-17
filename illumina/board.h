@@ -2,6 +2,7 @@
 #define ILLUMINA_BOARD_H
 
 #include <array>
+#include <functional>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -11,6 +12,18 @@
 #include "zobrist.h"
 
 namespace illumina {
+
+/**
+ * Listens to changes made to a board object.
+ */
+struct BoardListener {
+    std::function<void(const Board& board, Piece p, Square s)> on_add_piece = nullptr;
+    std::function<void(const Board& board, Piece p, Square s)> on_remove_piece = nullptr;
+    std::function<void(const Board& board, Move move)> on_make_move = nullptr;
+    std::function<void(const Board& board, Move move)> on_undo_move = nullptr;
+    std::function<void(const Board& board)> on_make_null_move = nullptr;
+    std::function<void(const Board& board)> on_undo_null_move = nullptr;
+};
 
 constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
 
@@ -79,6 +92,8 @@ public:
     bool is_move_pseudo_legal(Move move) const;
     bool is_move_legal(Move move) const;
 
+    void set_listener(BoardListener listener);
+
     template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
     Square first_attacker_of(Color c, Square s) const;
 
@@ -92,16 +107,20 @@ public:
     Bitboard all_attackers_of_type(Color c, Square s) const;
 
     Board() = default;
-    Board(const Board& rhs) = default;
+    Board(const Board& rhs);
     explicit Board(std::string_view fen_str);
+    Board(Board&& rhs) noexcept;
+    Board& operator=(const Board& rhs);
     ~Board() = default;
-    Board(Board&& rhs) = default;
-    Board& operator=(const Board& rhs) = default;
 
     static Board standard_startpos();
     static Board random_frc_startpos(bool mirrored = true);
 
 private:
+    // If any fields are added to this class, make sure to properly update
+    // the copy, assignment and move constructors -- these were manually written
+    // to prevent copying m_listeners to board copies.
+
     std::array<Piece, SQ_COUNT> m_pieces {};
     std::array<std::array<Bitboard, PT_COUNT>, CL_COUNT> m_bbs {};
     Color m_ctm = CL_WHITE;
@@ -134,6 +153,8 @@ private:
 
     std::vector<State> m_prev_states;
     State m_state {};
+
+    BoardListener m_listener {};
 
     Bitboard& piece_bb_ref(Piece piece);
     Bitboard& color_bb_ref(Color color);
@@ -324,6 +345,10 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_added(Square s, Piece p) {
+    if (m_listener.on_add_piece) {
+        m_listener.on_add_piece(*this, p, s);
+    }
+
     Color piece_color = p.color();
 
     Bitboard& new_color_bb  = color_bb_ref(piece_color);
@@ -347,6 +372,9 @@ inline void Board::piece_added(Square s, Piece p) {
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_removed(Square s) {
     Piece prev_piece = piece_at(s);
+    if (m_listener.on_remove_piece) {
+        m_listener.on_remove_piece(*this, prev_piece, s);
+    }
 
     Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
     Bitboard& prev_color_bb = color_bb_ref(prev_piece.color());
@@ -696,8 +724,8 @@ inline bool BoardResult::is_finished() const {
 }
 
 inline bool BoardResult::is_draw() const {
-    return outcome != BoardOutcome::UNFINISHED &&
-           outcome != BoardOutcome::CHECKMATE;
+    return    outcome != BoardOutcome::UNFINISHED
+           && outcome != BoardOutcome::CHECKMATE;
 }
 
 } // illumina

@@ -316,6 +316,10 @@ std::string Board::pretty() const {
 }
 
 void Board::make_move(Move move) {
+    if (m_listener.on_make_move) {
+        m_listener.on_make_move(*this, move);
+    }
+
     Color moving_color  = color_to_move();
     Color opponent      = opposite_color(color_to_move());
     Square source       = move.source();
@@ -409,10 +413,13 @@ void Board::make_move(Move move) {
 }
 
 void Board::undo_move() {
+    Move move = last_move();
+    if (m_listener.on_undo_move) {
+        m_listener.on_undo_move(*this, move);
+    }
+
     set_color_to_move(opposite_color(color_to_move()));
     Color moving_color = color_to_move();
-
-    Move move = last_move();
 
     Square source       = move.source();
     Square destination  = move.destination();
@@ -514,6 +521,10 @@ bool Board::is_attacked_by(Color c, Square s, Bitboard occ) const {
 }
 
 void Board::make_null_move() {
+    if (m_listener.on_make_null_move) {
+        m_listener.on_make_null_move(*this);
+    }
+
     m_prev_states.push_back(m_state);
 
     set_color_to_move(opposite_color(color_to_move()));
@@ -524,6 +535,10 @@ void Board::make_null_move() {
 }
 
 void Board::undo_null_move() {
+    if (m_listener.on_undo_null_move) {
+        m_listener.on_undo_null_move(*this);
+    }
+
     set_color_to_move(opposite_color(color_to_move()));
 
     m_state = m_prev_states.back();
@@ -802,6 +817,10 @@ void Board::compute_checkers() {
     m_state.n_checkers = popcount(checkers);
 }
 
+void Board::set_listener(BoardListener listener) {
+    m_listener = std::move(listener);
+}
+
 Board Board::standard_startpos() {
     return Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
@@ -897,5 +916,53 @@ Board Board::random_frc_startpos(bool mirrored) {
 
     return board;
 }
+
+// Board constructors below.
+// We don't use default copy/assignment constructor implementations since
+// we don't want listeners to be copied from a board object to another.
+
+Board::Board(const illumina::Board &rhs)
+        : m_pieces(rhs.m_pieces),
+          m_bbs(rhs.m_bbs),
+          m_ctm(rhs.m_ctm),
+          m_occ(rhs.m_occ),
+          m_pinners(rhs.m_pinners),
+          m_pinned_bb(rhs.m_pinned_bb),
+          m_base_ply_count(rhs.m_base_ply_count),
+          m_castle_rook_squares(rhs.m_castle_rook_squares),
+          m_prev_states(rhs.m_prev_states),
+          m_state(rhs.m_state),
+          m_listener({}) { }
+
+Board& Board::operator=(const illumina::Board &rhs) {
+    if (this != &rhs) {
+        m_pieces              = rhs.m_pieces;
+        m_bbs                 = rhs.m_bbs;
+        m_ctm                 = rhs.m_ctm;
+        m_occ                 = rhs.m_occ;
+        m_pinners             = rhs.m_pinners;
+        m_pinned_bb           = rhs.m_pinned_bb;
+        m_base_ply_count      = rhs.m_base_ply_count;
+        m_castle_rook_squares = rhs.m_castle_rook_squares;
+        m_state               = rhs.m_state;
+        m_prev_states         = rhs.m_prev_states;
+
+        m_listener = {};
+    }
+    return *this;
+}
+
+Board::Board(Board&& rhs) noexcept
+    : m_pieces(rhs.m_pieces),
+      m_bbs(rhs.m_bbs),
+      m_ctm(rhs.m_ctm),
+      m_occ(rhs.m_occ),
+      m_pinners(rhs.m_pinners),
+      m_pinned_bb(rhs.m_pinned_bb),
+      m_base_ply_count(rhs.m_base_ply_count),
+      m_castle_rook_squares(rhs.m_castle_rook_squares),
+      m_prev_states(std::move(rhs.m_prev_states)),
+      m_state(rhs.m_state),
+      m_listener(std::move(rhs.m_listener)) { }
 
 } // illumina

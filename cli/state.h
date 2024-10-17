@@ -18,6 +18,7 @@ public:
     void set_board(const Board& board);
 
     // Debug
+    void bench() const;
     void perft(int depth) const;
     void mperft(int depth) const;
 

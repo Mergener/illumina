@@ -132,8 +132,8 @@ inline void TimeManager::on_new_pv(Depth depth,
 
     // If we think that our next search won't be finished
     // before the next depth ends, interrupt the search.
-    if (depth >= TM_CUTOFF_MIN_DEPTH &&
-        elapsed() > (m_hard_bound * TM_CUTOFF_HARD_BOUND_FACTOR / TM_CUTOFF_HARD_BOUND_DIVISOR)) {
+    if (depth >= TM_CUTOFF_MIN_DEPTH
+        && elapsed() > (m_hard_bound * TM_CUTOFF_HARD_BOUND_FACTOR / TM_CUTOFF_HARD_BOUND_DIVISOR)) {
         m_soft_bound = 0;
         m_hard_bound = 0;
         return;
@@ -148,8 +148,8 @@ inline void TimeManager::on_new_pv(Depth depth,
     // If the last few plies had stable results, quicken
     // the search softly.
     Score cp_delta = score - m_last_best_score;
-    if (best_move == m_last_best_move &&
-        (cp_delta > TM_STABILITY_MIN_CP_DELTA && cp_delta < TM_STABILITY_MAX_CP_DELTA)) {
+    if (   best_move == m_last_best_move
+        && (cp_delta > TM_STABILITY_MIN_CP_DELTA && cp_delta < TM_STABILITY_MAX_CP_DELTA)) {
         // We have the same last move and a close score to the previous
         // iteration.
         m_stable_iterations++;

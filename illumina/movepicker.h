@@ -22,8 +22,8 @@ enum {
     MPS_GOOD_CAPTURES,
     MPS_EP,
     MPS_KILLER_MOVES,
-    MPS_BAD_CAPTURES,
     MPS_QUIET,
+    MPS_BAD_CAPTURES,
     MPS_END_NOT_CHECK,
 
     // For check positions, non-quiesce:
@@ -403,10 +403,10 @@ inline Move MovePicker<QUIESCE>::next() {
         return next();
     }
     // Prevent killer move revisits.
-    if (!QUIESCE &&
-        m_mv_hist->is_killer(m_ply, move) &&
-        (m_stage != MPS_KILLER_MOVES      &&
-        m_stage != MPS_KILLER_EVASIONS)) {
+    if (!QUIESCE
+         &&  m_mv_hist->is_killer(m_ply, move)
+         && (m_stage != MPS_KILLER_MOVES
+         &&  m_stage != MPS_KILLER_EVASIONS)) {
         return next();
     }
 
@@ -440,7 +440,37 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
     }
     else {
-        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move(), m_board->gives_check(move)));
+        bool gives_check = m_board->gives_check(move);
+
+        // Adjust score based on move history.
+        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move(), gives_check));
+
+        // Increase score of moves that give check.
+        move.add_value(MV_PICKER_QUIET_CHECK_BONUS * gives_check);
+
+        Color us = move.source_piece().color();
+        Color them = opposite_color(us);
+
+        Bitboard discovered_atks = discovered_attacks(*m_board, move.source(), move.destination());
+        Bitboard their_valuable_pieces = m_board->piece_bb(Piece(them, PT_KING))
+                                       | m_board->piece_bb(Piece(them, PT_QUEEN))
+                                       | m_board->piece_bb(Piece(them, PT_ROOK));
+
+        if (   (discovered_atks & their_valuable_pieces) != 0
+            && !has_good_see_simple(*m_board, move.source(), move.destination())) {
+            // Decrease score of moves that put a piece in potential danger for
+            // no clear reason.
+            move.add_value(-MV_PICKER_QUIET_DANGER_MALUS);
+        }
+
+        // Slightly decrease score of moves that move away from the center.
+        Square destination = move.destination();
+        BoardFile file = square_file(destination);
+        BoardRank rank = us == CL_WHITE
+                       ? std::min(square_rank(destination), BoardRank(RNK_4))
+                       : std::max(square_rank(destination), BoardRank(RNK_5));
+
+        move.add_value(-center_manhattan_distance(make_square(file, rank)));
     }
 }
 
