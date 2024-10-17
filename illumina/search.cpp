@@ -684,17 +684,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             }
         }
 
-        m_board.make_move(move);
-
         // Late move reductions.
         Depth reductions = 0;
         int move_history = m_hist.quiet_history(move,
                                                 m_board.last_move(),
                                                 m_board.gives_check(move));
         if (   n_searched_moves >= LMR_MIN_MOVE_IDX
-            && depth >= LMR_MIN_DEPTH
-            && !in_check
-            && !m_board.in_check()) {
+               && depth >= LMR_MIN_DEPTH
+               && !in_check
+               && !m_board.in_check()) {
             reductions = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
                 // Further reduce moves that are not improving the static evaluation.
@@ -716,14 +714,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // History Leaf Pruning.
         if (   !PV
-            && n_searched_moves > 0
-            && (depth - reductions + extensions) == 0
-            && move_history < HISTORY_LEAF_PRUNING_THRESHOLD
-            && move_picker.stage() >= MPS_QUIET
-            && move.is_quiet()) {
-            m_board.undo_move();
+               && n_searched_moves > 0
+               && (depth - reductions + extensions) == 0
+               && move_history < HISTORY_LEAF_PRUNING_THRESHOLD
+               && move_picker.stage() >= MPS_QUIET
+               && move.is_quiet()) {
             continue;
         }
+
+        m_board.make_move(move);
 
         Score score;
         if (n_searched_moves == 0) {
