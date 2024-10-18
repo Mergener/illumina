@@ -10,12 +10,12 @@
 
 namespace illumina {
 
-constexpr ui64 SEARCH_NODE_LIMIT    = 5128;
-constexpr int  MIN_RANDOM_PLIES     = 3;
-constexpr int  MAX_RANDOM_PLIES     = 8;
+constexpr ui64 SEARCH_NODE_LIMIT    = 4096;
+constexpr int  MIN_RANDOM_PLIES     = 4;
+constexpr int  MAX_RANDOM_PLIES     = 10;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
-constexpr Score HI_SCORE            = 800;
-constexpr int MAX_HI_SCORE_PLIES    = 6;
+constexpr Score HI_SCORE            = 1024;
+constexpr int MAX_HI_SCORE_PLIES    = 8;
 constexpr size_t MIN_POSITIONS_PER_GAME = 12;
 constexpr size_t MAX_POSITIONS_PER_GAME = 16;
 
@@ -46,8 +46,10 @@ Game simulate() {
     SearchSettings search_settings;
     search_settings.max_nodes = SEARCH_NODE_LIMIT;
     search_settings.move_time = 10000;
+    search_settings.eval_rand_seed = random(i64(0), INT64_MAX);
+    search_settings.eval_random_margin = 10;
 
-    Board board = Board::random_frc_startpos(false);;
+    Board board = Board::standard_startpos();
 
     // Play some random moves to apply variety to the
     // starting positions, but don't add positions that
@@ -65,7 +67,7 @@ Game simulate() {
             if (n_moves == 0) {
                 // Oops, we entered a stalemate or checkmate position.
                 // Rewind to the start.
-                board = Board::random_frc_startpos(false);
+                board = Board::standard_startpos();
                 i = -1;
                 continue;
             }
@@ -88,7 +90,7 @@ Game simulate() {
         if (std::abs(search_results.score) > 160) {
             // Position is excessively imbalanced.
             // Rewind to the start.
-            board = Board::random_frc_startpos(false);
+            board = Board::standard_startpos();
             continue;
         }
 
@@ -201,7 +203,7 @@ void generate_data(std::string_view out_file) {
                     continue;
                 }
 
-                out_tuples.push_back({ board.fen(true), ply_data.white_pov_score, game.outcome });
+                out_tuples.push_back({ board.fen(false), ply_data.white_pov_score, game.outcome });
 
                 board.make_move(ply_data.best_move);
             }
