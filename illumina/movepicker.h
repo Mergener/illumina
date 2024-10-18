@@ -425,7 +425,7 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     move.set_value(0);
     if (move.is_capture()) {
-        constexpr i32 MVV[PT_COUNT] = { 0, 0, 600, 650, 1200, 3000 };
+        constexpr i32 MVV[PT_COUNT] = { 0, 0, 600, 650, 1200, 2400 };
         move.add_value(MVV[move.captured_piece().type()]);
         move.add_value(m_mv_hist->capture_history(move));
     }
