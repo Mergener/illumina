@@ -25,6 +25,13 @@ struct PieceToArray : std::array<std::array<std::array<T, SQ_COUNT>, PT_COUNT>, 
     const T& get(Move move) const;
 };
 
+template <typename T>
+struct PieceVictimFromArray
+     : std::array<std::array<std::array<std::array<T, SQ_COUNT>, PT_COUNT>, PT_COUNT>, CL_COUNT> {
+    T& get(Move move);
+    const T& get(Move move) const;
+};
+
 class MoveHistory {
 public:
     const std::array<Move, 2>& killers(Depth ply) const;
@@ -39,6 +46,11 @@ public:
                               bool gives_check,
                               bool good);
 
+    int  capture_history(Move move) const;
+    void update_capture_history(Move move,
+                                Depth depth,
+                                bool good);
+
     MoveHistory();
 
 private:
@@ -50,6 +62,7 @@ private:
         ButterflyArray<int> m_quiet_history {};
         PieceToArray<PieceToArray<int>> m_counter_move_history {};
         PieceToArray<int> m_check_history {};
+        PieceVictimFromArray<int> capture_history {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
@@ -82,6 +95,20 @@ inline const std::array<Move, 2>& MoveHistory::killers(Depth ply) const {
     return m_data->m_killers[ply];
 }
 
+template <typename T>
+const T& PieceVictimFromArray<T>::get(illumina::Move move) const {
+    ILLUMINA_ASSERT(move.is_capture());
+    Piece source_piece = move.source_piece();
+    return (*this)[source_piece.color()][source_piece.type()][move.captured_piece().type()][move.source()];
+}
+
+template <typename T>
+T& PieceVictimFromArray<T>::get(illumina::Move move) {
+    ILLUMINA_ASSERT(move.is_capture());
+    Piece source_piece = move.source_piece();
+    return (*this)[source_piece.color()][source_piece.type()][move.captured_piece().type()][move.source()];
+}
+
 inline bool MoveHistory::is_killer(Depth ply, Move move) const {
     const std::array<Move, 2>& arr = killers(ply);
     return arr[0] == move || arr[1] == move;
@@ -110,6 +137,14 @@ inline int MoveHistory::quiet_history(Move move, Move last_move, bool gives_chec
              + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->m_counter_move_history.get(last_move).get(move))
              + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? m_data->m_check_history.get(move) : 0))
              ) / weight_sum;
+}
+
+inline int MoveHistory::capture_history(illumina::Move move) const {
+    return m_data->capture_history.get(move);
+}
+
+inline void MoveHistory::update_capture_history(illumina::Move move, illumina::Depth depth, bool good) {
+    update_history(m_data->capture_history.get(move), depth, good);
 }
 
 inline void MoveHistory::update_quiet_history(Move move,

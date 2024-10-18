@@ -163,10 +163,10 @@ private:
     void set_piece_at_internal(Square s, Piece p);
 
     template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
-    void piece_added(Square s, Piece p);
+    void add_piece(Square s, Piece p);
 
     template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
-    void piece_removed(Square s);
+    void remove_piece(Square s);
 
     template <bool CHECK>
     bool is_move_legal(Move move) const;
@@ -322,20 +322,20 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
     if (p == PIECE_NULL) {
         // Note that we can assume there was a piece on 's' because
         // of the check 'p == prev_piece' above.
-        piece_removed<DO_ZOB, false>(s);
+        remove_piece<DO_ZOB, false>(s);
         m_occ = unset_bit(m_occ, s);
     }
     else {
         if (prev_piece != PIECE_NULL) {
             // We removed a piece but placed a new one on the same square.
             // Don't change the occupancy.
-            piece_removed<DO_ZOB, false>(s);
+            remove_piece<DO_ZOB, false>(s);
         }
         else {
             // We're adding a new piece, set bit on occupancy.
             m_occ = set_bit(m_occ, s);
         }
-        piece_added<DO_ZOB, false>(s, p);
+        add_piece<DO_ZOB, false>(s, p);
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
@@ -344,7 +344,7 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
 }
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
-inline void Board::piece_added(Square s, Piece p) {
+inline void Board::add_piece(Square s, Piece p) {
     if (m_listener.on_add_piece) {
         m_listener.on_add_piece(*this, p, s);
     }
@@ -370,7 +370,7 @@ inline void Board::piece_added(Square s, Piece p) {
 }
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
-inline void Board::piece_removed(Square s) {
+inline void Board::remove_piece(Square s) {
     Piece prev_piece = piece_at(s);
     if (m_listener.on_remove_piece) {
         m_listener.on_remove_piece(*this, prev_piece, s);

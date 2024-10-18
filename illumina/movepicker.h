@@ -425,19 +425,9 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     move.set_value(0);
     if (move.is_capture()) {
-        // Perform MMV-LVA: Most valuable victims -> Least valuable attackers
-        constexpr i32 MVV_LVA[PT_COUNT][PT_COUNT] {
-            /*         x-    xP    xN    xB    xR    xQ    xK  */
-            /* -- */ { 0,    0,    0,    0,    0,    0,    0   },
-            /* Px */ { 0,   105,  205,  305,  405,  505,  9999 },
-            /* Nx */ { 0,   104,  204,  304,  404,  504,  9999 },
-            /* Bx */ { 0,   103,  203,  303,  403,  503,  9999 },
-            /* Rx */ { 0,   102,  202,  302,  600,  502,  9999 },
-            /* Qx */ { 0,   101,  201,  301,  401,  501,  9999 },
-            /* Kx */ { 0,   100,  200,  300,  400,  500,  9999 },
-        };
-
-        move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
+        constexpr i32 MVV[PT_COUNT] = { 0, 0, 600, 650, 1200, 3000 };
+        move.add_value(MVV[move.captured_piece().type()]);
+        move.add_value(m_mv_hist->capture_history(move));
     }
     else {
         bool gives_check = m_board->gives_check(move);

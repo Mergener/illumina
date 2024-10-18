@@ -589,9 +589,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         m_curr_move_number = 0;
     }
 
-    // Store played quiet moves in this list.
+    // Store played moves in the following lists.
     // Useful for history updates later on.
     StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
+    StaticList<Move, MAX_GENERATED_MOVES> captures_played;
 
     int move_idx = -1;
 
@@ -733,6 +734,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
         }
+        else if (move.is_capture() && !move.is_promotion()) {
+            captures_played.push_back(move);
+        }
 
         n_searched_moves++;
 
@@ -746,7 +750,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             best_move = move;
 
             // Update our history scores and refutation moves.
-            if (move.is_quiet()) {
+            if (move.is_capture()) {
+                for (Move capture: captures_played) {
+                    m_hist.update_capture_history(capture, depth, capture == best_move);
+                }
+            }
+            else if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);
 
                 for (Move quiet: quiets_played) {
@@ -755,6 +764,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                                                 depth,
                                                 m_board.gives_check(quiet),
                                                 quiet == best_move);
+                }
+
+                for (Move capture: captures_played) {
+                    m_hist.update_capture_history(capture, depth, false);
                 }
             }
 
@@ -841,8 +854,8 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
     // Finally, start looping over available noisy moves.
     MovePicker<true> move_picker(m_board, ply, m_hist);
+    StaticList<Move, MAX_GENERATED_MOVES> captures_played;
     SearchMove move;
-    SearchMove best_move;
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
@@ -854,13 +867,18 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         Score score = -quiescence_search(ply + 1, -beta, -alpha);
         m_board.undo_move();
 
+        captures_played.push_back(move);
+
         if (score >= beta) {
-            best_move = move;
             alpha = score;
+
+            for (Move capture: captures_played) {
+                m_hist.update_capture_history(capture, 1, capture == move);
+            }
+
             break;
         }
         if (score > alpha) {
-            best_move = move;
             alpha = score;
         }
     }
