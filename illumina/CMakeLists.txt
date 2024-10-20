@@ -3,7 +3,9 @@ set(lib_src types.h types.h debug.h illumina.h types.cpp illumina.cpp board.cpp 
         magic_attacks.cpp
         tunablevalues.cpp endgame.cpp endgame.h nnue.cpp nnue.h
         bench.cpp
-        bench.h)
+        bench.h
+        threadpool.cpp
+        threadpool.h)
 
 foreach(ARCH ${ARCHS})
     set(TARGET illumina_lib_${ARCH})

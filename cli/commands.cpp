@@ -7,29 +7,29 @@
 
 namespace illumina {
 
-void register_commands(CLIApplication& server) {
-    server.register_command("uci", [](const CommandContext& ctx) {
+void register_commands(CLIApplication& app) {
+    app.register_command("uci", [](const CommandContext& ctx) {
         global_state().uci();
     });
 
-    server.register_command("setoption", [](const CommandContext& ctx) {
+    app.register_command("setoption", [](const CommandContext& ctx) {
         std::string opt_name  = ctx.word_after("name");
         std::string value_str = ctx.word_after("value");
 
         global_state().set_option(opt_name, value_str);
     });
 
-    server.register_command("option", [](const CommandContext& ctx) {
+    app.register_command("option", [](const CommandContext& ctx) {
         std::string opt_name  = ctx.word_after("");
 
         global_state().display_option_value(opt_name);
     });
 
-    server.register_command("ucinewgame", [](const CommandContext& ctx) {
+    app.register_command("ucinewgame", [](const CommandContext& ctx) {
         global_state().new_game();
     });
 
-    server.register_command("position", [](const CommandContext& ctx) {
+    app.register_command("position", [](const CommandContext& ctx) {
         bool read_only = true;
         Board board;
         if (ctx.has_arg("startpos")) {
@@ -79,7 +79,7 @@ void register_commands(CLIApplication& server) {
         global_state().set_board(board);
     });
 
-    server.register_command("domoves", [](const CommandContext& ctx) {
+    app.register_command("domoves", [](const CommandContext& ctx) {
         Board board = global_state().board();
         std::vector<Move> moves;
         std::string move_list_str = ctx.all_after("");
@@ -94,27 +94,27 @@ void register_commands(CLIApplication& server) {
         global_state().set_board(board);
     });
 
-    server.register_command("bench", [](const CommandContext& ctx) {
+    app.register_command("bench", [](const CommandContext& ctx) {
         global_state().bench();
     });
 
-    server.register_command("perft", [](const CommandContext& ctx) {
+    app.register_command("perft", [](const CommandContext& ctx) {
         global_state().perft(int(ctx.int_after("")));
     });
 
-    server.register_command("mperft", [](const CommandContext& ctx) {
+    app.register_command("mperft", [](const CommandContext& ctx) {
         global_state().mperft(int(ctx.int_after("")));
     });
 
-    server.register_command("isready", [](const CommandContext& ctx) {
+    app.register_command("isready", [](const CommandContext& ctx) {
         global_state().check_if_ready();
     });
 
-    server.register_command("eval", [](const CommandContext& ctx) {
+    app.register_command("eval", [](const CommandContext& ctx) {
         global_state().evaluate();
     });
 
-    server.register_command("go", [](const CommandContext& ctx) {
+    app.register_command("go", [](const CommandContext& ctx) {
         SearchSettings settings;
         settings.max_depth = ctx.int_after("depth", MAX_DEPTH);
 
@@ -161,14 +161,13 @@ void register_commands(CLIApplication& server) {
         global_state().search(settings);
     });
 
-    server.register_command("stop", [](const CommandContext& ctx) {
+    app.register_command("stop", [](const CommandContext& ctx) {
         global_state().stop_search();
     });
 
-    server.register_command("quit", [](const CommandContext& ctx) {
+    app.register_command("quit", [](const CommandContext& ctx) {
         global_state().quit();
     });
-
 }
 
 } // illumina

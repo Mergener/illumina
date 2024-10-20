@@ -5,7 +5,7 @@
 
 namespace illumina {
 
-void register_commands(CLIApplication& server);
+void register_commands(CLIApplication& app);
 
 } // illumina
 

@@ -7,8 +7,9 @@
 
 #include "board.h"
 #include "timemanager.h"
-#include "types.h"
+#include "threadpool.h"
 #include "transpositiontable.h"
+#include "types.h"
 
 namespace illumina {
 
@@ -27,7 +28,6 @@ struct PVResults {
 struct SearchSettings {
     Score contempt = 0;
     int n_pvs = 1;
-    int n_threads = 1;
     int eval_random_margin = 0;
     ui64 eval_rand_seed = 0;
     ui64 max_nodes = UINT64_MAX;
@@ -63,6 +63,8 @@ public:
 
     void set_pv_finish_listener(const PVFinishListener& listener);
     void set_currmove_listener(const CurrentMoveListener& listener);
+    size_t helper_threads() const;
+    void set_helper_threads(int n_threads);
 
     Searcher() = default;
     Searcher(const Searcher& other) = delete;
@@ -72,11 +74,11 @@ public:
 
 private:
     bool m_searching = false;
-
     bool m_stop = false;
-    TranspositionTable m_tt;
 
+    TranspositionTable m_tt;
     TimeManager m_tm;
+    ThreadPool m_thread_pool;
 
     struct Listeners {
         PVFinishListener    pv_finish = [](PVResults&) {};
@@ -90,6 +92,10 @@ inline void Searcher::set_pv_finish_listener(const PVFinishListener& listener) {
 
 inline void Searcher::set_currmove_listener(const CurrentMoveListener& listener) {
     m_listeners.curr_move_listener = listener;
+}
+
+inline void Searcher::set_helper_threads(int n_threads) {
+    m_thread_pool.resize(n_threads);
 }
 
 inline Searcher::Searcher(TranspositionTable&& tt)

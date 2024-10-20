@@ -136,6 +136,7 @@ public:
     void iterative_deepening();
     bool should_stop() const;
     void check_limits();
+    bool running() const;
 
     const WorkerResults& results() const;
 
@@ -159,6 +160,7 @@ private:
     int         m_curr_pv_idx = 0;
     int         m_eval_random_margin = 0;
     int         m_eval_random_seed = 0;
+    bool        m_running = false;
 
     std::vector<Move> m_search_moves;
 
@@ -262,7 +264,7 @@ SearchResults Searcher::search(const Board& board,
     }
 
     // Determine the number of helper threads to be used.
-    int n_helper_threads = std::max(1, settings.n_threads) - 1;
+    int n_helper_threads = m_thread_pool.size();
 
     // Create secondary workers.
     for (int i = 0; i < n_helper_threads; ++i) {
@@ -270,19 +272,18 @@ SearchResults Searcher::search(const Board& board,
     }
 
     // Fire secondary threads.
-    std::vector<std::thread> helper_threads;
     for (int i = 0; i < n_helper_threads; ++i) {
         SearchWorker* worker = secondary_workers[i].get();
-        helper_threads.emplace_back([worker]() {
+        m_thread_pool.submit(([worker]() {
             worker->iterative_deepening();
-        });
+        }));
     }
 
     main_worker.iterative_deepening();
 
     // Wait for secondary threads to stop.
-    for (std::thread& thread: helper_threads) {
-        thread.join();
+    for (const auto& worker: secondary_workers) {
+        while (worker->running());
     }
 
     // Save obtained results in vector and vote for the best afterwards.
@@ -335,37 +336,9 @@ SearchResults Searcher::search(const Board& board,
 }
 
 void SearchWorker::iterative_deepening() {
-    Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
-    for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
-        if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
-            // If we finished soft, we don't want to start a new iteration.
-            if (m_main) {
-                m_context->stop_search();
-            }
-            break;
-        }
-
-        // Make sure this thread's search moves list is full once
-        // each new iteration starts.
-        m_search_moves = m_context->root_info().moves;
-
-        int n_pvs = std::clamp(m_settings->n_pvs, 1, MAX_PVS);
-        for (m_curr_pv_idx = 0; m_curr_pv_idx < n_pvs; ++m_curr_pv_idx) {
-            // If there are no moves to search, abort.
-            if (m_search_moves.empty()) {
-                break;
-            }
-
-            // Make sure we set a valid move as the best move so that
-            // we can return it if our search is interrupted early.
-            if (m_results.pv_results[m_curr_pv_idx].best_move == MOVE_NULL) {
-                m_results.pv_results[m_curr_pv_idx].best_move = m_search_moves[0];
-            }
-
-            check_limits();
-            aspiration_windows();
-            m_results.searched_depth = m_root_depth;
-            check_limits();
+    try {
+        Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
+        for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
             if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
                 if (m_main) {
@@ -374,16 +347,51 @@ void SearchWorker::iterative_deepening() {
                 break;
             }
 
-            // When using MultiPV, erase the best searched move and look for a new
-            // pv without it.
-            Move pv_move = m_results.pv_results[m_curr_pv_idx].best_move;
-            auto best_move_it = std::find(m_search_moves.begin(), m_search_moves.end(), pv_move);
-            if (best_move_it != m_search_moves.end()) {
-                m_search_moves.erase(best_move_it);
+            // Make sure this thread's search moves list is full once
+            // each new iteration starts.
+            m_search_moves = m_context->root_info().moves;
+
+            int n_pvs = std::clamp(m_settings->n_pvs, 1, MAX_PVS);
+            for (m_curr_pv_idx = 0; m_curr_pv_idx < n_pvs; ++m_curr_pv_idx) {
+                // If there are no moves to search, abort.
+                if (m_search_moves.empty()) {
+                    break;
+                }
+
+                // Make sure we set a valid move as the best move so that
+                // we can return it if our search is interrupted early.
+                if (m_results.pv_results[m_curr_pv_idx].best_move == MOVE_NULL) {
+                    m_results.pv_results[m_curr_pv_idx].best_move = m_search_moves[0];
+                }
+
+                check_limits();
+                aspiration_windows();
+                m_results.searched_depth = m_root_depth;
+                check_limits();
+                if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
+                    // If we finished soft, we don't want to start a new iteration.
+                    if (m_main) {
+                        m_context->stop_search();
+                    }
+                    break;
+                }
+
+                // When using MultiPV, erase the best searched move and look for a new
+                // pv without it.
+                Move pv_move = m_results.pv_results[m_curr_pv_idx].best_move;
+                auto best_move_it = std::find(m_search_moves.begin(), m_search_moves.end(), pv_move);
+                if (best_move_it != m_search_moves.end()) {
+                    m_search_moves.erase(best_move_it);
+                }
             }
+            m_curr_pv_idx = 0;
         }
-        m_curr_pv_idx = 0;
     }
+    catch (const std::exception& e) {
+        m_running = false;
+        throw e;
+    }
+    m_running = false;
 }
 
 void SearchWorker::aspiration_windows() {
@@ -462,7 +470,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Keep track on some stats to report or use later.
-    m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
+    m_results.sel_depth = std::max(m_results.sel_depth, node->ply + 1);
 
     // Make sure we count the root node.
     if constexpr (ROOT) {
@@ -1028,6 +1036,10 @@ SearchWorker::SearchWorker(bool main,
 
 const WorkerResults& SearchWorker::results() const {
     return m_results;
+}
+
+bool SearchWorker::running() const {
+    return m_running;
 }
 
 static void init_search_constants() {

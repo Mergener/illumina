@@ -297,7 +297,6 @@ void State::search(SearchSettings settings) {
 
     settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
     settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
-    settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
     settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
     settings.eval_rand_seed     = m_eval_random_seed;
 
@@ -378,7 +377,11 @@ void State::register_options() {
             m_searcher.tt().resize(spin.value() * 1024 * 1024);
         });
 
-    m_options.register_option<UCIOptionSpin>("Threads", 1, 1, UINT16_MAX);
+    m_options.register_option<UCIOptionSpin>("Threads", 1, 1, UINT16_MAX)
+            .add_update_handler([this](const UCIOption& opt) {
+                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+                m_searcher.set_helper_threads(std::max(i64(0), spin.value() - 1));
+            });
     m_options.register_option<UCIOptionSpin>("MultiPV", 1, 1, MAX_PVS);
     m_options.register_option<UCIOptionSpin>("Contempt", 0, -MAX_SCORE, MAX_SCORE);
     m_options.register_option<UCIOptionCheck>("UCI_Chess960", false)
