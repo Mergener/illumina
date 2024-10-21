@@ -3,11 +3,6 @@
 namespace illumina {
 
 ThreadPool::ThreadPool(size_t n_threads) {
-    create_helpers(n_threads);
-}
-
-void ThreadPool::create_helpers(size_t n_threads) {
-    m_stop = false;
     for (size_t i = 0; i < n_threads; ++i) {
         m_workers.emplace_back([this] {
             while (true) {
@@ -29,12 +24,7 @@ void ThreadPool::create_helpers(size_t n_threads) {
     }
 }
 
-void ThreadPool::kill_all_helpers() {
-    if (m_workers.empty()) {
-        m_stop = true;
-        return;
-    }
-
+ThreadPool::~ThreadPool() {
     {
         std::unique_lock<std::mutex> lock(m_queue_mutex);
         m_stop = true;
@@ -42,23 +32,10 @@ void ThreadPool::kill_all_helpers() {
     m_condition.notify_all();
 
     for (std::thread& worker: m_workers) {
-        worker.join();
+        if (worker.joinable()) {
+            worker.join();
+        }
     }
-
-    m_workers.clear();
-}
-
-void ThreadPool::resize(size_t n_threads) {
-    if (n_threads == m_workers.size()) {
-        return;
-    }
-
-    kill_all_helpers();
-    create_helpers(n_threads);
-}
-
-ThreadPool::~ThreadPool() {
-    kill_all_helpers();
 }
 
 }

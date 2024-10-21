@@ -90,6 +90,33 @@ const Searcher::Listeners& SearchContext::listeners() const {
     return *m_listeners;
 }
 
+Searcher::Searcher(TranspositionTable&& tt)
+        : m_tt(std::move(tt)) { }
+
+Searcher::Searcher()
+    : m_main_worker(std::make_unique<SearchWorker>(true)) {
+};
+
+Searcher::Searcher(Searcher&& other) {
+};
+
+Searcher::~Searcher() {
+}
+
+void Searcher::set_helper_threads(int n_threads) {
+    if (n_threads == m_helper_workers.size()) {
+        return;
+    }
+
+    m_thread_pool.~ThreadPool();
+    new (&m_thread_pool) ThreadPool(n_threads);
+    m_helper_workers.clear();
+
+    for (size_t i = 0; i < n_threads; ++i) {
+        m_helper_workers.emplace_back(std::make_unique<SearchWorker>(false));
+    }
+}
+
 SearchContext::SearchContext(TranspositionTable* tt,
                              bool* should_stop,
                              const Searcher::Listeners* listeners,
@@ -136,17 +163,16 @@ public:
     void iterative_deepening();
     bool should_stop() const;
     void check_limits();
-    bool running() const;
+    void initialize(Board board,
+                    SearchContext* context,
+                    const SearchSettings* settings);
 
     const WorkerResults& results() const;
 
-    SearchWorker(bool main,
-                 Board  board,
-                 SearchContext* context,
-                 const SearchSettings* settings);
-    Board       m_board;
+    SearchWorker(bool main);
 
 private:
+    Board m_board;
     const SearchSettings* m_settings;
     const SearchContext*  m_context;
     WorkerResults         m_results;
@@ -160,7 +186,6 @@ private:
     int         m_curr_pv_idx = 0;
     int         m_eval_random_margin = 0;
     int         m_eval_random_seed = 0;
-    bool        m_running = false;
 
     std::vector<Move> m_search_moves;
 
@@ -235,13 +260,9 @@ SearchResults Searcher::search(const Board& board,
     results.best_move = root_info.moves[0];
 
     // Create search context.
-    std::vector<std::unique_ptr<SearchWorker>> secondary_workers;
     m_stop = false;
     m_tt.new_search();
-    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
-
-    // Create main worker.
-    SearchWorker main_worker(true, board, &context, &settings);
+    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &m_helper_workers, &m_tm);
 
     // Kickstart our time manager.
     ui64 our_time = UINT64_MAX;
@@ -263,34 +284,27 @@ SearchResults Searcher::search(const Board& board,
         m_tm.stop();
     }
 
-    // Determine the number of helper threads to be used.
-    int n_helper_threads = m_thread_pool.size();
+    // Start secondary workers.
+    std::vector<std::future<WorkerResults>> worker_futures;
+    for (std::unique_ptr<SearchWorker>& worker: m_helper_workers) {
+        SearchWorker* worker_ptr = worker.get();
 
-    // Create secondary workers.
-    for (int i = 0; i < n_helper_threads; ++i) {
-        secondary_workers.emplace_back(std::make_unique<SearchWorker>(false, board, &context, &settings));
+        worker_futures.push_back(m_thread_pool.submit(([worker_ptr, &board, &context, &settings]() {
+            worker_ptr->initialize(board, &context, &settings);
+            worker_ptr->iterative_deepening();
+            return worker_ptr->results();
+        })));
     }
 
-    // Fire secondary threads.
-    for (int i = 0; i < n_helper_threads; ++i) {
-        SearchWorker* worker = secondary_workers[i].get();
-        m_thread_pool.submit(([worker]() {
-            worker->iterative_deepening();
-        }));
-    }
+    // Start main worker.
+    m_main_worker->initialize(board, &context, &settings);
+    m_main_worker->iterative_deepening();
 
-    main_worker.iterative_deepening();
-
-    // Wait for secondary threads to stop.
-    for (const auto& worker: secondary_workers) {
-        while (worker->running());
-    }
-
-    // Save obtained results in vector and vote for the best afterwards.
+    // Save obtained results in vector and vote for the best afterward.
     std::vector<WorkerResults> all_results;
-    all_results.push_back(main_worker.results());
-    for (std::unique_ptr<SearchWorker>& worker: secondary_workers) {
-        all_results.push_back(worker->results());
+    all_results.push_back(m_main_worker->results());
+    for (std::future<WorkerResults>& future: worker_futures) {
+        all_results.push_back(future.get());
     }
 
     // Vote for the best results. Prioritize results
@@ -336,9 +350,8 @@ SearchResults Searcher::search(const Board& board,
 }
 
 void SearchWorker::iterative_deepening() {
-    try {
-        Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
-        for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
+    Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
+    for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
             if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
                 // If we finished soft, we don't want to start a new iteration.
                 if (m_main) {
@@ -386,12 +399,6 @@ void SearchWorker::iterative_deepening() {
             }
             m_curr_pv_idx = 0;
         }
-    }
-    catch (const std::exception& e) {
-        m_running = false;
-        throw e;
-    }
-    m_running = false;
 }
 
 void SearchWorker::aspiration_windows() {
@@ -1007,23 +1014,16 @@ bool SearchWorker::should_stop() const {
     return m_context->should_stop();
 }
 
-SearchWorker::SearchWorker(bool main,
-                           Board board,
-                           SearchContext* context,
-                           const SearchSettings* settings)
-    : m_main(main),
-      m_board(std::move(board)),
-      m_context(context),
-      m_settings(settings),
-      m_eval_random_margin(m_main
-                           ? settings->eval_random_margin
-                           : std::max(SMP_EVAL_RANDOM_MARGIN, settings->eval_random_margin)),
-      m_eval_random_seed(m_main
-                         ? settings->eval_rand_seed
-                         : random(ui64(1), UINT64_MAX)) {
-    m_eval.on_new_board(m_board);
+void SearchWorker::initialize(Board board,
+                              SearchContext* context,
+                              const SearchSettings* settings) {
+    ILLUMINA_ASSERT(!m_running);
 
-    // Dispatch board callbacks to Worker's methods.
+    // Clear previous history.
+    m_hist.reset();
+
+    // Prepare board.
+    m_board = std::move(board);
     BoardListener board_listener {};
     board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move(b); };
     board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move(b); };
@@ -1032,14 +1032,37 @@ SearchWorker::SearchWorker(bool main,
     board_listener.on_add_piece      = [this](const Board& b, Piece p, Square s) { on_piece_added(b, p, s); };
     board_listener.on_remove_piece   = [this](const Board& b, Piece p, Square s) { on_piece_removed(b, p, s); };
     m_board.set_listener(board_listener);
+
+    // Prepare evaluator.
+    m_eval.on_new_board(m_board);
+
+    // Initialize root data.
+    m_root_depth       = 1;
+    m_curr_move        = MOVE_NULL;
+    m_curr_move_number = 0;
+    m_curr_pv_idx      = 0;
+
+    // Initialize search data.
+    m_context = context;
+    m_settings = settings;
+    m_results = {};
+
+    // Initialize miscellaneous.
+    m_eval_random_margin = m_main
+                           ? settings->eval_random_margin
+                           : std::max(SMP_EVAL_RANDOM_MARGIN, settings->eval_random_margin);
+
+    m_eval_random_seed = m_main
+                         ? settings->eval_rand_seed
+                         : random(ui64(1), UINT64_MAX);
+}
+
+SearchWorker::SearchWorker(bool main)
+    : m_main(main) {
 }
 
 const WorkerResults& SearchWorker::results() const {
     return m_results;
-}
-
-bool SearchWorker::running() const {
-    return m_running;
 }
 
 static void init_search_constants() {

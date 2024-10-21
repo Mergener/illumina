@@ -47,6 +47,8 @@ struct SearchResults {
     ui64 total_nodes = 0;
 };
 
+class SearchWorker;
+
 class Searcher {
     friend class SearchContext;
     friend class SearchWorker;
@@ -66,19 +68,21 @@ public:
     size_t helper_threads() const;
     void set_helper_threads(int n_threads);
 
-    Searcher() = default;
+    Searcher();
     Searcher(const Searcher& other) = delete;
-    Searcher(Searcher&& other) = default;
+    Searcher(Searcher&& other);
     explicit Searcher(TranspositionTable&& tt);
-    ~Searcher() = default;
+    ~Searcher();
 
 private:
-    bool m_searching = false;
     bool m_stop = false;
 
     TranspositionTable m_tt;
     TimeManager m_tm;
-    ThreadPool m_thread_pool;
+    ThreadPool m_thread_pool = { 0 };
+
+    std::unique_ptr<SearchWorker> m_main_worker;
+    std::vector<std::unique_ptr<SearchWorker>> m_helper_workers;
 
     struct Listeners {
         PVFinishListener    pv_finish = [](PVResults&) {};
@@ -93,13 +97,6 @@ inline void Searcher::set_pv_finish_listener(const PVFinishListener& listener) {
 inline void Searcher::set_currmove_listener(const CurrentMoveListener& listener) {
     m_listeners.curr_move_listener = listener;
 }
-
-inline void Searcher::set_helper_threads(int n_threads) {
-    m_thread_pool.resize(n_threads);
-}
-
-inline Searcher::Searcher(TranspositionTable&& tt)
-    : m_tt(std::move(tt)) { }
 
 void recompute_search_constants();
 
