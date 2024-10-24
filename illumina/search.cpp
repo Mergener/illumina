@@ -162,9 +162,13 @@ private:
 
     std::vector<Move> m_search_moves;
 
+    template <bool TRACE>
     Score quiescence_search(Depth ply, Score alpha, Score beta);
 
-    template <bool PV, bool SKIP_NULL = false, bool ROOT = false>
+    template <bool TRACE,
+              bool PV,
+              bool SKIP_NULL = false,
+              bool ROOT = false>
     Score pvs(Depth depth,
               Score alpha,
               Score beta,
@@ -413,7 +417,13 @@ void SearchWorker::aspiration_windows() {
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
-        Score score = pvs<true, false, true>(depth, alpha, beta, &search_stack[0]);
+        Score score;
+        if (m_main && m_settings->tracer != nullptr) {
+            score = pvs<true, false, true>(depth, alpha, beta, &search_stack[0]);
+        }
+        else {
+            score = pvs<false, false, true>(depth, alpha, beta, &search_stack[0]);
+        }
 
         if (score > alpha && score < beta) {
             // We found an exact score within our bounds, finish
@@ -449,7 +459,10 @@ void SearchWorker::aspiration_windows() {
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
-template<bool PV, bool SKIP_NULL, bool ROOT>
+template<bool TRACE,
+         bool PV,
+         bool SKIP_NULL,
+         bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
@@ -530,7 +543,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
-        return quiescence_search(ply, alpha, beta);
+        return quiescence_search<TRACE>(ply, alpha, beta);
     }
 
     // Compute the static eval. Useful for many heuristics.
@@ -560,7 +573,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
 
         m_board.make_null_move();
-        Score score = -pvs<false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
+        Score score = -pvs<TRACE, false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
         m_board.undo_null_move();
 
         if (score >= beta) {
@@ -676,7 +689,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             Score se_beta = tt_entry.score() - depth * 3;
 
             node->skip_move = move;
-            Score score = pvs<false>(depth / 2, se_beta - 1, se_beta, node);
+            Score score = pvs<TRACE, false>(depth / 2, se_beta - 1, se_beta, node);
             node->skip_move = MOVE_NULL;
 
             if (score < se_beta) {
@@ -716,15 +729,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
-            score = -pvs<PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
+            score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
         }
         else {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -pvs<false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
+            score = -pvs<TRACE, false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
             if (score > alpha && score < beta) {
-                score = -pvs<PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
+                score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
             }
         }
 
@@ -824,6 +837,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     return alpha;
 }
 
+template <bool TRACE>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     Score stand_pat = evaluate();
 
@@ -851,7 +865,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
 
         m_board.make_move(move);
-        Score score = -quiescence_search(ply + 1, -beta, -alpha);
+        Score score = -quiescence_search<TRACE>(ply + 1, -beta, -alpha);
         m_board.undo_move();
 
         if (score >= beta) {
