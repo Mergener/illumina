@@ -419,10 +419,10 @@ void SearchWorker::aspiration_windows() {
     while (!should_stop()) {
         Score score;
         if (m_main && m_settings->tracer != nullptr) {
-            score = pvs<true, false, true>(depth, alpha, beta, &search_stack[0]);
+            score = pvs<true, true, false, true>(depth, alpha, beta, &search_stack[0]);
         }
         else {
-            score = pvs<false, false, true>(depth, alpha, beta, &search_stack[0]);
+            score = pvs<false, true, false, true>(depth, alpha, beta, &search_stack[0]);
         }
 
         if (score > alpha && score < beta) {
@@ -459,11 +459,59 @@ void SearchWorker::aspiration_windows() {
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
+// Some tracing related macros to prevent cumbersome if constexprs
+
+#define TRACE_PUSH()                      \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        const auto& board = m_board;      \
+        NodeInputInfo node_info;          \
+        node_info.board = &board;         \
+        tracer->push_node(node_info);     \
+    }                                     \
+} while(false)
+
+#define TRACE_POP()                        \
+do {                                       \
+    if constexpr (TRACE) {                 \
+        auto tracer = m_settings->tracer;  \
+        const Board& board = m_board;      \
+        tracer->pop_node();                \
+    }                                      \
+} while(false)
+
+#define TRACE_SET_INT(type, val)           \
+do {                                       \
+    if constexpr (TRACE) {                 \
+        auto tracer = m_settings->tracer;  \
+        tracer->set_int_value(type, val);  \
+    }                                      \
+} while (false)
+
+#define TRACE_SET_FLAG(type)               \
+do {                                       \
+    if constexpr (TRACE) {                 \
+        auto tracer = m_settings->tracer;  \
+        tracer->set_flag(type);            \
+    }                                      \
+} while (false)
+
+#define TRACE_BEST_MOVE(move)              \
+do {                                       \
+    if constexpr (TRACE) {                 \
+        auto tracer = m_settings->tracer;  \
+        tracer->set_best_move(move);       \
+    }                                      \
+} while (false)
+
 template<bool TRACE,
          bool PV,
          bool SKIP_NULL,
          bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
+    ILLUMINA_ASSERT(!TRACE || m_settings->tracer != nullptr);
+
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
         node->pv[0] = MOVE_NULL;
@@ -480,6 +528,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Make sure we count the root node.
     if constexpr (ROOT) {
         m_results.nodes++;
+
+        if constexpr (TRACE) {
+            m_settings->tracer->new_tree(m_board, m_root_depth, m_curr_pv_idx);
+        }
     }
 
     // Check if we must stop our search.
@@ -573,8 +625,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
 
         m_board.make_null_move();
+        TRACE_PUSH();
         Score score = -pvs<TRACE, false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
         m_board.undo_null_move();
+        TRACE_POP();
 
         if (score >= beta) {
             return score;
@@ -698,6 +752,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         m_board.make_move(move);
+        TRACE_PUSH();
 
         // Late move reductions.
         Depth reductions = 0;
@@ -742,6 +797,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         m_board.undo_move();
+        TRACE_POP();
 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
@@ -757,6 +813,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Our search failed high.
             alpha     = score;
             best_move = move;
+            TRACE_BEST_MOVE(best_move);
 
             // Update our history scores and refutation moves.
             if (move.is_quiet()) {
@@ -787,6 +844,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // We've got a new best move.
             alpha     = score;
             best_move = move;
+            TRACE_BEST_MOVE(move);
 
             // Make sure we update our best_move in the root ASAP.
             if (ROOT && (!should_stop() || depth <= 2)) {
@@ -812,7 +870,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Check if we have a checkmate or stalemate.
     if (!has_legal_moves) {
-        return m_board.in_check() ? (-MATE_SCORE + ply) : 0;
+        Score score =  m_board.in_check() ? (-MATE_SCORE + ply) : 0;
+        TRACE_SET_INT(TRACEV_SCORE, score);
+        return score;
     }
 
     if (should_stop()) {
@@ -839,6 +899,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
 template <bool TRACE>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
+    TRACE_SET_FLAG(TRACEV_QSEARCH);
+
     Score stand_pat = evaluate();
 
     if (stand_pat >= beta) {
@@ -865,16 +927,20 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
 
         m_board.make_move(move);
+        TRACE_PUSH();
         Score score = -quiescence_search<TRACE>(ply + 1, -beta, -alpha);
         m_board.undo_move();
+        TRACE_POP();
 
         if (score >= beta) {
             best_move = move;
+            TRACE_BEST_MOVE(move);
             alpha = score;
             break;
         }
         if (score > alpha) {
             best_move = move;
+            TRACE_BEST_MOVE(move);
             alpha = score;
         }
     }
