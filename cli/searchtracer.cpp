@@ -109,13 +109,18 @@ void SearchTracer::set_best_move(Move move) {
 
 void SearchTracer::finish_tree() {
     save_tree(m_curr_tree);
+    std::cout << "info string Saved ID/MultiPV/AspWin search tree with id " << m_curr_tree.id << std::endl;
     m_curr_tree = {};
-}
 
+    // Push root node to batch.
+    ILLUMINA_ASSERT(m_curr_node.parent_index == 0);
+    m_node_batch.push_back(m_curr_node);
+}
 
 void SearchTracer::finish_search() {
     flush_nodes();
     save_search(m_curr_search);
+    std::cout << "info string Saved search with id " << m_curr_search.id << std::endl;
     m_curr_search = {};
 }
 
@@ -144,7 +149,7 @@ void SearchTracer::flush_nodes() {
         SQLite::Transaction transaction(m_db);
 
         SQLite::Statement insert(m_db,
-                                 "INSERT INTO NODES (node_index, node_order, parent_index, tree, last_move, "
+                                 "INSERT OR IGNORE INTO NODES (node_index, node_order, parent_index, tree, last_move, "
                                  "alpha, beta, depth, static_eval, score, best_move) "
                                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 

@@ -45,7 +45,7 @@ private:
     size_t m_target_node_count;
 
     struct NodeInfo {
-        ui64 index;
+        ui64 index = 1;
         ui64 parent_index = 0;
         ui32 tree;
         Move last_move;
@@ -74,7 +74,7 @@ private:
         int root_depth;
 
         // Not saved in DB
-        int next_node_index = 0;
+        int next_node_index = 1;
     };
     TreeInfo m_curr_tree;
 
