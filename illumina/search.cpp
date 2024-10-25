@@ -481,36 +481,36 @@ do {                                      \
     }                                     \
 } while(false)
 
-#define TRACE_POP()                        \
-do {                                       \
-    if constexpr (TRACE) {                 \
-        auto tracer = m_settings->tracer;  \
-        tracer->pop_node();                \
-    }                                      \
+#define TRACE_POP()                       \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->pop_node();               \
+    }                                     \
 } while(false)
 
-#define TRACE_SET_INT(type, val)           \
-do {                                       \
-    if constexpr (TRACE) {                 \
-        auto tracer = m_settings->tracer;  \
-        tracer->set_int_value(type, val);  \
-    }                                      \
+#define TRACE_SET_INT(type, val)          \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->set_int_value(type, val); \
+    }                                     \
 } while (false)
 
-#define TRACE_SET_FLAG(type)               \
-do {                                       \
-    if constexpr (TRACE) {                 \
-        auto tracer = m_settings->tracer;  \
-        tracer->set_flag(type);            \
-    }                                      \
+#define TRACE_SET_FLAG(type)              \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->set_flag(type);           \
+    }                                     \
 } while (false)
 
-#define TRACE_BEST_MOVE(move)              \
-do {                                       \
-    if constexpr (TRACE) {                 \
-        auto tracer = m_settings->tracer;  \
-        tracer->set_best_move(move);       \
-    }                                      \
+#define TRACE_BEST_MOVE(move)             \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->set_best_move(move);      \
+    }                                     \
 } while (false)
 
 template<bool TRACE,
