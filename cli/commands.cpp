@@ -142,6 +142,11 @@ void register_commands(CLIApplication& server) {
             settings.max_nodes = ctx.int_after("nodes");
         }
 
+        bool trace = false;
+        if (ctx.has_arg("trace")) {
+            trace = true;
+        }
+
         if (ctx.has_arg("searchmoves")) {
             // Parse all searchmoves.
             std::vector<Move> search_moves;
@@ -158,7 +163,7 @@ void register_commands(CLIApplication& server) {
             settings.search_moves = search_moves;
         }
 
-        global_state().search(settings);
+        global_state().search(settings, trace);
     });
 
     server.register_command("stop", [](const CommandContext& ctx) {

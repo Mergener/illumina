@@ -43,6 +43,7 @@ constexpr size_t TT_DEFAULT_SIZE_MB = 32;
 class TranspositionTable {
 public:
     void clear();
+    size_t size() const;
     void resize(size_t new_size_bytes);
     void new_search();
     bool probe(ui64 key, TranspositionTableEntry& entry, Depth ply = 0);
@@ -95,6 +96,10 @@ inline Score TranspositionTableEntry::score() const {
 
 inline int TranspositionTable::hash_full() const {
     return int(double(m_entry_count) / double(m_max_entry_count) * 1000);
+}
+
+inline size_t TranspositionTable::size() const {
+    return m_size_in_bytes;
 }
 
 

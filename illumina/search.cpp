@@ -220,6 +220,14 @@ do {                                      \
     }                                     \
 } while(false)
 
+#define TRACE_PUSH_SIBLING()              \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->push_sibling_node();      \
+    }                                     \
+} while(false)
+
 #define TRACE_POP()                       \
 do {                                      \
     if constexpr (TRACE) {                \
@@ -337,7 +345,17 @@ SearchResults Searcher::search(const Board& board,
         });
     }
 
+    // Initialize tracer search.
+    if (settings.tracer != nullptr) {
+        settings.tracer->new_search(board, tt().size() / (1024 * 1024), settings);
+    }
+
     main_worker.iterative_deepening();
+
+    // Finish tracing search.
+    if (settings.tracer != nullptr) {
+        settings.tracer->finish_search();
+    }
 
     // Wait for secondary threads to stop.
     for (std::thread& thread: helper_threads) {
@@ -479,6 +497,7 @@ void SearchWorker::aspiration_windows() {
                              m_curr_pv_idx,
                              alpha, beta);
             score = pvs<true, true, false, true>(depth, alpha, beta, &search_stack[0]);
+            tracer->finish_tree();
         }
         else {
             score = pvs<false, true, false, true>(depth, alpha, beta, &search_stack[0]);
@@ -755,7 +774,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             Score se_beta = tt_entry.score() - depth * 3;
 
             node->skip_move = move;
+
+            TRACE_PUSH_SIBLING();
+            TRACE_SET_FLAG(TRACE_F_TESTING_SINGULAR);
+
             Score score = pvs<TRACE, false>(depth / 2, se_beta - 1, se_beta, node);
+
+            TRACE_POP();
+
             node->skip_move = MOVE_NULL;
 
             if (score < se_beta) {
@@ -803,7 +829,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // re-search with the full window.
             score = -pvs<TRACE, false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
             if (score > alpha && score < beta) {
+                TRACE_PUSH_SIBLING();
                 score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
+                TRACE_POP();
             }
         }
 

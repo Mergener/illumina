@@ -8,6 +8,9 @@
 
 namespace illumina {
 
+static constexpr size_t DEFAULT_TRACER_BATCH_SIZE = 256; // in MiB
+static const char* TRACER_VERSION = "v1.0";
+
 class SearchTracer : public ISearchTracer {
 public:
     void new_search(const Board& root,
@@ -24,6 +27,7 @@ public:
     void finish_tree() override;
 
     void push_node(Move move) override;
+    void push_sibling_node() override;
 
     void set_int_value(TraceInt which, i64 value) override;
 
@@ -33,8 +37,8 @@ public:
 
     void pop_node(bool discard = false) override;
 
-    explicit SearchTracer(std::string db_path,
-                          size_t batch_size_mb = 128 * 1024 * 1024);
+    explicit SearchTracer(const std::string& db_path,
+                          size_t batch_size_mib = DEFAULT_TRACER_BATCH_SIZE);
 
 private:
     SQLite::Database m_db;
@@ -42,7 +46,7 @@ private:
 
     struct NodeInfo {
         ui64 index;
-        ui64 parent_index;
+        ui64 parent_index = 0;
         ui32 tree;
         Move last_move;
         Move best_move;
@@ -52,8 +56,10 @@ private:
         i16  static_eval = 0;
         ui8  depth = 0;
         i8   node_order;
-        i8   next_child_order = 0;
         bool qsearch = false;
+
+        // Not saved in DB
+        i8   next_child_order = 0;
     };
     NodeInfo m_curr_node;
     std::vector<NodeInfo> m_node_batch;
@@ -66,6 +72,8 @@ private:
         int asp_beta;
         int multipv;
         int root_depth;
+
+        // Not saved in DB
         int next_node_index = 0;
     };
     TreeInfo m_curr_tree;
@@ -86,9 +94,9 @@ private:
 
     void bootstrap_db();
     void flush_nodes();
-    void save_node(const NodeInfo& node);
     void save_tree(const TreeInfo& tree);
     void save_search(const SearchInfo& search);
+    void throw_corrupted_db();
 };
 
 } // illumina

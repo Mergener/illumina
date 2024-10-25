@@ -16,7 +16,8 @@ enum TraceInt {
 };
 
 enum TraceFlag {
-    TRACE_F_QSEARCH
+    TRACE_F_QSEARCH,
+    TRACE_F_TESTING_SINGULAR
 };
 
 class SearchSettings;
@@ -33,6 +34,7 @@ public:
                           int asp_beta) = 0;
     virtual void finish_tree() = 0;
     virtual void push_node(Move move) = 0;
+    virtual void push_sibling_node() = 0;
     virtual void set_int_value(TraceInt which, i64 value) = 0;
     virtual void set_flag(TraceFlag which) = 0;
     virtual void set_best_move(Move move) = 0;
