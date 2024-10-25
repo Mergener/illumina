@@ -7,10 +7,6 @@
 
 namespace illumina {
 
-struct NodeInputInfo {
-    const Board* board;
-};
-
 enum TraceInt {
     TRACEV_BETA,
     TRACEV_ALPHA,
@@ -29,7 +25,7 @@ public:
     virtual void new_tree(const Board& root,
                           int root_depth,
                           int multi_pv);
-    virtual void push_node(const NodeInputInfo& node_info) = 0;
+    virtual void push_node(Move move) = 0;
     virtual void set_int_value(TraceInt which, i64 value) = 0;
     virtual void set_flag(TraceFlag which) = 0;
     virtual void set_best_move(Move move) = 0;

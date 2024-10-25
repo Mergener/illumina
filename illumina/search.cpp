@@ -181,12 +181,24 @@ private:
     Score evaluate() const;
     Score draw_score() const;
 
+    template <bool TRACE>
     void on_make_move(const Board& board, Move move);
+
+    template <bool TRACE>
     void on_undo_move(const Board& board, Move move);
+
+    template <bool TRACE>
     void on_make_null_move(const Board& board);
+
+    template <bool TRACE>
     void on_undo_null_move(const Board& board);
+
+    template <bool TRACE>
     void on_piece_added(const Board& board, Piece p, Square s);
+
+    template <bool TRACE>
     void on_piece_removed(const Board& board, Piece p, Square s);
+
 };
 
 void Searcher::stop() {
@@ -459,16 +471,13 @@ void SearchWorker::aspiration_windows() {
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
-// Some tracing related macros to prevent cumbersome if constexprs
+// Some tracing related macros to prevent cumbersome 'if constexprs'
 
-#define TRACE_PUSH()                      \
+#define TRACE_PUSH(move)                  \
 do {                                      \
     if constexpr (TRACE) {                \
         auto tracer = m_settings->tracer; \
-        const auto& board = m_board;      \
-        NodeInputInfo node_info;          \
-        node_info.board = &board;         \
-        tracer->push_node(node_info);     \
+        tracer->push_node(move);          \
     }                                     \
 } while(false)
 
@@ -476,7 +485,6 @@ do {                                      \
 do {                                       \
     if constexpr (TRACE) {                 \
         auto tracer = m_settings->tracer;  \
-        const Board& board = m_board;      \
         tracer->pop_node();                \
     }                                      \
 } while(false)
@@ -510,7 +518,11 @@ template<bool TRACE,
          bool SKIP_NULL,
          bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
-    ILLUMINA_ASSERT(!TRACE || m_settings->tracer != nullptr);
+    ILLUMINA_ASSERT(!TRACE || (m_settings->tracer != nullptr && !m_main));
+
+    TRACE_SET_FLAG(PV ? TRACEV_PV_SEARCH : TRACEV_ZW_SEARCH);
+    TRACE_SET_INT(TRACEV_ALPHA, alpha);
+    TRACE_SET_INT(TRACEV_BETA, beta);
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
@@ -601,6 +613,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Compute the static eval. Useful for many heuristics.
     static_eval    = !in_check ? evaluate() : 0;
     bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
+    TRACE_SET_INT(TRACEV_STATIC_EVAL, static_eval);
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
@@ -625,10 +638,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
 
         m_board.make_null_move();
-        TRACE_PUSH();
         Score score = -pvs<TRACE, false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
         m_board.undo_null_move();
-        TRACE_POP();
 
         if (score >= beta) {
             return score;
@@ -752,7 +763,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         m_board.make_move(move);
-        TRACE_PUSH();
 
         // Late move reductions.
         Depth reductions = 0;
@@ -797,7 +807,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         m_board.undo_move();
-        TRACE_POP();
 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
@@ -927,10 +936,8 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
 
         m_board.make_move(move);
-        TRACE_PUSH();
         Score score = -quiescence_search<TRACE>(ply + 1, -beta, -alpha);
         m_board.undo_move();
-        TRACE_POP();
 
         if (score >= beta) {
             best_move = move;
@@ -1049,28 +1056,38 @@ Score SearchWorker::draw_score() const {
            :  m_settings->contempt;
 }
 
+template <bool TRACE>
 void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
+    TRACE_PUSH(move);
     m_results.nodes++;
     m_eval.on_make_move(board, move);
 }
 
+template <bool TRACE>
 void SearchWorker::on_undo_move(const illumina::Board& board, illumina::Move move) {
+    TRACE_POP();
     m_eval.on_undo_move(board, move);
 }
 
+template <bool TRACE>
 void SearchWorker::on_make_null_move(const illumina::Board& board) {
+    TRACE_PUSH(MOVE_NULL);
     m_results.nodes++;
     m_eval.on_make_null_move(board);
 }
 
+template <bool TRACE>
 void SearchWorker::on_undo_null_move(const illumina::Board& board) {
+    TRACE_POP();
     m_eval.on_undo_null_move(board);
 }
 
+template <bool TRACE>
 void SearchWorker::on_piece_added(const Board& board, Piece p, Square s) {
     m_eval.on_piece_added(board, p , s);
 }
 
+template <bool TRACE>
 void SearchWorker::on_piece_removed(const Board& board, Piece p, Square s) {
     m_eval.on_piece_removed(board, p , s);
 }
@@ -1097,12 +1114,22 @@ SearchWorker::SearchWorker(bool main,
 
     // Dispatch board callbacks to Worker's methods.
     BoardListener board_listener {};
-    board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move(b); };
-    board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move(b); };
-    board_listener.on_make_move      = [this](const Board& b, Move m) { on_make_move(b, m); };
-    board_listener.on_undo_move      = [this](const Board& b, Move m) { on_undo_move(b, m); };
-    board_listener.on_add_piece      = [this](const Board& b, Piece p, Square s) { on_piece_added(b, p, s); };
-    board_listener.on_remove_piece   = [this](const Board& b, Piece p, Square s) { on_piece_removed(b, p, s); };
+    if (!main || settings->tracer == nullptr) {
+        board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move<false>(b); };
+        board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move<false>(b); };
+        board_listener.on_make_move = [this](const Board& b, Move m) { on_make_move<false>(b, m); };
+        board_listener.on_undo_move = [this](const Board& b, Move m) { on_undo_move<false>(b, m); };
+        board_listener.on_add_piece = [this](const Board& b, Piece p, Square s) { on_piece_added<false>(b, p, s); };
+        board_listener.on_remove_piece = [this](const Board& b, Piece p, Square s) { on_piece_removed<false>(b, p, s); };
+    }
+    else {
+        board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move<true>(b); };
+        board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move<true>(b); };
+        board_listener.on_make_move = [this](const Board& b, Move m) { on_make_move<true>(b, m); };
+        board_listener.on_undo_move = [this](const Board& b, Move m) { on_undo_move<true>(b, m); };
+        board_listener.on_add_piece = [this](const Board& b, Piece p, Square s) { on_piece_added<true>(b, p, s); };
+        board_listener.on_remove_piece = [this](const Board& b, Piece p, Square s) { on_piece_removed<true>(b, p, s); };
+    }
     m_board.set_listener(board_listener);
 }
 
