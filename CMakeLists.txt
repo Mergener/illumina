@@ -47,10 +47,13 @@ if (DEVELOPMENT)
 
 endif()
 
-option(TRACE "Signals that this will include the tracing module within CLI.
-              Note that this includes the heavy SQLITE3 dependency.
-              Not supposed to be used in regular Illumina builds." OFF)
-if (TRACE)
+option(INCLUDE_TRACING_MODULE
+            "Signals that this will include the tracing module within CLI.
+             Note that this includes the heavy SQLITE3 dependency.
+             Not supposed to be used in regular Illumina builds."
+        OFF)
+if (INCLUDE_TRACING_MODULE)
+    message("Tracing module included.")
     add_definitions(-DTRACING_ENABLED)
 endif()
 

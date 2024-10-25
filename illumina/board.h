@@ -78,6 +78,7 @@ public:
     bool           is_insufficient_material_draw() const;
     bool           color_has_sufficient_material(Color color) const;
     BoardResult    result() const;
+    bool           detect_frc() const;
 
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
