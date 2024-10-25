@@ -8,23 +8,24 @@
 namespace illumina {
 
 enum TraceInt {
-    TRACEV_BETA,
-    TRACEV_ALPHA,
-    TRACEV_STATIC_EVAL,
-    TRACEV_SCORE
+    TRACE_V_BETA,
+    TRACE_V_ALPHA,
+    TRACE_V_STATIC_EVAL,
+    TRACE_V_SCORE,
+    TRACE_V_DEPTH
 };
 
 enum TraceFlag {
-    TRACEV_PV_SEARCH,
-    TRACEV_ZW_SEARCH,
-    TRACEV_QSEARCH
+    TRACE_F_QSEARCH
 };
 
 class ISearchTracer {
 public:
-    virtual void new_tree(const Board& root,
-                          int root_depth,
-                          int multi_pv);
+    virtual void new_search(const Board& root);
+    virtual void new_tree(int root_depth,
+                          int multi_pv,
+                          int asp_alpha,
+                          int asp_beta);
     virtual void push_node(Move move) = 0;
     virtual void set_int_value(TraceInt which, i64 value) = 0;
     virtual void set_flag(TraceFlag which) = 0;
@@ -32,6 +33,6 @@ public:
     virtual void pop_node() = 0;
 };
 
-}
+} // illumina
 
-#endif //ILLUMINA_TRACING_H
+#endif // ILLUMINA_TRACING_H

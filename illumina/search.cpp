@@ -135,6 +135,7 @@ class SearchWorker {
 public:
     void iterative_deepening();
     bool should_stop() const;
+    bool tracing() const;
     void check_limits();
 
     const WorkerResults& results() const;
@@ -208,6 +209,48 @@ void Searcher::stop() {
 TranspositionTable& Searcher::tt() {
     return m_tt;
 }
+
+// Some tracing related macros to prevent cumbersome 'if constexprs'
+
+#define TRACE_PUSH(move)                  \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->push_node(move);          \
+    }                                     \
+} while(false)
+
+#define TRACE_POP()                       \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->pop_node();               \
+    }                                     \
+} while(false)
+
+#define TRACE_SET_INT(type, val)          \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->set_int_value(type, val); \
+    }                                     \
+} while (false)
+
+#define TRACE_SET_FLAG(type)              \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->set_flag(type);           \
+    }                                     \
+} while (false)
+
+#define TRACE_BEST_MOVE(move)             \
+do {                                      \
+    if constexpr (TRACE) {                \
+        auto tracer = m_settings->tracer; \
+        tracer->set_best_move(move);      \
+    }                                     \
+} while (false)
 
 SearchResults Searcher::search(const Board& board,
                                const SearchSettings& settings) {
@@ -325,7 +368,7 @@ SearchResults Searcher::search(const Board& board,
                            i64((worker_results.pv_results[0].bound_type == BT_EXACT)) * 400;
 
         if (result_score > best_result_score) {
-            selected_results = &worker_results;
+            selected_results  = &worker_results;
             best_result_score = result_score;
         }
     }
@@ -430,7 +473,11 @@ void SearchWorker::aspiration_windows() {
     // Perform search with aspiration windows.
     while (!should_stop()) {
         Score score;
-        if (m_main && m_settings->tracer != nullptr) {
+        if (tracing()) {
+            ISearchTracer* tracer = m_settings->tracer;
+            tracer->new_tree(m_root_depth,
+                             m_curr_pv_idx,
+                             alpha, beta);
             score = pvs<true, true, false, true>(depth, alpha, beta, &search_stack[0]);
         }
         else {
@@ -471,58 +518,16 @@ void SearchWorker::aspiration_windows() {
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
-// Some tracing related macros to prevent cumbersome 'if constexprs'
-
-#define TRACE_PUSH(move)                  \
-do {                                      \
-    if constexpr (TRACE) {                \
-        auto tracer = m_settings->tracer; \
-        tracer->push_node(move);          \
-    }                                     \
-} while(false)
-
-#define TRACE_POP()                       \
-do {                                      \
-    if constexpr (TRACE) {                \
-        auto tracer = m_settings->tracer; \
-        tracer->pop_node();               \
-    }                                     \
-} while(false)
-
-#define TRACE_SET_INT(type, val)          \
-do {                                      \
-    if constexpr (TRACE) {                \
-        auto tracer = m_settings->tracer; \
-        tracer->set_int_value(type, val); \
-    }                                     \
-} while (false)
-
-#define TRACE_SET_FLAG(type)              \
-do {                                      \
-    if constexpr (TRACE) {                \
-        auto tracer = m_settings->tracer; \
-        tracer->set_flag(type);           \
-    }                                     \
-} while (false)
-
-#define TRACE_BEST_MOVE(move)             \
-do {                                      \
-    if constexpr (TRACE) {                \
-        auto tracer = m_settings->tracer; \
-        tracer->set_best_move(move);      \
-    }                                     \
-} while (false)
-
 template<bool TRACE,
          bool PV,
          bool SKIP_NULL,
          bool ROOT>
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
-    ILLUMINA_ASSERT(!TRACE || (m_settings->tracer != nullptr && !m_main));
+    ILLUMINA_ASSERT(!TRACE || tracing());
 
-    TRACE_SET_FLAG(PV ? TRACEV_PV_SEARCH : TRACEV_ZW_SEARCH);
-    TRACE_SET_INT(TRACEV_ALPHA, alpha);
-    TRACE_SET_INT(TRACEV_BETA, beta);
+    TRACE_SET_INT(TRACE_V_ALPHA, alpha);
+    TRACE_SET_INT(TRACE_V_BETA, beta);
+    TRACE_SET_INT(TRACE_V_DEPTH, depth);
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
@@ -540,10 +545,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Make sure we count the root node.
     if constexpr (ROOT) {
         m_results.nodes++;
-
-        if constexpr (TRACE) {
-            m_settings->tracer->new_tree(m_board, m_root_depth, m_curr_pv_idx);
-        }
     }
 
     // Check if we must stop our search.
@@ -613,7 +614,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Compute the static eval. Useful for many heuristics.
     static_eval    = !in_check ? evaluate() : 0;
     bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
-    TRACE_SET_INT(TRACEV_STATIC_EVAL, static_eval);
+    TRACE_SET_INT(TRACE_V_STATIC_EVAL, static_eval);
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
@@ -880,7 +881,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Check if we have a checkmate or stalemate.
     if (!has_legal_moves) {
         Score score =  m_board.in_check() ? (-MATE_SCORE + ply) : 0;
-        TRACE_SET_INT(TRACEV_SCORE, score);
+        TRACE_SET_INT(TRACE_V_SCORE, score);
         return score;
     }
 
@@ -908,7 +909,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
 template <bool TRACE>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
-    TRACE_SET_FLAG(TRACEV_QSEARCH);
+    TRACE_SET_FLAG(TRACE_F_QSEARCH);
 
     Score stand_pat = evaluate();
 
@@ -1131,6 +1132,10 @@ SearchWorker::SearchWorker(bool main,
         board_listener.on_remove_piece = [this](const Board& b, Piece p, Square s) { on_piece_removed<true>(b, p, s); };
     }
     m_board.set_listener(board_listener);
+}
+
+bool SearchWorker::tracing() const {
+    return m_main && m_settings->tracer != nullptr;
 }
 
 const WorkerResults& SearchWorker::results() const {
