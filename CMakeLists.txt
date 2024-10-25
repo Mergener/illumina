@@ -47,6 +47,13 @@ if (DEVELOPMENT)
 
 endif()
 
+option(TRACE "Signals that this will include the tracing module within CLI.
+              Note that this includes the heavy SQLITE3 dependency.
+              Not supposed to be used in regular Illumina builds." OFF)
+if (TRACE)
+    add_definitions(-DTRACING_ENABLED)
+endif()
+
 # For GCC-derived compilers, we need to specify some flags in order
 # to have <thread> and <filesystem> properly working.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
