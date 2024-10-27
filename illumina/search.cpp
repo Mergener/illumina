@@ -216,7 +216,19 @@ TranspositionTable& Searcher::tt() {
 do {                                      \
     if constexpr (TRACE) {                \
         auto tracer = m_settings->tracer; \
-        tracer->push_node(move);          \
+        ui64 zob = m_board.hash_key();    \
+        if (   move.is_promotion()           \
+            && move.promotion_piece_type() != PT_BISHOP \
+            && move.promotion_piece_type() != PT_KNIGHT \
+            && move.promotion_piece_type() != PT_ROOK   \
+            && move.promotion_piece_type() != PT_QUEEN)\
+        {                                 \
+            std::cout << m_board.fen() << std::endl;        \
+            std::cout << move << std::endl;  \
+            std::cout << m_board.hash_key() << std::endl;   \
+            std::cout << std::endl; \
+        }                                  \
+        tracer->push_node(zob, move);     \
     }                                     \
 } while(false)
 
@@ -494,7 +506,7 @@ void SearchWorker::aspiration_windows() {
         if (tracing()) {
             ISearchTracer* tracer = m_settings->tracer;
             tracer->new_tree(m_root_depth,
-                             m_curr_pv_idx,
+                             m_curr_pv_idx + 1,
                              alpha, beta);
             score = pvs<true, true, false, true>(depth, alpha, beta, &search_stack[0]);
             tracer->finish_tree();
@@ -547,6 +559,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     TRACE_SET_INT(TRACE_V_ALPHA, alpha);
     TRACE_SET_INT(TRACE_V_BETA, beta);
     TRACE_SET_INT(TRACE_V_DEPTH, depth);
+
+    if constexpr (PV) {
+        TRACE_SET_FLAG(TRACE_F_PV);
+    }
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
@@ -845,6 +861,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         if (score >= best_score) {
             best_score = score;
+            TRACE_SET_INT(TRACE_V_SCORE, best_score);
         }
 
         if (score >= beta) {
@@ -938,6 +955,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 template <bool TRACE>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET_FLAG(TRACE_F_QSEARCH);
+
+    if (std::abs(beta - alpha) > 1) {
+        TRACE_SET_FLAG(TRACE_F_PV);
+    }
 
     Score stand_pat = evaluate();
 

@@ -23,23 +23,32 @@ void SearchTracer::new_search(const Board& root,
     m_curr_search.limits_binc  = settings.black_inc.value_or(0);
     m_curr_search.limits_nodes = settings.max_nodes;
     m_curr_search.limits_movetime = settings.move_time.value_or(0);
+
+    m_curr_tree = {};
+    m_curr_tree.search = m_curr_search.id;
 }
 
 void SearchTracer::new_tree(int root_depth, int multi_pv, int asp_alpha, int asp_beta) {
     m_curr_tree = {};
-    m_curr_tree.id        = random_ui64();
-    m_curr_tree.search    = m_curr_search.id;
-    m_curr_tree.asp_alpha = asp_alpha;
-    m_curr_tree.asp_beta  = asp_beta;
-    m_curr_tree.multipv   = multi_pv;
+    m_curr_tree.id         = random_ui64();
+    m_curr_tree.search     = m_curr_search.id;
+    m_curr_tree.asp_alpha  = asp_alpha;
+    m_curr_tree.asp_beta   = asp_beta;
+    m_curr_tree.multipv    = multi_pv;
+    m_curr_tree.root_depth = root_depth;
+
+    m_curr_node.index = 1;
+    m_curr_node.parent_index = 0;
+    m_curr_node.tree = m_curr_tree.id;
 }
 
-void SearchTracer::push_node(Move move) {
+void SearchTracer::push_node(ui64 zob, Move move) {
     NodeInfo new_node;
     new_node.index = m_curr_tree.next_node_index++;
     new_node.parent_index = m_curr_node.index;
     new_node.tree = m_curr_tree.id;
     new_node.last_move = move;
+    new_node.zob_key = zob;
     new_node.next_child_order = m_curr_node.next_child_order++;
 
     m_node_stack.push_back(m_curr_node);
@@ -97,6 +106,14 @@ void SearchTracer::set_flag(TraceFlag which) {
             m_curr_node.qsearch = true;
             break;
 
+        case TRACE_F_TESTING_SINGULAR:
+            m_curr_node.singular_search = true;
+            break;
+
+        case TRACE_F_PV:
+            m_curr_node.pv = true;
+            break;
+
         default:
             break;
     }
@@ -109,7 +126,7 @@ void SearchTracer::set_best_move(Move move) {
 
 void SearchTracer::finish_tree() {
     save_tree(m_curr_tree);
-    std::cout << "info string Saved ID/MultiPV/AspWin search tree with id " << m_curr_tree.id << std::endl;
+    std::cout << std::hex << "info string Saved ID/MultiPV/AspWin search tree with id 0x" << m_curr_tree.id << std::dec << std::endl;
     m_curr_tree = {};
 
     // Push root node to batch.
@@ -120,7 +137,7 @@ void SearchTracer::finish_tree() {
 void SearchTracer::finish_search() {
     flush_nodes();
     save_search(m_curr_search);
-    std::cout << "info string Saved search with id " << m_curr_search.id << std::endl;
+    std::cout << std::hex << "info string Saved search with id 0x" << m_curr_search.id << std::dec << std::endl;
     m_curr_search = {};
 }
 
@@ -128,6 +145,11 @@ struct FastMoveSerializer {
     char chars[6];
 
     FastMoveSerializer(Move move) {
+        if (move == MOVE_NULL) {
+            chars[0] = chars[1] = chars[2] = chars[3] = '0';
+            chars[4] = '\0';
+            return;
+        }
         Square src = move.source();
         Square dst = move.destination();
 
@@ -149,22 +171,27 @@ void SearchTracer::flush_nodes() {
         SQLite::Transaction transaction(m_db);
 
         SQLite::Statement insert(m_db,
-                                 "INSERT OR IGNORE INTO NODES (node_index, node_order, parent_index, tree, last_move, "
-                                 "alpha, beta, depth, static_eval, score, best_move) "
-                                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                 "INSERT INTO NODES (node_index, parent_index, tree, last_move, "
+                                 "zob_key, alpha, beta, depth, static_eval, score, best_move, "
+                                 "qsearch, singular_search, pv) "
+                                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         for (const NodeInfo& node : m_node_batch) {
-            insert.bind(1, i64(node.index));
-            insert.bind(2, int(node.node_order));
-            insert.bind(3, i64(node.parent_index));
-            insert.bind(4, node.tree);
-            insert.bind(5, FastMoveSerializer(node.last_move).chars);
-            insert.bind(6, node.alpha);
-            insert.bind(7, node.beta);
-            insert.bind(8, int(node.depth));
-            insert.bind(9, node.static_eval);
-            insert.bind(10, node.score);
-            insert.bind(11, FastMoveSerializer(node.best_move).chars);
+            int i = 0;
+            insert.bind(++i, i64(node.index));
+            insert.bind(++i, i64(node.parent_index));
+            insert.bind(++i, i64(node.tree));
+            insert.bind(++i, FastMoveSerializer(node.last_move).chars);
+            insert.bind(++i, i64(node.zob_key));
+            insert.bind(++i, node.alpha);
+            insert.bind(++i, node.beta);
+            insert.bind(++i, int(node.depth));
+            insert.bind(++i, node.static_eval);
+            insert.bind(++i, node.score);
+            insert.bind(++i, FastMoveSerializer(node.best_move).chars);
+            insert.bind(++i, node.qsearch);
+            insert.bind(++i, node.singular_search);
+            insert.bind(++i, node.pv);
 
             insert.exec();
             insert.reset();
@@ -204,13 +231,13 @@ void SearchTracer::bootstrap_db() {
     ss << "CREATE TABLE IF NOT EXISTS searches (\n"
           "    id INTEGER PRIMARY KEY, \n"
           "    time_of_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n"
-          "    depth INTEGER,\n"
-          "    nodes INTEGER,\n"
-          "    wtime INTEGER,\n"
-          "    btime INTEGER,\n"
-          "    winc INTEGER,\n"
-          "    binc INTEGER,\n"
-          "    movetime INTEGER,\n"
+          "    limits_depth INTEGER,\n"
+          "    limits_nodes INTEGER,\n"
+          "    limits_wtime INTEGER,\n"
+          "    limits_btime INTEGER,\n"
+          "    limits_winc INTEGER,\n"
+          "    limits_binc INTEGER,\n"
+          "    limits_movetime INTEGER,\n"
           "    hash INTEGER,\n"
           "    root_fen TEXT\n"
           ");\n"
@@ -231,17 +258,20 @@ void SearchTracer::bootstrap_db() {
 
     // Create nodes table.
     ss << "CREATE TABLE IF NOT EXISTS nodes (\n"
-          "    node_index INTEGER,\n"
-          "    node_order INTEGER,\n"
-          "    parent_index INTEGER,\n"
-          "    tree INTEGER,\n"
-          "    last_move TEXT CHECK(length(last_move) <= 5),\n"
+          "    node_index INTEGER REQUIRED,\n"
+          "    parent_index INTEGER REQUIRED,\n"
+          "    tree INTEGER REQUIRED,\n"
+          "    last_move TEXT REQUIRED,\n"
+          "    zob_key INTEGER,\n"
           "    alpha INTEGER,\n"
           "    beta INTEGER,\n"
           "    depth INTEGER,\n"
           "    static_eval INTEGER,\n"
           "    score INTEGER,\n"
           "    best_move TEXT,\n"
+          "    qsearch BOOLEAN,\n"
+          "    singular_search BOOLEAN,\n"
+          "    pv BOOLEAN,\n"
           "    PRIMARY KEY (node_index, tree, parent_index),\n"
           "    FOREIGN KEY (tree) REFERENCES trees(id) ON DELETE CASCADE,\n"
           "    FOREIGN KEY (parent_index) REFERENCES nodes(node_index) ON DELETE SET NULL\n"
@@ -256,11 +286,39 @@ void SearchTracer::bootstrap_db() {
 }
 
 void SearchTracer::save_tree(const TreeInfo& tree) {
+    SQLite::Statement statement(m_db, "INSERT INTO trees (id, search, root_depth,"
+                                      "asp_alpha, asp_beta, multipv) VALUES"
+                                      "(?, ?, ?, ?, ?, ?);");
+    int i = 0;
+    statement.bind(++i, i64(tree.id));
+    statement.bind(++i, i64(tree.search));
+    statement.bind(++i, i64(tree.root_depth));
+    statement.bind(++i, i64(tree.asp_alpha));
+    statement.bind(++i, i64(tree.asp_beta));
+    statement.bind(++i, i64(tree.multipv));
 
+    statement.exec();
 }
 
 void SearchTracer::save_search(const SearchInfo& search) {
+    SQLite::Statement statement(m_db, "INSERT INTO searches (id,"
+                                      "limits_depth, limits_nodes, limits_wtime,"
+                                      "limits_btime, limits_winc, limits_binc,"
+                                      "limits_movetime, hash, root_fen) VALUES"
+                                      "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    int i = 0;
+    statement.bind(++i, i64(search.id));
+    statement.bind(++i, search.limits_depth);
+    statement.bind(++i, i64(search.limits_nodes));
+    statement.bind(++i, search.limits_wtime);
+    statement.bind(++i, search.limits_btime);
+    statement.bind(++i, search.limits_winc);
+    statement.bind(++i, search.limits_binc);
+    statement.bind(++i, search.limits_movetime);
+    statement.bind(++i, i64(search.hash));
+    statement.bind(++i, search.root_fen);
 
+    statement.exec();
 }
 
 SearchTracer::SearchTracer(const std::string& db_path,
