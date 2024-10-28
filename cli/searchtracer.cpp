@@ -1,5 +1,6 @@
 #include "searchtracer.h"
 
+#include <sstream>
 #include "utils.h"
 
 namespace illumina {
@@ -42,13 +43,11 @@ void SearchTracer::new_tree(int root_depth, int multi_pv, int asp_alpha, int asp
     m_curr_node.tree = m_curr_tree.id;
 }
 
-void SearchTracer::push_node(ui64 zob, Move move) {
+void SearchTracer::push_node() {
     NodeInfo new_node;
     new_node.index = m_curr_tree.next_node_index++;
     new_node.parent_index = m_curr_node.index;
     new_node.tree = m_curr_tree.id;
-    new_node.last_move = move;
-    new_node.zob_key = zob;
     new_node.next_child_order = m_curr_node.next_child_order++;
 
     m_node_stack.push_back(m_curr_node);
@@ -76,52 +75,6 @@ void SearchTracer::pop_node(bool discard) {
 
     m_curr_node = m_node_stack.back();
     m_node_stack.pop_back();
-}
-
-void SearchTracer::set_int_value(TraceInt which, i64 value) {
-    switch (which) {
-        case TRACE_V_BETA:
-            m_curr_node.beta = i32(value);
-            break;
-        case TRACE_V_ALPHA:
-            m_curr_node.alpha = i32(value);
-            break;
-        case TRACE_V_STATIC_EVAL:
-            m_curr_node.static_eval = i16(value);
-            break;
-        case TRACE_V_SCORE:
-            m_curr_node.score = i32(value);
-            break;
-        case TRACE_V_DEPTH:
-            m_curr_node.depth = i8(value);
-            break;
-        default:
-            break;
-    }
-}
-
-void SearchTracer::set_flag(TraceFlag which) {
-    switch (which) {
-        case TRACE_F_QSEARCH:
-            m_curr_node.qsearch = true;
-            break;
-
-        case TRACE_F_TESTING_SINGULAR:
-            m_curr_node.singular_search = true;
-            break;
-
-        case TRACE_F_PV:
-            m_curr_node.pv = true;
-            break;
-
-        default:
-            break;
-    }
-
-}
-
-void SearchTracer::set_best_move(Move move) {
-    m_curr_node.best_move = move;
 }
 
 void SearchTracer::finish_tree() {
@@ -170,11 +123,34 @@ void SearchTracer::flush_nodes() {
     try {
         SQLite::Transaction transaction(m_db);
 
+        static std::string s_node_insert_query = []() {
+            std::stringstream ss;
+            ss << "INSERT INTO NODES (";
+#define
+            ss << ")";
+
+            ss << "(";
+            int total = int(TraceableBool::N)
+                        + int(TraceableInt::N)
+                        + int(TraceableMove::N);
+
+            for (int i = 0; i < total; ++i) {
+                ss << "?";
+                if (i < (total - 1)) {
+                    ss << ", ";
+                }
+            }
+
+            ss << ")";
+            return ss.str();
+        }();
+
         SQLite::Statement insert(m_db,
+                                 std::string(
                                  "INSERT INTO NODES (node_index, parent_index, tree, last_move, "
                                  "zob_key, alpha, beta, depth, static_eval, score, best_move, "
                                  "qsearch, singular_search, pv) "
-                                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                 "VALUES ") + s_node_values_tuple);
 
         for (const NodeInfo& node : m_node_batch) {
             int i = 0;

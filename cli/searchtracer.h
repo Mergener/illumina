@@ -33,13 +33,13 @@ public:
     void finish_tree() override;
     void finish_search() override;
 
-    void push_node(ui64 zob, Move move) override;
+    void push_node() override;
     void push_sibling_node() override;
     void pop_node(bool discard = false) override;
 
-    void set_int_value(TraceInt which, i64 value) override;
-    void set_flag(TraceFlag which) override;
-    void set_best_move(Move move) override;
+    void set(TraceableInt which, i64 value) override;
+    void set(TraceableBool which, bool value) override;
+    void set(TraceableMove which, Move value) override;
 
     explicit SearchTracer(const std::string& db_path,
                           size_t batch_size_mib = DEFAULT_TRACER_BATCH_SIZE);
@@ -52,17 +52,10 @@ private:
         ui64 index = 1;
         ui64 parent_index = 0;
         ui64 tree;
-        ui64 zob_key;
-        Move last_move;
-        Move best_move;
-        i32  alpha = 0;
-        i32  beta = 0;
-        i32  score = 0;
-        i16  static_eval = 0;
-        ui8  depth = 0;
-        bool qsearch = false;
-        bool singular_search = false;
-        bool pv = false;
+
+        i64  traceable_ints[(int)TraceableInt::N];
+        bool traceable_bools[(int)TraceableBool::N];
+        Move traceable_moves[(int)TraceableMove::N];
 
         // Not saved in DB
         i8 next_child_order = 0;

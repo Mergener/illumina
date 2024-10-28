@@ -7,18 +7,23 @@
 
 namespace illumina {
 
-enum TraceInt {
-    TRACE_V_BETA,
-    TRACE_V_ALPHA,
-    TRACE_V_STATIC_EVAL,
-    TRACE_V_SCORE,
-    TRACE_V_DEPTH
+enum class TraceableInt {
+#define TRACEABLE_INT(name, default) name,
+#include "traceables.def"
+#undef TRACEABLE_INT
+N
 };
 
-enum TraceFlag {
-    TRACE_F_QSEARCH,
-    TRACE_F_TESTING_SINGULAR,
-    TRACE_F_PV
+enum class TraceableBool {
+#define TRACEABLE_INT(...)
+#include "traceables.def"
+N
+};
+
+enum class TraceableMove {
+#define TRACEABLE_INT(...)
+#include "traceables.def"
+N
 };
 
 class SearchSettings;
@@ -34,11 +39,11 @@ public:
                           int asp_alpha,
                           int asp_beta) = 0;
     virtual void finish_tree() = 0;
-    virtual void push_node(ui64 zob, Move move) = 0;
+    virtual void push_node() = 0;
     virtual void push_sibling_node() = 0;
-    virtual void set_int_value(TraceInt which, i64 value) = 0;
-    virtual void set_flag(TraceFlag which) = 0;
-    virtual void set_best_move(Move move) = 0;
+    virtual void set(TraceableInt which, i64 value) = 0;
+    virtual void set(TraceableBool which, bool value) = 0;
+    virtual void set(TraceableMove which, Move value) = 0;
     virtual void pop_node(bool discard = false) = 0;
 };
 

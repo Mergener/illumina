@@ -1,0 +1,23 @@
+#ifndef TRACEABLE_BOOL
+#define TRACEABLE_BOOL(...)
+#endif
+
+#ifndef TRACEABLE_INT
+#define TRACEABLE_INT(...)
+#endif
+
+#ifndef TRACEABLE_MOVE
+#define TRACEABLE_MOVE(...)
+#endif
+
+TRACEABLE_BOOL(qsearch, false)
+TRACEABLE_BOOL(testing_singular, false)
+TRACEABLE_BOOL(pv, false)
+TRACEABLE_INT(alpha, 0)
+TRACEABLE_INT(beta,  0)
+TRACEABLE_INT(static_eval, 0)
+TRACEABLE_INT(score, 0)
+TRACEABLE_INT(depth, 0)
+TRACEABLE_INT(zob_key, 0)
+TRACEABLE_MOVE(best_move)
+TRACEABLE_MOVE(last_move)
