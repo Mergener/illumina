@@ -9,18 +9,25 @@
 
 namespace illumina {
 
+/**
+ * Enum for every value that can be traced in the search.
+ */
+enum class Traceable {
+#define TRACEABLE(name, cpp_type) name,
+#include "traceables.def"
+N
+};
+
+/**
+ * Type for values that can be traced.
+ * At the moment, only i64, string and bools are supported.
+ */
 using TracedValue = std::variant<std::monostate, i64, std::string, bool>;
 #define TRACEABLE(name, cpp_type) static_assert(  std::is_same_v<cpp_type, i64>   \
                                                 | std::is_same_v<cpp_type, std::string>  \
                                                 | std::is_same_v<cpp_type, bool>, \
                                                 "Unsupported traceable type.");
 #include "traceables.def"
-
-enum class Traceable {
-#define TRACEABLE(name, cpp_type) name,
-#include "traceables.def"
-N
-};
 
 class SearchSettings;
 

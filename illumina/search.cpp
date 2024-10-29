@@ -533,7 +533,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     TRACE_SET(Traceable::DEPTH, depth);
 
     if constexpr (PV) {
-            TRACE_SET(Traceable::PV, true);
+        TRACE_SET(Traceable::PV, true);
     }
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
