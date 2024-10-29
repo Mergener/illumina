@@ -764,7 +764,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             node->skip_move = move;
 
             TRACE_PUSH_SIBLING();
-            TRACE_SET(Traceable::TESTING_SINGULAR, true);
+            TRACE_SET(Traceable::SKIP_MOVE, node->skip_move);
 
             Score score = pvs<TRACE, false>(depth / 2, se_beta - 1, se_beta, node);
 
@@ -840,7 +840,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Our search failed high.
             alpha     = score;
             best_move = move;
-            TRACE_SET(Traceable::BEST_MOVE, best_move.to_uci());
+            TRACE_SET(Traceable::BEST_MOVE, best_move);
 
             // Update our history scores and refutation moves.
             if (move.is_quiet()) {
@@ -871,7 +871,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // We've got a new best move.
             alpha     = score;
             best_move = move;
-            TRACE_SET(Traceable::BEST_MOVE, move.to_uci());
+            TRACE_SET(Traceable::BEST_MOVE, move);
 
             // Make sure we update our best_move in the root ASAP.
             if (ROOT && (!should_stop() || depth <= 2)) {
@@ -959,13 +959,13 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
         if (score >= beta) {
             best_move = move;
-            TRACE_SET(Traceable::BEST_MOVE, move.to_uci());
+            TRACE_SET(Traceable::BEST_MOVE, move);
             alpha = score;
             break;
         }
         if (score > alpha) {
             best_move = move;
-            TRACE_SET(Traceable::BEST_MOVE, move.to_uci());
+            TRACE_SET(Traceable::BEST_MOVE, move);
             alpha = score;
         }
     }
@@ -1079,7 +1079,7 @@ void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move mov
     m_results.nodes++;
     m_eval.on_make_move(board, move);
     TRACE_PUSH();
-    TRACE_SET(Traceable::LAST_MOVE, move.to_uci());
+    TRACE_SET(Traceable::LAST_MOVE, move);
     TRACE_SET(Traceable::ZOB_KEY, i64(board.hash_key()));
 }
 
@@ -1094,7 +1094,7 @@ void SearchWorker::on_make_null_move(const illumina::Board& board) {
     m_results.nodes++;
     m_eval.on_make_null_move(board);
     TRACE_PUSH();
-    TRACE_SET(Traceable::LAST_MOVE, MOVE_NULL.to_uci());
+    TRACE_SET(Traceable::LAST_MOVE, MOVE_NULL);
     TRACE_SET(Traceable::ZOB_KEY, i64(board.hash_key()));
 }
 

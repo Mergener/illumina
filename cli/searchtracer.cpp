@@ -10,17 +10,43 @@ static ui64 random_ui64() {
 }
 
 template <typename T>
-static void bind_traced_value_to_statement(SQLite::Statement& stmt,
-                                           int index,
-                                           const TracedValue& value) {
-    std::visit([&stmt, index](const auto& v) {
+void bind_to_statement(SQLite::Statement& stmt,
+                       int index,
+                       const T& value) {
+    stmt.bind(index, value);
+}
+
+template <>
+void bind_to_statement(SQLite::Statement& stmt,
+                       int index,
+                       const Move& move) {
+    stmt.bind(index, move.to_uci());
+}
+
+/**
+ * Binds a traced value to a SQLite statement.
+ * Typename T is the target type to bind the value, declared in traceables.def.
+ * The traced value's current state might match T, in which we will store it.
+ * If the traced value's current type doesn't match T, we assume the value is either
+ * invalid or wasn't set, so we assign a default value.
+ */
+template <typename T>
+void bind_to_statement(SQLite::Statement& stmt,
+                       int index,
+                       const TracedValue& value) {
+    std::visit([&stmt, index, &value](const auto& v) {
         using TVal = std::decay_t<decltype(v)>;
 
         if constexpr (std::is_same_v<TVal, T>) {
-            stmt.bind(index, T(v));
+            bind_to_statement(stmt, index, T(v));
+        }
+        else if constexpr (std::is_same_v<TVal, std::monostate>) {
+            bind_to_statement(stmt, index, T());
         }
         else {
-            stmt.bind(index, T());
+            std::stringstream ss;
+            ss << "Unexpected traced value " << std::get<TVal>(value) << std::endl;
+            throw std::runtime_error(ss.str());
         }
     }, value);
 }
@@ -38,6 +64,9 @@ std::string sql_type_map() {
         return "BOOLEAN";
     }
     else if constexpr (std::is_same_v<T, std::string>) {
+        return "TEXT";
+    }
+    else if constexpr (std::is_same_v<T, Move>) {
         return "TEXT";
     }
     return "";
@@ -128,27 +157,6 @@ void SearchTracer::finish_search() {
     m_curr_search = {};
 }
 
-struct FastMoveSerializer {
-    char chars[6];
-
-    FastMoveSerializer(Move move) {
-        if (move == MOVE_NULL) {
-            chars[0] = chars[1] = chars[2] = chars[3] = '0';
-            chars[4] = '\0';
-            return;
-        }
-        Square src = move.source();
-        Square dst = move.destination();
-
-        chars[0] = file_to_char(square_file(src));
-        chars[1] = rank_to_char(square_rank(src));
-        chars[2] = file_to_char(square_file(dst));
-        chars[3] = rank_to_char(square_rank(dst));
-        chars[4] = move.is_promotion() ? piece_type_to_char(move.promotion_piece_type()) : '\0';
-        chars[5] = '\0';
-    }
-};
-
 void SearchTracer::flush_nodes() {
     // Log flushing to console, but don't spam it when flushing
     // few amounts of nodes.
@@ -183,7 +191,7 @@ void SearchTracer::flush_nodes() {
             statement.bind(++i, i64(node.parent_index));
             statement.bind(++i, i64(node.tree));
 
-#define TRACEABLE(name, type) bind_traced_value_to_statement<type>(statement, ++i, node.traced_values[int(Traceable:: name)]);
+#define TRACEABLE(name, type) bind_to_statement<type>(statement, ++i, node.traced_values[int(Traceable:: name)]);
 #include "traceables.def"
 
             statement.exec();
