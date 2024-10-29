@@ -9,6 +9,40 @@ static ui64 random_ui64() {
     return random(ui64(0), UINT64_MAX);
 }
 
+template <typename T>
+static void bind_traced_value_to_statement(SQLite::Statement& stmt,
+                                           int index,
+                                           const TracedValue& value) {
+    std::visit([&stmt, index](const auto& v) {
+        using TVal = std::decay_t<decltype(v)>;
+
+        if constexpr (std::is_same_v<TVal, T>) {
+            stmt.bind(index, T(v));
+        }
+        else {
+            stmt.bind(index, T());
+        }
+    }, value);
+}
+
+void SearchTracer::set(Traceable which, TracedValue value) {
+    m_curr_node.traced_values[int(which)] = value;
+}
+
+template <typename T>
+std::string sql_type_map() {
+    if constexpr (std::is_same_v<T, i64>) {
+        return "INTEGER";
+    }
+    else if constexpr (std::is_same_v<T, bool>) {
+        return "BOOLEAN";
+    }
+    else if constexpr (std::is_same_v<T, std::string>) {
+        return "TEXT";
+    }
+    return "";
+}
+
 void SearchTracer::new_search(const Board& root,
                               size_t hash_size_mb,
                               const SearchSettings& settings) {
@@ -116,6 +150,8 @@ struct FastMoveSerializer {
 };
 
 void SearchTracer::flush_nodes() {
+    // Log flushing to console, but don't spam it when flushing
+    // few amounts of nodes.
     if (m_target_node_count >= 16384) {
         std::cout << "info string Saving " << m_node_batch.size() << " nodes to trace db" << std::endl;
     }
@@ -123,54 +159,35 @@ void SearchTracer::flush_nodes() {
     try {
         SQLite::Transaction transaction(m_db);
 
-        static std::string s_node_insert_query = []() {
-            std::stringstream ss;
-            ss << "INSERT INTO NODES (";
-#define TRACEABLE_INT()
-            ss << ")";
+        // Build SQL insert statement from traceables.
+        std::stringstream ss;
+        ss << "INSERT INTO NODES (node_index, parent_index, tree";
 
-            ss << "(";
-            int total = int(TraceableBool::N)
-                        + int(TraceableInt::N)
-                        + int(TraceableMove::N);
+#define TRACEABLE(name, type) ss << ", " << lower_case(#name);
+#include "traceables.def"
 
-            for (int i = 0; i < total; ++i) {
-                ss << "?";
-                if (i < (total - 1)) {
-                    ss << ", ";
-                }
-            }
+        ss << ") VALUES (?, ?, ?";
 
-            ss << ")";
-            return ss.str();
-        }();
+#define TRACEABLE(name, type) ss << ", ?";
+#include "traceables.def"
 
-        SQLite::Statement insert(m_db,
-                                 std::string(
-                                 "INSERT INTO NODES (node_index, parent_index, tree, last_move, "
-                                 "zob_key, alpha, beta, depth, static_eval, score, best_move, "
-                                 "qsearch, singular_search, pv) "
-                                 "VALUES ") + s_node_values_tuple);
+        ss << ");";
+
+        SQLite::Statement statement(m_db, ss.str());
 
         for (const NodeInfo& node : m_node_batch) {
             int i = 0;
-            insert.bind(++i, i64(node.index));
-            insert.bind(++i, i64(node.parent_index));
-            insert.bind(++i, i64(node.tree));
-            insert.bind(++i, FastMoveSerializer(node.last_move).chars);
-            insert.bind(++i, i64(node.zob_key));
-            insert.bind(++i, node.alpha);
-            insert.bind(++i, node.beta);
-            insert.bind(++i, int(node.depth));
-            insert.bind(++i, node.static_eval);
-            insert.bind(++i, node.score);
-            insert.bind(++i, FastMoveSerializer(node.best_move).chars);
-            insert.bind(++i, node.qsearch);
-            insert.bind(++i, node.singular_search);
-            insert.bind(++i, node.pv);
 
-            insert.exec();
-            insert.reset();
+            // Bind ever-present attributes to statement.
+            statement.bind(++i, i64(node.index));
+            statement.bind(++i, i64(node.parent_index));
+            statement.bind(++i, i64(node.tree));
+
+#define TRACEABLE(name, type) bind_traced_value_to_statement<type>(statement, ++i, node.traced_values[int(Traceable:: name)]);
+#include "traceables.def"
+
+            statement.exec();
+            statement.reset();
         }
 
         transaction.commit();
@@ -236,19 +253,12 @@ void SearchTracer::bootstrap_db() {
     ss << "CREATE TABLE IF NOT EXISTS nodes (\n"
           "    node_index INTEGER REQUIRED,\n"
           "    parent_index INTEGER REQUIRED,\n"
-          "    tree INTEGER REQUIRED,\n"
-          "    last_move TEXT REQUIRED,\n"
-          "    zob_key INTEGER,\n"
-          "    alpha INTEGER,\n"
-          "    beta INTEGER,\n"
-          "    depth INTEGER,\n"
-          "    static_eval INTEGER,\n"
-          "    score INTEGER,\n"
-          "    best_move TEXT,\n"
-          "    qsearch BOOLEAN,\n"
-          "    singular_search BOOLEAN,\n"
-          "    pv BOOLEAN,\n"
-          "    PRIMARY KEY (node_index, tree, parent_index),\n"
+          "    tree INTEGER REQUIRED,\n";
+
+#define TRACEABLE(name, type) ss << "    " << lower_case(#name) << " " << sql_type_map<type>() << ",\n";
+#include "traceables.def"
+
+    ss << "    PRIMARY KEY (node_index, tree, parent_index),\n"
           "    FOREIGN KEY (tree) REFERENCES trees(id) ON DELETE CASCADE,\n"
           "    FOREIGN KEY (parent_index) REFERENCES nodes(node_index) ON DELETE SET NULL\n"
           ");\n"

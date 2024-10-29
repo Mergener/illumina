@@ -37,9 +37,7 @@ public:
     void push_sibling_node() override;
     void pop_node(bool discard = false) override;
 
-    void set(TraceableInt which, i64 value) override;
-    void set(TraceableBool which, bool value) override;
-    void set(TraceableMove which, Move value) override;
+    void set(Traceable which, TracedValue value) override;
 
     explicit SearchTracer(const std::string& db_path,
                           size_t batch_size_mib = DEFAULT_TRACER_BATCH_SIZE);
@@ -53,9 +51,7 @@ private:
         ui64 parent_index = 0;
         ui64 tree;
 
-        i64  traceable_ints[(int)TraceableInt::N];
-        bool traceable_bools[(int)TraceableBool::N];
-        Move traceable_moves[(int)TraceableMove::N];
+        TracedValue traced_values[int(Traceable::N)];
 
         // Not saved in DB
         i8 next_child_order = 0;

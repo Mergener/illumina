@@ -2,26 +2,22 @@
 #define ILLUMINA_TRACING_H
 
 #include <functional>
+#include <variant>
+#include <type_traits>
 
 #include "board.h"
 
 namespace illumina {
 
-enum class TraceableInt {
-#define TRACEABLE_INT(name, default) name,
+using TracedValue = std::variant<std::monostate, i64, std::string, bool>;
+#define TRACEABLE(name, cpp_type) static_assert(  std::is_same_v<cpp_type, i64>   \
+                                                | std::is_same_v<cpp_type, std::string>  \
+                                                | std::is_same_v<cpp_type, bool>, \
+                                                "Unsupported traceable type.");
 #include "traceables.def"
-#undef TRACEABLE_INT
-N
-};
 
-enum class TraceableBool {
-#define TRACEABLE_BOOL(name, default) name,
-#include "traceables.def"
-N
-};
-
-enum class TraceableMove {
-#define TRACEABLE_MOVE(name) name,
+enum class Traceable {
+#define TRACEABLE(name, cpp_type) name,
 #include "traceables.def"
 N
 };
@@ -41,9 +37,7 @@ public:
     virtual void finish_tree() = 0;
     virtual void push_node() = 0;
     virtual void push_sibling_node() = 0;
-    virtual void set(TraceableInt which, i64 value) = 0;
-    virtual void set(TraceableBool which, bool value) = 0;
-    virtual void set(TraceableMove which, Move value) = 0;
+    virtual void set(Traceable which, TracedValue value) = 0;
     virtual void pop_node(bool discard = false) = 0;
 };
 

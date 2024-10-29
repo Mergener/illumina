@@ -1,27 +1,20 @@
-#ifndef TRACEABLE_BOOL
-#define TRACEABLE_BOOL(...)
+// Define here values that can be traced for each node in our search tracer.
+// The only supported types for traceables are std::string, i64 and bool.
+
+#ifndef TRACEABLE
+#define TRACEABLE(name, cpp_type, default)
 #endif
 
-#ifndef TRACEABLE_INT
-#define TRACEABLE_INT(...)
-#endif
+TRACEABLE(QSEARCH, bool)
+TRACEABLE(TESTING_SINGULAR, bool)
+TRACEABLE(PV, bool)
+TRACEABLE(ALPHA, i64)
+TRACEABLE(BETA,  i64)
+TRACEABLE(STATIC_EVAL, i64)
+TRACEABLE(SCORE, i64)
+TRACEABLE(DEPTH, i64)
+TRACEABLE(ZOB_KEY, i64)
+TRACEABLE(BEST_MOVE, std::string)
+TRACEABLE(LAST_MOVE, std::string)
 
-#ifndef TRACEABLE_MOVE
-#define TRACEABLE_MOVE(...)
-#endif
-
-TRACEABLE_BOOL(QSEARCH, false)
-TRACEABLE_BOOL(TESTING_SINGULAR, false)
-TRACEABLE_BOOL(PV, false)
-TRACEABLE_INT(ALPHA, 0)
-TRACEABLE_INT(BETA,  0)
-TRACEABLE_INT(STATIC_EVAL, 0)
-TRACEABLE_INT(SCORE, 0)
-TRACEABLE_INT(DEPTH, 0)
-TRACEABLE_INT(ZOB_KEY, 0)
-TRACEABLE_MOVE(BEST_MOVE)
-TRACEABLE_MOVE(LAST_MOVE)
-
-#undef TRACEABLE_BOOL
-#undef TRACEABLE_INT
-#undef TRACEABLE_MOVE
+#undef TRACEABLE
