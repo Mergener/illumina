@@ -15,13 +15,13 @@ N
 };
 
 enum class TraceableBool {
-#define TRACEABLE_INT(...)
+#define TRACEABLE_BOOL(name, default) name,
 #include "traceables.def"
 N
 };
 
 enum class TraceableMove {
-#define TRACEABLE_INT(...)
+#define TRACEABLE_MOVE(name) name,
 #include "traceables.def"
 N
 };

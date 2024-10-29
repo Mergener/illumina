@@ -11,6 +11,10 @@
 // 3652, just like a double of value 0.0541 will be exposed as 54.
 //
 
+#ifndef TUNABLE_VALUE
+#define TUNABLE_VALUE(name, type, base_value, min_value, max_value)
+#endif
+
 //
 // Search constants
 //

@@ -126,7 +126,7 @@ void SearchTracer::flush_nodes() {
         static std::string s_node_insert_query = []() {
             std::stringstream ss;
             ss << "INSERT INTO NODES (";
-#define
+#define TRACEABLE_INT()
             ss << ")";
 
             ss << "(";
