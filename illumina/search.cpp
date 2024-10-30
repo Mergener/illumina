@@ -553,6 +553,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (   !PV
         && !SKIP_NULL
         && !in_check
+        && non_pawn_bb(m_board) != 0
         && popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES
         && static_eval >= beta
         && depth >= NMP_MIN_DEPTH
