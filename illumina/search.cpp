@@ -528,13 +528,13 @@ template<bool TRACE,
 Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
     ILLUMINA_ASSERT(!TRACE || tracing());
 
+    TRACE_SET(Traceable::FEN, m_board.fen());
+    TRACE_SET(Traceable::PV, PV);
     TRACE_SET(Traceable::ALPHA, alpha);
     TRACE_SET(Traceable::BETA, beta);
+    TRACE_SET(Traceable::LAST_MOVE, m_board.last_move());
+    TRACE_SET(Traceable::ZOB_KEY, i64(m_board.hash_key()));
     TRACE_SET(Traceable::DEPTH, depth);
-
-    if constexpr (PV) {
-        TRACE_SET(Traceable::PV, true);
-    }
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
@@ -585,12 +585,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     bool found_in_tt = tt.probe(board_key, tt_entry, node->ply);
     if (found_in_tt) {
         hash_move = tt_entry.move();
+        TRACE_SET(Traceable::FOUND_IN_TT, true);
 
         if (   !PV
             && node->skip_move == MOVE_NULL
             && tt_entry.depth() >= depth) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
                 // TT Cuttoff.
+                TRACE_SET(Traceable::TT_CUTOFF, true);
                 return tt_entry.score();
             }
             else if (tt_entry.bound_type() == BT_LOWERBOUND) {
@@ -620,8 +622,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Compute the static eval. Useful for many heuristics.
     static_eval    = !in_check ? evaluate() : 0;
-    bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
     TRACE_SET(Traceable::STATIC_EVAL, static_eval);
+
+    // Compute improving flag, also useful for many heuristics.
+    bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
+    TRACE_SET(Traceable::IMPROVING, improving);
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
@@ -926,16 +931,24 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
 template <bool TRACE>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
+    TRACE_SET(Traceable::FEN, m_board.fen());
     TRACE_SET(Traceable::QSEARCH, true);
+    TRACE_SET(Traceable::PV, (beta - alpha) > 1);
+    TRACE_SET(Traceable::ALPHA, alpha);
+    TRACE_SET(Traceable::BETA, beta);
 
     Score stand_pat = evaluate();
+    TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
     if (stand_pat >= beta) {
+        TRACE_SET(Traceable::SCORE, beta);
         return beta;
     }
     if (stand_pat > alpha) {
         alpha = stand_pat;
     }
+
+    TRACE_SET(Traceable::SCORE, alpha);
 
     check_limits();
     if (should_stop()) {
@@ -960,12 +973,14 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         if (score >= beta) {
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
+            TRACE_SET(Traceable::SCORE, alpha);
             alpha = score;
             break;
         }
         if (score > alpha) {
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
+            TRACE_SET(Traceable::SCORE, alpha);
             alpha = score;
         }
     }
@@ -1079,8 +1094,6 @@ void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move mov
     m_results.nodes++;
     m_eval.on_make_move(board, move);
     TRACE_PUSH();
-    TRACE_SET(Traceable::LAST_MOVE, move);
-    TRACE_SET(Traceable::ZOB_KEY, i64(board.hash_key()));
 }
 
 template <bool TRACE>

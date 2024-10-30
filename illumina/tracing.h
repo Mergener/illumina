@@ -20,13 +20,14 @@ N
 
 /**
  * Type for values that can be traced.
- * At the moment, only i64, string and bools are supported.
+ * At the moment, only i64, string, double and bools are supported.
  */
-using TracedValue = std::variant<std::monostate, i64, std::string, bool, Move>;
-#define TRACEABLE(name, cpp_type) static_assert(  std::is_same_v<cpp_type, i64>   \
-                                                | std::is_same_v<cpp_type, std::string>  \
-                                                | std::is_same_v<cpp_type, bool> \
-                                                | std::is_same_v<cpp_type, Move>, \
+using TracedValue = std::variant<std::monostate, i64, std::string, bool, Move, double>;
+#define TRACEABLE(name, cpp_type) static_assert(  std::is_same_v<cpp_type, i64>         \
+                                                | std::is_same_v<cpp_type, std::string> \
+                                                | std::is_same_v<cpp_type, bool>        \
+                                                | std::is_same_v<cpp_type, Move>        \
+                                                | std::is_same_v<cpp_type, double>,     \
                                                 "Unsupported traceable type.");
 #include "traceables.def"
 

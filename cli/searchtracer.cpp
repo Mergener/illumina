@@ -69,7 +69,12 @@ std::string sql_type_map() {
     else if constexpr (std::is_same_v<T, Move>) {
         return "TEXT";
     }
-    return "";
+    else if constexpr (std::is_same_v<T, double>) {
+        return "REAL";
+    }
+    else {
+        static_assert(!std::is_same<T,T>::value, "Unsupported traceable type.");
+    }
 }
 
 void SearchTracer::new_search(const Board& root,
@@ -206,9 +211,19 @@ void SearchTracer::flush_nodes() {
     m_node_batch.clear();
 }
 
-void SearchTracer::bootstrap_db() {
-    std::stringstream ss;
+static bool column_exists(const SQLite::Database& db,
+                          const std::string& table_name,
+                          const std::string& column_name) {
+    SQLite::Statement query(db, "PRAGMA table_info(" + table_name + ")");
+    while (query.executeStep()) {
+        if (query.getColumn(1).getString() == column_name) {
+            return true;
+        }
+    }
+    return false;
+}
 
+void SearchTracer::bootstrap_db() {
     // Create metadata table.
     if (!m_db.tableExists("meta")) {
         m_db.exec(
@@ -229,51 +244,55 @@ void SearchTracer::bootstrap_db() {
     }
 
     // Create searches table.
-    ss << "CREATE TABLE IF NOT EXISTS searches (\n"
-          "    id INTEGER PRIMARY KEY, \n"
-          "    time_of_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n"
-          "    limits_depth INTEGER,\n"
-          "    limits_nodes INTEGER,\n"
-          "    limits_wtime INTEGER,\n"
-          "    limits_btime INTEGER,\n"
-          "    limits_winc INTEGER,\n"
-          "    limits_binc INTEGER,\n"
-          "    limits_movetime INTEGER,\n"
-          "    hash INTEGER,\n"
-          "    root_fen TEXT\n"
-          ");\n"
-       << std::endl;
+    m_db.exec("CREATE TABLE IF NOT EXISTS searches (\n"
+              "    id INTEGER PRIMARY KEY, \n"
+              "    time_of_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n"
+              "    limits_depth INTEGER,\n"
+              "    limits_nodes INTEGER,\n"
+              "    limits_wtime INTEGER,\n"
+              "    limits_btime INTEGER,\n"
+              "    limits_winc INTEGER,\n"
+              "    limits_binc INTEGER,\n"
+              "    limits_movetime INTEGER,\n"
+              "    hash INTEGER,\n"
+              "    root_fen TEXT\n"
+              ");\n");
 
     // Create trees table.
-    ss << "CREATE TABLE IF NOT EXISTS trees (\n"
-          "    id INTEGER,\n"
-          "    search INTEGER,\n"
-          "    root_depth INTEGER,\n"
-          "    asp_alpha INTEGER,\n"
-          "    asp_beta INTEGER,\n"
-          "    multipv INTEGER,\n"
-          "    PRIMARY KEY (id, search),  \n"
-          "    FOREIGN KEY (search) REFERENCES searches(id) ON DELETE CASCADE  \n"
-          ");\n"
-       << std::endl;
+    m_db.exec("CREATE TABLE IF NOT EXISTS trees (\n"
+              "    id INTEGER,\n"
+              "    search INTEGER,\n"
+              "    root_depth INTEGER,\n"
+              "    asp_alpha INTEGER,\n"
+              "    asp_beta INTEGER,\n"
+              "    multipv INTEGER,\n"
+              "    PRIMARY KEY (id, search),  \n"
+              "    FOREIGN KEY (search) REFERENCES searches(id) ON DELETE CASCADE  \n"
+              ");\n");
 
     // Create nodes table.
-    ss << "CREATE TABLE IF NOT EXISTS nodes (\n"
-          "    node_index INTEGER REQUIRED,\n"
-          "    parent_index INTEGER REQUIRED,\n"
-          "    tree INTEGER REQUIRED,\n";
+    m_db.exec("CREATE TABLE IF NOT EXISTS nodes (\n"
+              "    node_index INTEGER REQUIRED,\n"
+              "    parent_index INTEGER REQUIRED,\n"
+              "    tree INTEGER REQUIRED,"
+              "    PRIMARY KEY (node_index, tree, parent_index),\n"
+              "    FOREIGN KEY (tree) REFERENCES trees(id) ON DELETE CASCADE,\n"
+              "    FOREIGN KEY (parent_index) REFERENCES nodes(node_index) ON DELETE SET NULL\n"
+              ");");
 
-#define TRACEABLE(name, type) ss << "    " << lower_case(#name) << " " << sql_type_map<type>() << ",\n";
+    // Create node indexes;
+    m_db.exec("CREATE INDEX IF NOT EXISTS idx_node_index ON nodes(node_index);");
+    m_db.exec("CREATE INDEX IF NOT EXISTS idx_parent ON nodes(parent_index);");
+
+    // Add each necessary node column.
+    std::stringstream ss;
+#define TRACEABLE(name, type) \
+    if (!column_exists(m_db, "nodes", lower_case(#name))) { \
+        std::string query = std::string("ALTER TABLE nodes ADD ") + lower_case(#name) + " " + sql_type_map<type>() + ";"; \
+        std::cout << query << std::endl;                    \
+        m_db.exec(query);\
+    }
 #include "traceables.def"
-
-    ss << "    PRIMARY KEY (node_index, tree, parent_index),\n"
-          "    FOREIGN KEY (tree) REFERENCES trees(id) ON DELETE CASCADE,\n"
-          "    FOREIGN KEY (parent_index) REFERENCES nodes(node_index) ON DELETE SET NULL\n"
-          ");\n"
-          "\n"
-          "CREATE INDEX IF NOT EXISTS idx_node_index ON nodes(node_index);\n"
-          "CREATE INDEX IF NOT EXISTS idx_parent ON nodes(parent_index);"
-          << std::endl;
 
     std::string query = ss.str();
     m_db.exec(query);

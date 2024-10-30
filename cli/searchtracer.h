@@ -8,8 +8,11 @@
 
 namespace illumina {
 
-/** Size, in MiB, to fill up the nodes batch before flushing them into the trace DB. */
-static constexpr size_t DEFAULT_TRACER_BATCH_SIZE = 256;
+/**
+ * Size, in MiB, to fill up the nodes batch before flushing them into the trace DB.
+ * Note that this memory usage nearly doubles at the time of really saving the nodes.
+ */
+static constexpr size_t DEFAULT_TRACER_BATCH_SIZE = 512;
 
 /**
  * Version used to check whether our current implementation of the search tracer is compatible
