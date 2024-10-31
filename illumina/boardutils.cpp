@@ -247,4 +247,11 @@ Bitboard discovered_attacks(const Board& board,
     return revealed;
 }
 
+Bitboard non_pawn_bb(const Board& board) {
+    Bitboard occupancy = board.occupancy();
+    Bitboard kings     = board.piece_type_bb(PT_KING);
+    Bitboard pawns     = board.piece_type_bb(PT_PAWN);
+    return occupancy & (~kings) & (~pawns);
+}
+
 } // illumina
