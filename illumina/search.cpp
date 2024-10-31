@@ -534,7 +534,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Compute the static eval. Useful for many heuristics.
-    static_eval    = !in_check ? evaluate() : 0;
+    if (!in_check) {
+        static_eval = !found_in_tt ? evaluate() : tt_entry.static_eval();
+    }
+    else {
+        static_eval = 0;
+    }
     bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
 
     // Reverse futility pruning.
@@ -553,6 +558,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (   !PV
         && !SKIP_NULL
         && !in_check
+        && non_pawn_bb(m_board) != 0
         && popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES
         && static_eval >= beta
         && depth >= NMP_MIN_DEPTH
@@ -635,8 +641,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             continue;
         }
 
+        Color them = opposite_color(m_board.color_to_move());
+        Bitboard discovered_atks = discovered_attacks(m_board, move.source(), move.destination());
+        Bitboard their_valuable_pieces = m_board.piece_bb(Piece(them, PT_KING))
+                                         | m_board.piece_bb(Piece(them, PT_QUEEN))
+                                         | m_board.piece_bb(Piece(them, PT_ROOK));
         // SEE pruning.
         if (   (!PV || m_root_depth > SEE_PRUNING_MAX_DEPTH)
+            && (discovered_atks & their_valuable_pieces) == 0
             && depth <= SEE_PRUNING_MAX_DEPTH
             && !m_board.in_check()
             && move_picker.stage() > MPS_GOOD_CAPTURES
@@ -807,13 +819,16 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, BT_LOWERBOUND);
+            tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_LOWERBOUND);
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
-            tt.try_store(board_key, ply, best_move, n_searched_moves > 0 ? best_score : alpha, depth, BT_UPPERBOUND);
+            tt.try_store(board_key,
+                         ply, best_move,
+                         n_searched_moves > 0 ? best_score : alpha,
+                         depth, static_eval, BT_UPPERBOUND);
         } else {
             // We have an exact score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, BT_EXACT);
+            tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_EXACT);
         }
     }
 

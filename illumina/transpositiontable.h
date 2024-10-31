@@ -17,6 +17,7 @@ public:
     ui8       generation() const;
     Score     score() const;
     Depth     depth() const;
+    Score     static_eval() const;
 
 private:
     ui32 m_key_low;
@@ -31,9 +32,11 @@ private:
     ui32 m_info;
 
     i16 m_score;
+    i16 m_static_eval;
 
     void replace(ui64 key, Move move,
                  Score score, Depth depth,
+                 i16 static_eval,
                  BoundType bound_type,
                  ui8 generation);
 };
@@ -46,7 +49,13 @@ public:
     void resize(size_t new_size_bytes);
     void new_search();
     bool probe(ui64 key, TranspositionTableEntry& entry, Depth ply = 0);
-    void try_store(ui64 key, Depth ply, Move move, Score score, Depth depth, BoundType bound_type);
+    void try_store(ui64 key,
+                   Depth ply,
+                   Move move,
+                   Score score,
+                   Depth depth,
+                   Score static_eval,
+                   BoundType bound_type);
     int hash_full() const;
 
     explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
@@ -91,6 +100,10 @@ inline Depth TranspositionTableEntry::depth() const {
 
 inline Score TranspositionTableEntry::score() const {
     return m_score;
+}
+
+inline Score TranspositionTableEntry::static_eval() const {
+    return m_static_eval;
 }
 
 inline int TranspositionTable::hash_full() const {
