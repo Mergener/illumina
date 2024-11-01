@@ -265,16 +265,14 @@ SearchResults Searcher::search(const Board& board,
     int n_helper_threads = std::max(1, settings.n_threads) - 1;
 
     // Create secondary workers.
-    for (int i = 0; i < n_helper_threads; ++i) {
-        secondary_workers.emplace_back(std::make_unique<SearchWorker>(false, board, &context, &settings));
-    }
+    secondary_workers.resize(n_helper_threads);
 
     // Fire secondary threads.
     std::vector<std::thread> helper_threads;
     for (int i = 0; i < n_helper_threads; ++i) {
-        SearchWorker* worker = secondary_workers[i].get();
-        helper_threads.emplace_back([worker]() {
-            worker->iterative_deepening();
+        helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
+            secondary_workers[i] = std::make_unique<SearchWorker>(false, board, &context, &settings);
+            secondary_workers[i]->iterative_deepening();
         });
     }
 
@@ -632,7 +630,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         // Late move pruning.
-        if (   alpha > -MATE_THRESHOLD
+        if (   !ROOT
+            && alpha > -MATE_THRESHOLD
             && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
             && move_idx >= s_lmp_count_table[improving][depth]
             && move_picker.stage() > MPS_KILLER_MOVES
@@ -916,6 +915,10 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
 
     ui64 total_nodes = m_results.nodes;
     for (const std::unique_ptr<SearchWorker>& worker: m_context->helper_workers()) {
+        if (worker == nullptr) {
+            continue;
+        }
+
         total_nodes += worker->results().nodes;
     }
     pv_results.nodes = total_nodes;
