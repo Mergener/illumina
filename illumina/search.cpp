@@ -833,6 +833,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 }
 
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
+    m_results.sel_depth = std::max(m_results.sel_depth, ply);
+
     Score stand_pat = evaluate();
 
     if (stand_pat >= beta) {
