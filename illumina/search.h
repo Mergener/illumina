@@ -7,6 +7,7 @@
 
 #include "board.h"
 #include "timemanager.h"
+#include "tracing.h"
 #include "types.h"
 #include "transpositiontable.h"
 
@@ -38,6 +39,7 @@ struct SearchSettings {
     std::optional<i64>   black_inc;
     std::optional<i64>   move_time;
     std::optional<std::vector<Move>> search_moves;
+    ISearchTracer* tracer = nullptr;
 };
 
 struct SearchResults {

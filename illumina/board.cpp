@@ -916,6 +916,25 @@ Board Board::random_frc_startpos(bool mirrored) {
     return board;
 }
 
+bool Board::detect_frc() const {
+    constexpr Square STANDARD_KING_SQUARE[] = { SQ_E1, SQ_E8 };
+
+    for (Side side: SIDES) {
+        for (Color color: COLORS) {
+            if (!has_castling_rights(color, side)) {
+                continue;
+            }
+
+            if (   king_square(color) != STANDARD_KING_SQUARE[color]
+                || castle_rook_square(color, side) != standard_castle_rook_src_square(color, side)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 // Board constructors below.
 // We don't use default copy/assignment constructor implementations since
 // we don't want listeners to be copied from a board object to another.

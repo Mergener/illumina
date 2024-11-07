@@ -26,7 +26,7 @@ public:
     void evaluate() const;
 
     // Search
-    void search(SearchSettings settings);
+    void search(SearchSettings settings, bool trace);
     void stop_search();
 
     // Misc

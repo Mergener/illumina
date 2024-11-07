@@ -20,7 +20,9 @@ Besides the build types CMake offers, Illumina also offers the following CMake o
 
 - `TUNING`: Specifies that we're creating a tuning build. Tuning build exposes many internal constants as UCI options, such as search and time management constants. `OFF` by default.
 - `DEVELOPMENT`: Specifies that we're creating a development build. This is mainly for displaying the correct version name when the engine starts and/or `uci` is called. `ON` by default.
-
+- `INCLUDE_TRACING_MODULE`: Includes Illumina's tracing module, that allows `go trace` commands. 
+This option requires the SQLiteCPP submodule to be cloned and may considerably increase executable size.
+`OFF` by default.
 ## Honorable Mentions
 
 - [Marlinflow](https://github.com/jnlt3/marlinflow): Used to train Illumina's evaluation network.

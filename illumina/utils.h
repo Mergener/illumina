@@ -95,6 +95,10 @@ inline Color random_color() {
     return random(0, CL_COUNT);
 }
 
+std::string lower_case(std::string str);
+
+std::string upper_case(std::string str);
+
 
 } // illumina
 

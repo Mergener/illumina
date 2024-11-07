@@ -47,6 +47,16 @@ if (DEVELOPMENT)
 
 endif()
 
+option(INCLUDE_TRACING_MODULE
+            "Signals that this will include the tracing module within CLI.
+             Note that this includes the heavy SQLITE3 dependency.
+             Not supposed to be used in regular Illumina builds."
+        OFF)
+if (INCLUDE_TRACING_MODULE)
+    message("Tracing module included.")
+    add_definitions(-DTRACING_ENABLED)
+endif()
+
 # For GCC-derived compilers, we need to specify some flags in order
 # to have <thread> and <filesystem> properly working.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -95,11 +105,23 @@ add_definitions(-DILLUMINA_VERSION_MAJOR=${ILLUMINA_VERSION_MAJOR})
 add_definitions(-DILLUMINA_VERSION_MINOR=${ILLUMINA_VERSION_MINOR})
 add_definitions(-DILLUMINA_VERSION_NAME=\"${ILLUMINA_VERSION_NAME}\")
 
+# Check for available modules
+set(HAS_LITETEST false)
+set(HAS_SQLITE   false)
+
 # Add external dependencies.
 add_subdirectory(ext)
 
 # Add Illumina's modules.
 add_subdirectory(illumina)
 add_subdirectory(cli)
-add_subdirectory(tests)
 
+if (HAS_LITETEST)
+    add_subdirectory(tests)
+else()
+    message("Litetest submodule not found; tests won't be compiled")
+endif()
+
+if (INCLUDE_TRACING_MODULE AND NOT HAS_SQLITE)
+    message(FATAL_ERROR "SQLiteCpp module was not found, but tracing module was requested. Make sure to clone submodules or re-clone Illumina using git clone <illumina-repo> --recurse-submodules")
+endif()
