@@ -27,6 +27,11 @@ Bitboard discovered_attacks(const Board& board,
                             Square source,
                             Square dest);
 
+/*
+ * Returns the bitboard of non-pawn pieces, excluding kings as well.
+ */
+Bitboard non_pawn_bb(const Board& board);
+
 } // illumina
 
 #endif // ILLUMINA_BOARDUTILS_H
