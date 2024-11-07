@@ -205,7 +205,7 @@ void SearchTracer::flush_nodes() {
 
         transaction.commit();
     } catch (const std::exception& e) {
-        std::cerr << "Query failed: " << e.what() << std::endl;
+        std::cerr << "Tracing SQLite3 error when saving nodes: " << e.what() << std::endl;
         throw;
     }
     m_node_batch.clear();
@@ -224,114 +224,131 @@ static bool column_exists(const SQLite::Database& db,
 }
 
 void SearchTracer::bootstrap_db() {
-    // Create metadata table.
-    if (!m_db.tableExists("meta")) {
-        m_db.exec(
-            "CREATE TABLE meta (\n"
-            "    id INTEGER PRIMARY KEY CHECK(id = 1), \n"
-            "    version_id TEXT\n"
-            ");\n"
-            "INSERT INTO meta (version_id) VALUES (\'" + std::string(TRACER_VERSION) + "\');"
-            "\n");
-    }
-    else {
-        // Metadata table existed, check for version.
-        SQLite::Column col = m_db.execAndGet("SELECT version_id FROM meta");
-        std::string version_id = col.getText();
-        if (version_id != TRACER_VERSION) {
-            throw std::runtime_error("Specified trace DB has incompatible version.");
+    try {
+        // Create metadata table.
+        if (!m_db.tableExists("meta")) {
+            m_db.exec(
+                    "CREATE TABLE meta (\n"
+                    "    id INTEGER PRIMARY KEY CHECK(id = 1), \n"
+                    "    version_id TEXT\n"
+                    ");\n"
+                    "INSERT INTO meta (version_id) VALUES (\'" + std::string(TRACER_VERSION) + "\');"
+                                                                                               "\n");
+        } else {
+            // Metadata table existed, check for version.
+            SQLite::Column col = m_db.execAndGet("SELECT version_id FROM meta");
+            std::string version_id = col.getText();
+            if (version_id != TRACER_VERSION) {
+                throw std::runtime_error("Specified trace DB has incompatible version.");
+            }
         }
-    }
 
-    // Create searches table.
-    m_db.exec("CREATE TABLE IF NOT EXISTS searches (\n"
-              "    id INTEGER PRIMARY KEY, \n"
-              "    time_of_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n"
-              "    limits_depth INTEGER,\n"
-              "    limits_nodes INTEGER,\n"
-              "    limits_wtime INTEGER,\n"
-              "    limits_btime INTEGER,\n"
-              "    limits_winc INTEGER,\n"
-              "    limits_binc INTEGER,\n"
-              "    limits_movetime INTEGER,\n"
-              "    hash INTEGER,\n"
-              "    root_fen TEXT\n"
-              ");\n");
+        // Create searches table.
+        m_db.exec("CREATE TABLE IF NOT EXISTS searches (\n"
+                  "    id INTEGER PRIMARY KEY, \n"
+                  "    time_of_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n"
+                  "    limits_depth INTEGER,\n"
+                  "    limits_nodes INTEGER,\n"
+                  "    limits_wtime INTEGER,\n"
+                  "    limits_btime INTEGER,\n"
+                  "    limits_winc INTEGER,\n"
+                  "    limits_binc INTEGER,\n"
+                  "    limits_movetime INTEGER,\n"
+                  "    hash INTEGER,\n"
+                  "    root_fen TEXT\n"
+                  ");\n");
 
-    // Create trees table.
-    m_db.exec("CREATE TABLE IF NOT EXISTS trees (\n"
-              "    id INTEGER,\n"
-              "    search INTEGER,\n"
-              "    root_depth INTEGER,\n"
-              "    asp_alpha INTEGER,\n"
-              "    asp_beta INTEGER,\n"
-              "    multipv INTEGER,\n"
-              "    PRIMARY KEY (id, search),  \n"
-              "    FOREIGN KEY (search) REFERENCES searches(id) ON DELETE CASCADE  \n"
-              ");\n");
+        // Create trees table.
+        m_db.exec("CREATE TABLE IF NOT EXISTS trees (\n"
+                  "    id INTEGER,\n"
+                  "    search INTEGER,\n"
+                  "    root_depth INTEGER,\n"
+                  "    asp_alpha INTEGER,\n"
+                  "    asp_beta INTEGER,\n"
+                  "    multipv INTEGER,\n"
+                  "    PRIMARY KEY (id, search),  \n"
+                  "    FOREIGN KEY (search) REFERENCES searches(id) ON DELETE CASCADE  \n"
+                  ");\n");
 
-    // Create nodes table.
-    m_db.exec("CREATE TABLE IF NOT EXISTS nodes (\n"
-              "    node_index INTEGER REQUIRED,\n"
-              "    parent_index INTEGER REQUIRED,\n"
-              "    tree INTEGER REQUIRED,"
-              "    PRIMARY KEY (node_index, tree, parent_index),\n"
-              "    FOREIGN KEY (tree) REFERENCES trees(id) ON DELETE CASCADE,\n"
-              "    FOREIGN KEY (parent_index) REFERENCES nodes(node_index) ON DELETE SET NULL\n"
-              ");");
+        // Create nodes table.
+        m_db.exec("CREATE TABLE IF NOT EXISTS nodes (\n"
+                  "    node_index INTEGER REQUIRED,\n"
+                  "    parent_index INTEGER REQUIRED,\n"
+                  "    tree INTEGER REQUIRED,"
+                  "    PRIMARY KEY (node_index, tree, parent_index),\n"
+                  "    FOREIGN KEY (tree) REFERENCES trees(id) ON DELETE CASCADE,\n"
+                  "    FOREIGN KEY (parent_index) REFERENCES nodes(node_index) ON DELETE SET NULL\n"
+                  ");");
 
-    // Create node indexes;
-    m_db.exec("CREATE INDEX IF NOT EXISTS idx_node_index ON nodes(node_index);");
-    m_db.exec("CREATE INDEX IF NOT EXISTS idx_parent ON nodes(parent_index);");
+        // Create node indexes;
+        m_db.exec("CREATE INDEX IF NOT EXISTS idx_node_index ON nodes(node_index);");
+        m_db.exec("CREATE INDEX IF NOT EXISTS idx_parent ON nodes(parent_index);");
 
-    // Add each necessary node column.
-    std::stringstream ss;
+        // Add each necessary node column.
+        std::stringstream ss;
 #define TRACEABLE(name, type) \
     if (!column_exists(m_db, "nodes", lower_case(#name))) { \
         std::string query = std::string("ALTER TABLE nodes ADD ") + lower_case(#name) + " " + sql_type_map<type>() + ";"; \
-        std::cout << query << std::endl;                    \
         m_db.exec(query);\
     }
+
 #include "traceables.def"
 
-    std::string query = ss.str();
-    m_db.exec(query);
+        std::string query = ss.str();
+        m_db.exec(query);
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Tracing/SQLite3 error when bootstrapping trace DB: " << e.what() << std::endl;
+        throw;
+    }
 }
 
 void SearchTracer::save_tree(const TreeInfo& tree) {
-    SQLite::Statement statement(m_db, "INSERT INTO trees (id, search, root_depth,"
-                                      "asp_alpha, asp_beta, multipv) VALUES"
-                                      "(?, ?, ?, ?, ?, ?);");
-    int i = 0;
-    statement.bind(++i, i64(tree.id));
-    statement.bind(++i, i64(tree.search));
-    statement.bind(++i, i64(tree.root_depth));
-    statement.bind(++i, i64(tree.asp_alpha));
-    statement.bind(++i, i64(tree.asp_beta));
-    statement.bind(++i, i64(tree.multipv));
+    try {
+        SQLite::Statement statement(m_db, "INSERT INTO trees (id, search, root_depth,"
+                                          "asp_alpha, asp_beta, multipv) VALUES"
+                                          "(?, ?, ?, ?, ?, ?);");
+        int i = 0;
+        statement.bind(++i, i64(tree.id));
+        statement.bind(++i, i64(tree.search));
+        statement.bind(++i, i64(tree.root_depth));
+        statement.bind(++i, i64(tree.asp_alpha));
+        statement.bind(++i, i64(tree.asp_beta));
+        statement.bind(++i, i64(tree.multipv));
 
-    statement.exec();
+        statement.exec();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Tracing/SQLite3 error when saving tree: " << e.what() << std::endl;
+        throw;
+    }
 }
 
 void SearchTracer::save_search(const SearchInfo& search) {
-    SQLite::Statement statement(m_db, "INSERT INTO searches (id,"
-                                      "limits_depth, limits_nodes, limits_wtime,"
-                                      "limits_btime, limits_winc, limits_binc,"
-                                      "limits_movetime, hash, root_fen) VALUES"
-                                      "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
-    int i = 0;
-    statement.bind(++i, i64(search.id));
-    statement.bind(++i, search.limits_depth);
-    statement.bind(++i, i64(search.limits_nodes));
-    statement.bind(++i, search.limits_wtime);
-    statement.bind(++i, search.limits_btime);
-    statement.bind(++i, search.limits_winc);
-    statement.bind(++i, search.limits_binc);
-    statement.bind(++i, search.limits_movetime);
-    statement.bind(++i, i64(search.hash));
-    statement.bind(++i, search.root_fen);
+    try {
+        SQLite::Statement statement(m_db, "INSERT INTO searches (id,"
+                                          "limits_depth, limits_nodes, limits_wtime,"
+                                          "limits_btime, limits_winc, limits_binc,"
+                                          "limits_movetime, hash, root_fen) VALUES"
+                                          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+        int i = 0;
+        statement.bind(++i, i64(search.id));
+        statement.bind(++i, search.limits_depth);
+        statement.bind(++i, i64(search.limits_nodes));
+        statement.bind(++i, search.limits_wtime);
+        statement.bind(++i, search.limits_btime);
+        statement.bind(++i, search.limits_winc);
+        statement.bind(++i, search.limits_binc);
+        statement.bind(++i, search.limits_movetime);
+        statement.bind(++i, i64(search.hash));
+        statement.bind(++i, search.root_fen);
 
-    statement.exec();
+        statement.exec();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Tracing/SQLite3 error when saving search: " << e.what() << std::endl;
+        throw;
+    }
 }
 
 SearchTracer::SearchTracer(const std::string& db_path,
