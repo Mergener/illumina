@@ -147,7 +147,7 @@ void SearchTracer::pop_node(bool discard) {
 
 void SearchTracer::finish_tree() {
     save_tree(m_curr_tree);
-    std::cout << std::hex << "info string Saved ID/MultiPV/AspWin search tree with id 0x" << m_curr_tree.id << std::dec << std::endl;
+    std::cout << "info string Saved ID/MultiPV/AspWin search tree with id " << i64(m_curr_tree.id) << std::endl;
     m_curr_tree = {};
 
     // Push root node to batch.
@@ -158,7 +158,7 @@ void SearchTracer::finish_tree() {
 void SearchTracer::finish_search() {
     flush_nodes();
     save_search(m_curr_search);
-    std::cout << std::hex << "info string Saved search with id 0x" << m_curr_search.id << std::dec << std::endl;
+    std::cout << "info string Saved search with id " << i64(m_curr_search.id) << std::dec << std::endl;
     m_curr_search = {};
 }
 

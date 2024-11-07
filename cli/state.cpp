@@ -60,6 +60,8 @@ void State::new_game() {
 void State::display_board() const {
     std::cout << m_board.pretty()         << std::endl;
     std::cout << "FEN: " << m_board.fen(m_options.option<UCIOptionCheck>("UCI_Chess960").value()) << std::endl;
+    std::cout << "Zob Key: 0x" << std::hex << m_board.hash_key() << std::dec << std::endl;
+    std::cout << "Zob Key (i64, base 10): " << i64(m_board.hash_key()) << std::endl;
 }
 
 const Board& State::board() const {
