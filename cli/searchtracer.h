@@ -50,16 +50,13 @@ private:
     size_t m_target_node_count;
 
     struct NodeInfo {
-        ui64 index = 1;
-        ui64 parent_index = 0;
-        ui64 tree;
+        ui64 index {};
+        ui64 parent_index {};
+        ui64 tree {};
 
         TracedValue traced_values[int(Traceable::N)];
-
-        // Not saved in DB
-        i8 next_child_order = 0;
     };
-    NodeInfo m_curr_node;
+    NodeInfo m_curr_node {};
     std::vector<NodeInfo> m_node_batch;
     std::vector<NodeInfo> m_node_stack;
 

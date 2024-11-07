@@ -106,9 +106,7 @@ void SearchTracer::new_tree(int root_depth, int multi_pv, int asp_alpha, int asp
     m_curr_tree.multipv    = multi_pv;
     m_curr_tree.root_depth = root_depth;
 
-    m_curr_node.index = 1;
-    m_curr_node.parent_index = 0;
-    m_curr_node.tree = m_curr_tree.id;
+    push_node();
 }
 
 void SearchTracer::push_node() {
@@ -116,7 +114,6 @@ void SearchTracer::push_node() {
     new_node.index = m_curr_tree.next_node_index++;
     new_node.parent_index = m_curr_node.index;
     new_node.tree = m_curr_tree.id;
-    new_node.next_child_order = m_curr_node.next_child_order++;
 
     m_node_stack.push_back(m_curr_node);
     m_curr_node = new_node;
@@ -146,13 +143,13 @@ void SearchTracer::pop_node(bool discard) {
 }
 
 void SearchTracer::finish_tree() {
+    while (!m_node_stack.empty()) {
+        pop_node();
+    }
+
     save_tree(m_curr_tree);
     std::cout << "info string Saved ID/MultiPV/AspWin search tree with id " << i64(m_curr_tree.id) << std::endl;
     m_curr_tree = {};
-
-    // Push root node to batch.
-    ILLUMINA_ASSERT(m_curr_node.parent_index == 0);
-    m_node_batch.push_back(m_curr_node);
 }
 
 void SearchTracer::finish_search() {

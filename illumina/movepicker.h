@@ -39,7 +39,7 @@ class MovePicker {
 public:
     MovePickingStage stage() const;
     bool finished() const;
-    Move next();
+    SearchMove next();
     void score_move(SearchMove& move);
 
     explicit MovePicker(const Board& board,
@@ -381,7 +381,7 @@ void MovePicker<QUIESCE>::advance_stage() {
 }
 
 template <bool QUIESCE>
-inline Move MovePicker<QUIESCE>::next() {
+inline SearchMove MovePicker<QUIESCE>::next() {
     if (finished()) {
         // We've finished generating moves.
         return MOVE_NULL;
@@ -392,8 +392,8 @@ inline Move MovePicker<QUIESCE>::next() {
         advance_stage();
         return next();
     }
-    
-    Move move = Move(*m_moves_it++);
+
+    SearchMove move = *m_moves_it++;
 
     // Prevent hash move revisits.
     if (move == m_hash_move) {

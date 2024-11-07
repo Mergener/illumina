@@ -531,8 +531,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     TRACE_SET(Traceable::ALPHA, alpha);
     TRACE_SET(Traceable::BETA, beta);
     TRACE_SET(Traceable::LAST_MOVE, m_board.last_move());
+    TRACE_SET(Traceable::LAST_MOVE_RAW, m_board.last_move().raw());
     TRACE_SET(Traceable::ZOB_KEY, i64(m_board.hash_key()));
     TRACE_SET(Traceable::DEPTH, depth);
+    TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
@@ -690,7 +692,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     int move_idx = -1;
 
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
-    Move move {};
+    SearchMove move {};
     bool has_legal_moves = false;
     Score best_score = -MATE_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
@@ -787,6 +789,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         m_board.make_move(move);
+        TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
 
         // Late move reductions.
         Depth reductions = 0;
@@ -943,8 +946,10 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::ALPHA, alpha);
     TRACE_SET(Traceable::BETA, beta);
     TRACE_SET(Traceable::LAST_MOVE, m_board.last_move());
+    TRACE_SET(Traceable::LAST_MOVE_RAW, m_board.last_move().raw());
     TRACE_SET(Traceable::ZOB_KEY, i64(m_board.hash_key()));
     TRACE_SET(Traceable::DEPTH, 0);
+    TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
 
     Score stand_pat = evaluate();
@@ -977,7 +982,8 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
 
         m_board.make_move(move);
-        Score score = -quiescence_search<PV, TRACE>(ply + 1, -beta, -alpha);
+        TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
+        Score score = -quiescence_search<TRACE, PV>(ply + 1, -beta, -alpha);
         m_board.undo_move();
 
         if (score >= beta) {
@@ -1122,6 +1128,7 @@ void SearchWorker::on_make_null_move(const illumina::Board& board) {
     m_eval.on_make_null_move(board);
     TRACE_PUSH();
     TRACE_SET(Traceable::LAST_MOVE, MOVE_NULL);
+    TRACE_SET(Traceable::LAST_MOVE_RAW, MOVE_NULL.raw());
     TRACE_SET(Traceable::ZOB_KEY, i64(board.hash_key()));
 }
 
