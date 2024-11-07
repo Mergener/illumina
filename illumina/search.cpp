@@ -461,6 +461,7 @@ void SearchWorker::aspiration_windows() {
     Score window     = ASP_WIN_WINDOW;
     Depth depth      = m_root_depth;
 
+
     // Don't use aspiration windows in lower depths since
     // their results is still too unstable.
     if (depth >= ASP_WIN_MIN_DEPTH) {
@@ -941,6 +942,9 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::PV, PV);
     TRACE_SET(Traceable::ALPHA, alpha);
     TRACE_SET(Traceable::BETA, beta);
+    TRACE_SET(Traceable::LAST_MOVE, m_board.last_move());
+    TRACE_SET(Traceable::ZOB_KEY, i64(m_board.hash_key()));
+    TRACE_SET(Traceable::DEPTH, 0);
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
 
     Score stand_pat = evaluate();
