@@ -53,7 +53,7 @@ public:
     std::string current_value_str() const override;
     std::string type_name() const override;
 
-    UCIOptionString(std::string name, std::string default_val);
+    UCIOptionString(std::string name, const std::string& default_val);
 
 private:
     std::string m_val;

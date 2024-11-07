@@ -81,10 +81,10 @@ std::string UCIOptionString::type_name() const {
     return "string";
 }
 
-UCIOptionString::UCIOptionString(std::string name, std::string default_val)
+UCIOptionString::UCIOptionString(std::string name, const std::string& default_val)
     : UCIOption(std::move(name)),
-      m_val(std::move(default_val)),
-      m_default_val(std::move(default_val)) {}
+      m_val(default_val),
+      m_default_val(default_val) {}
 
 //
 // UCIOptionSpin
