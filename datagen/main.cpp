@@ -11,10 +11,10 @@
 namespace illumina {
 
 constexpr ui64 SEARCH_NODE_LIMIT    = 4096;
-constexpr int  MIN_RANDOM_PLIES     = 4;
-constexpr int  MAX_RANDOM_PLIES     = 10;
+constexpr int  MIN_RANDOM_PLIES     = 5;
+constexpr int  MAX_RANDOM_PLIES     = 12;
 constexpr size_t MAX_BYTES          = 80ULL * 1024 * 1024 * 1024;
-constexpr Score HI_SCORE            = 1024;
+constexpr Score HI_SCORE            = KNOWN_WIN / 3;
 constexpr int MAX_HI_SCORE_PLIES    = 8;
 constexpr size_t MIN_POSITIONS_PER_GAME = 12;
 constexpr size_t MAX_POSITIONS_PER_GAME = 16;
@@ -46,8 +46,6 @@ Game simulate() {
     SearchSettings search_settings;
     search_settings.max_nodes = SEARCH_NODE_LIMIT;
     search_settings.move_time = 10000;
-    search_settings.eval_rand_seed = random(i64(0), INT64_MAX);
-    search_settings.eval_random_margin = 10;
 
     Board board = Board::standard_startpos();
 
@@ -87,7 +85,7 @@ Game simulate() {
 
         SearchResults search_results = player.searcher.search(board, validation_search_settings);
 
-        if (std::abs(search_results.score) > 160) {
+        if (std::abs(search_results.score) > 180) {
             // Position is excessively imbalanced.
             // Rewind to the start.
             board = Board::standard_startpos();
@@ -96,6 +94,9 @@ Game simulate() {
 
         done_creating_startpos = true;
     }
+
+    search_settings.eval_rand_seed = random(i64(0), INT64_MAX);
+    search_settings.eval_random_margin = 10;
 
     game.start_pos = board;
     int hi_score_plies = 0;
