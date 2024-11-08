@@ -8,8 +8,6 @@
 
 namespace illumina {
 
-static constexpr int LAG_MARGIN = 10;
-
 class PVResults;
 
 class TimeManager {
@@ -38,6 +36,7 @@ private:
     bool m_running = false;
     bool m_tourney_time = false;
 
+    double m_expected_branch_factor = 1.5;
     ui64 m_last_total_nodes {};
 
     void force_timeout();
@@ -56,14 +55,6 @@ inline ui64 TimeManager::soft_bound() const {
 
 inline ui64 TimeManager::hard_bound() const {
     return m_hard_bound;
-}
-
-inline bool TimeManager::finished_soft() const {
-    return m_running && delta_ms(now(), m_time_start) >= m_soft_bound;
-}
-
-inline bool TimeManager::finished_hard() const {
-    return m_running && delta_ms(now(), m_time_start) >= m_hard_bound;
 }
 
 inline TimeManager::TimeManager() {
