@@ -38,6 +38,10 @@ private:
     bool m_running = false;
     bool m_tourney_time = false;
 
+    ui64 m_last_total_nodes {};
+
+    void force_timeout();
+
     void setup(bool tourney_time);
     void set_starting_bounds(ui64 soft, ui64 hard);
 };
