@@ -853,6 +853,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             alpha     = score;
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, best_move);
+            TRACE_SET(Traceable::BEST_MOVE_RAW, best_move.raw());
 
             // Update our history scores and refutation moves.
             if (move.is_quiet()) {
@@ -884,6 +885,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             alpha     = score;
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
+            TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
 
             // Make sure we update our best_move in the root ASAP.
             if (ROOT && (!should_stop() || depth <= 2)) {
@@ -989,6 +991,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         if (score >= beta) {
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
+            TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
             TRACE_SET(Traceable::SCORE, alpha);
             alpha = score;
             break;
@@ -996,6 +999,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         if (score > alpha) {
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
+            TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
             TRACE_SET(Traceable::SCORE, alpha);
             alpha = score;
         }
