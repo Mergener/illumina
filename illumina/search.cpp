@@ -721,41 +721,46 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             }
         }
 
-        // Late move pruning.
-        if (   !ROOT
-            && alpha > -MATE_THRESHOLD
-            && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
-            && move_idx >= s_lmp_count_table[improving][depth]
-            && move_picker.stage() > MPS_KILLER_MOVES
-            && !in_check
-            && move.is_quiet()) {
-            continue;
-        }
+        // Low depth pruning.
+        if (   non_pawn_bb(m_board)
+            && alpha > -KNOWN_WIN) {
+            // Late move pruning.
+            if (!ROOT
+                && alpha > -MATE_THRESHOLD
+                && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
+                && move_idx >= s_lmp_count_table[improving][depth]
+                && move_picker.stage() > MPS_KILLER_MOVES
+                && !in_check
+                && move.is_quiet()) {
+                continue;
+            }
 
-        Color them = opposite_color(m_board.color_to_move());
-        Bitboard discovered_atks = discovered_attacks(m_board, move.source(), move.destination());
-        Bitboard their_valuable_pieces = m_board.piece_bb(Piece(them, PT_KING))
-                                         | m_board.piece_bb(Piece(them, PT_QUEEN))
-                                         | m_board.piece_bb(Piece(them, PT_ROOK));
-        // SEE pruning.
-        if (   (!PV || m_root_depth > SEE_PRUNING_MAX_DEPTH)
-            && (discovered_atks & their_valuable_pieces) == 0
-            && depth <= SEE_PRUNING_MAX_DEPTH
-            && !m_board.in_check()
-            && move_picker.stage() > MPS_GOOD_CAPTURES
-            && !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
-            continue;
-        }
+            Color them = opposite_color(m_board.color_to_move());
+            Bitboard discovered_atks = discovered_attacks(m_board, move.source(), move.destination());
+            Bitboard their_valuable_pieces = m_board.piece_bb(Piece(them, PT_KING))
+                                             | m_board.piece_bb(Piece(them, PT_QUEEN))
+                                             | m_board.piece_bb(Piece(them, PT_ROOK));
 
-        // Futility pruning.
-        if (   (!PV || m_root_depth > FP_MAX_DEPTH)
-            && depth <= FP_MAX_DEPTH
-            && !in_check
-            && move != hash_move
-            && move.is_quiet()
-            && (static_eval + FP_MARGIN) < alpha
-            && !m_board.gives_check(move)) {
-            continue;
+            // SEE pruning.
+            if ((!PV || m_root_depth > SEE_PRUNING_MAX_DEPTH)
+                && (discovered_atks & their_valuable_pieces) == 0
+                && depth <= SEE_PRUNING_MAX_DEPTH
+                && !m_board.in_check()
+                && move_picker.stage() > MPS_GOOD_CAPTURES
+                && !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
+                continue;
+            }
+
+            // Futility pruning.
+            if ((!PV || m_root_depth > FP_MAX_DEPTH)
+                && depth <= FP_MAX_DEPTH
+                && !in_check
+                && move != hash_move
+                && move.is_quiet()
+                && (static_eval + FP_MARGIN) < alpha
+                && !m_board.gives_check(move)) {
+                continue;
+            }
         }
 
         // Singular extensions.
