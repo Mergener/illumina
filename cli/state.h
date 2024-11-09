@@ -19,7 +19,7 @@ public:
 
     // Debug
     void bench() const;
-    void perft(int depth) const;
+    void perft(int depth, bool bulk) const;
     void mperft(int depth) const;
 
     // Evaluation

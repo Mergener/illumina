@@ -97,8 +97,8 @@ void State::bench() const {
     std::cout << "\tNodes/sec:            "  << results.nps << std::endl;
 }
 
-void State::perft(int depth) const {
-    illumina::perft(m_board, depth, { true });
+void State::perft(int depth, bool bulk) const {
+    illumina::perft(m_board, depth, { true, false, bulk });
 }
 
 void State::mperft(int depth) const {

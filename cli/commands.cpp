@@ -99,7 +99,12 @@ void register_commands(CLIApplication& server) {
     });
 
     server.register_command("perft", [](const CommandContext& ctx) {
-        global_state().perft(int(ctx.int_after("")));
+        if (ctx.has_arg("nobulk")) {
+            global_state().perft(int(ctx.int_after("nobulk")), false);
+        }
+        else {
+            global_state().perft(int(ctx.int_after("")), true);
+        }
     });
 
     server.register_command("mperft", [](const CommandContext& ctx) {
