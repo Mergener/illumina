@@ -64,6 +64,11 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS "-pthread -static-libstdc++ -static-libgcc --static")
 endif()
 
+# We don't want Clang to dynamically link the standard library.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc ${CMAKE_EXE_LINKER_FLAGS}")
+endif()
+
 # Define our supported architectures here.
 set(ARCHS bmi2 avx2 base)
 
