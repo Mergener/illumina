@@ -73,6 +73,7 @@ void State::set_board(const Board& board) {
 }
 
 void State::bench() const {
+#ifndef OPENBENCH_COMPLIANCE
     BenchSettings settings = default_bench_settings();
 
     std::cout << "Starting bench...\n" << std::endl;
@@ -95,6 +96,11 @@ void State::bench() const {
     std::cout << "\tTotal search time:    "  << results.search_time_ms << " ms" << std::endl;
     std::cout << "\tTotal searched nodes: "  << results.total_nodes << std::endl;
     std::cout << "\tNodes/sec:            "  << results.nps << std::endl;
+#else
+    BenchSettings settings = default_bench_settings();
+    BenchResults results = illumina::bench(settings);
+    std::cout << results.total_nodes << " nodes " << results.nps << " nps" << std::endl;
+#endif
 }
 
 void State::perft(int depth, bool bulk) const {

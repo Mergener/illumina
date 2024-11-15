@@ -57,6 +57,15 @@ if (INCLUDE_TRACING_MODULE)
     add_definitions(-DTRACING_ENABLED)
 endif()
 
+option(OPENBENCH_COMPLIANCE_MODE
+        "Makes this build openbench compliant, which implies applying any necessary changes
+         for this compliance to work -- including a simplified version of the bench command."
+       OFF)
+if (OPENBENCH_COMPLIANCE_MODE)
+    message("OpenBench compliance mode enabled.")
+    add_definitions(-DOPENBENCH_COMPLIANCE)
+endif()
+
 # For GCC-derived compilers, we need to specify some flags in order
 # to have <thread> and <filesystem> properly working.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
