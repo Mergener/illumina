@@ -11,7 +11,12 @@ set(ILLUMINA_LIBRARY_SOURCE_DIR ${CMAKE_SOURCE_DIR}/illumina)
 set(ILLUMINA_CLI_SOURCE_DIR ${CMAKE_SOURCE_DIR}/cli)
 set(ILLUMINA_TESTS_DIR ${CMAKE_SOURCE_DIR}/tests)
 set(ILLUMINA_EXT_DIR ${CMAKE_SOURCE_DIR}/ext)
-set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.json)
+
+# We might want to use a custom net.
+if(NOT DEFINED NNUE_PATH)
+    set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.json)
+endif()
+message(STATUS "NNUE_PATH is set to: ${NNUE_PATH}")
 
 # Add some compilation options.
 option(TUNING "Tunable values become runtime variables that can be changed via UCI options." OFF)

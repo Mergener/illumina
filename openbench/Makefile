@@ -31,12 +31,26 @@ else
 	EXEC_EXT :=
 endif
 
+EVALFILE ?=
+
+# Resolve EVALFILE to its absolute path.
+ifneq ($(EVALFILE),)
+    ABSOLUTE_EVALFILE := $(shell realpath $(EVALFILE))
+endif
+
+# Set the C and C++ compilers, either from environment variables or defaults.
+# Prioritize Clang over GCC if available.
+CC  ?= $(shell command -v clang || echo gcc)
+CXX ?= $(shell command -v clang++ || echo g++)
+
 # Default target to configure, build, and move the best binary.
 all: clean configure build move
 
 # Run CMake to configure the project.
 configure:
-	cmake -S .. -B $(BUILD_DIR) -G $(CMAKE_GENERATOR) $(CMAKE_OPTIONS)
+	cmake -S .. -B $(BUILD_DIR) -G $(CMAKE_GENERATOR) $(CMAKE_OPTIONS) \
+		  -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) \
+		  $(if $(ABSOLUTE_EVALFILE),-DNNUE_PATH=$(ABSOLUTE_EVALFILE))
 
 # Build the selected target.
 build: configure
