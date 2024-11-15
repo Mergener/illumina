@@ -615,11 +615,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Clamp excessive depths.
     depth = std::min(std::min(MAX_DEPTH, depth), m_root_depth * 2 - ply);
 
-    // Dive into the quiescence search when depth becomes zero.
-    if (depth <= 0) {
-        return quiescence_search<TRACE, PV>(ply, alpha, beta);
-    }
-
     // Compute the static eval. Useful for many heuristics.
     if (!in_check) {
         static_eval = !found_in_tt ? evaluate() : tt_entry.static_eval();
@@ -642,6 +637,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         && alpha < MATE_THRESHOLD
         && static_eval - rfp_margin > beta) {
         return static_eval - rfp_margin;
+    }
+
+    // Mate distance pruning.
+    Score expected_mate_score = MATE_SCORE - ply;
+    if (expected_mate_score < beta) {
+        beta = expected_mate_score;
+        if (alpha >= beta) {
+            return beta;
+        }
     }
 
     // Null move pruning.
@@ -671,13 +675,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         depth -= IIR_DEPTH_RED;
     }
 
-    // Mate distance pruning.
-    Score expected_mate_score = MATE_SCORE - ply;
-    if (expected_mate_score < beta) {
-        beta = expected_mate_score;
-        if (alpha >= beta) {
-            return beta;
-        }
+    // Dive into the quiescence search when depth becomes zero.
+    if (depth <= 0) {
+        return quiescence_search<TRACE, PV>(ply, alpha, beta);
     }
 
     // Kickstart our curr move counter for later reporting.
@@ -957,6 +957,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::ZOB_KEY, i64(m_board.hash_key()));
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
+    
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
 
     Score stand_pat = evaluate();
