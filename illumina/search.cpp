@@ -1121,9 +1121,9 @@ Score SearchWorker::draw_score() const {
 
 template <bool TRACE>
 void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
+    TRACE_PUSH();
     m_results.nodes++;
     m_eval.on_make_move(board, move);
-    TRACE_PUSH();
 }
 
 template <bool TRACE>
@@ -1134,12 +1134,12 @@ void SearchWorker::on_undo_move(const illumina::Board& board, illumina::Move mov
 
 template <bool TRACE>
 void SearchWorker::on_make_null_move(const illumina::Board& board) {
+    TRACE_PUSH();
     m_results.nodes++;
     m_eval.on_make_null_move(board);
-    TRACE_PUSH();
+
     TRACE_SET(Traceable::LAST_MOVE, MOVE_NULL);
     TRACE_SET(Traceable::LAST_MOVE_RAW, MOVE_NULL.raw());
-    TRACE_SET(Traceable::ZOB_KEY, i64(board.hash_key()));
 }
 
 template <bool TRACE>
