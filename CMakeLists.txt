@@ -62,10 +62,8 @@ endif()
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # GCC requires some flags in order for threads and <filesystem> to work.
     set(CMAKE_CXX_FLAGS "-pthread -static-libstdc++ -static-libgcc --static")
-endif()
-
 # We don't want Clang to dynamically link the standard library.
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc ${CMAKE_EXE_LINKER_FLAGS}")
 endif()
 
