@@ -398,6 +398,7 @@ static void add_tuning_option(UCIOptionManager& options,
                               double default_value,
                               double min = -0x100000,
                               double max = 0x100000) {
+#ifndef OPENBENCH_COMPLIANCE
     options.register_option<UCIOptionSpin>(opt_name + std::string("_FP"),
                                            default_value * 1000,
                                            min * 1000,
@@ -407,6 +408,15 @@ static void add_tuning_option(UCIOptionManager& options,
                 opt_ref = double(spin.value()) / 1000.0;
                 recompute_search_constants();
             });
+#else
+    options.register_option<UCIOptionString>(opt_name + std::string("_FP"),
+                                             std::to_string(default_value))
+            .add_update_handler([&opt_ref](const UCIOption& opt) {
+                const auto& spin = dynamic_cast<const UCIOptionString&>(opt);
+                opt_ref = std::stod(spin.value());
+                recompute_search_constants();
+            });
+#endif
 }
 #endif
 
