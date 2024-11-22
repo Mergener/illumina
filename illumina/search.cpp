@@ -317,6 +317,7 @@ SearchResults Searcher::search(const Board& board,
     int n_helper_threads = std::max(1, settings.n_threads) - 1;
 
     // Create secondary workers.
+    secondary_workers.clear();
     secondary_workers.resize(n_helper_threads);
 
     // Fire secondary threads.
