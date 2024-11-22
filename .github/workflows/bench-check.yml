@@ -35,11 +35,10 @@ jobs:
         run: |
           # Check if bench.txt has changes
           git diff --exit-code bench.txt || {
-            # If there are changes, add, commit, and push the file
             git config --global user.name "GitHub Actions"
             git config --global user.email "actions@github.com"
-            git add bench.txt
-            bench_message=$(cat bench.txt)
+            git add ./openbench/bench.txt
+            bench_message=$(cat ./openbench/bench.txt)
             git commit -m "bench $bench_message"
             git push
           }
