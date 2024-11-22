@@ -1,0 +1,47 @@
+name: Bench Validation
+
+permissions:
+  contents: write 
+  
+on:
+  push:
+    branches:
+      - '*'
+      - '**'
+
+  pull_request:
+    branches:
+      - '*'
+      - '**'
+
+jobs:
+  run-bench:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up C++ compiler and CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Build and Run Bench
+        run: |
+          cd openbench
+          make EXE=illumina
+          output=$(./illumina bench)
+          echo "$output" > bench.txt
+
+      - name: Verify Bench File and Commit Changes
+        run: |
+          git diff --exit-code openbench/bench.txt || {
+            pwd
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "actions@github.com"
+            git add openbench/bench.txt
+            bench_message=$(head -n 1 openbench/bench.txt | grep -o '^[0-9]*')
+            git commit -m "bench $bench_message"
+            git push
+          }
