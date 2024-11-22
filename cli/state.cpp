@@ -385,11 +385,11 @@ static void add_tuning_option(UCIOptionManager& options,
                               int min = INT_MIN,
                               int max = INT_MAX) {
     options.register_option<UCIOptionSpin>(opt_name, default_value, min, max)
-            .add_update_handler([&opt_ref](const UCIOption& opt) {
-                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
-                opt_ref = spin.value();
-                recompute_search_constants();
-            });
+           .add_update_handler([&opt_ref](const UCIOption& opt) {
+               const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+               opt_ref = spin.value();
+               recompute_search_constants();
+           });
 }
 
 static void add_tuning_option(UCIOptionManager& options,
