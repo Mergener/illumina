@@ -73,6 +73,7 @@ void State::set_board(const Board& board) {
 }
 
 void State::bench() const {
+#ifndef OPENBENCH_COMPLIANCE
     BenchSettings settings = default_bench_settings();
 
     std::cout << "Starting bench...\n" << std::endl;
@@ -95,6 +96,11 @@ void State::bench() const {
     std::cout << "\tTotal search time:    "  << results.search_time_ms << " ms" << std::endl;
     std::cout << "\tTotal searched nodes: "  << results.total_nodes << std::endl;
     std::cout << "\tNodes/sec:            "  << results.nps << std::endl;
+#else
+    BenchSettings settings = default_bench_settings();
+    BenchResults results = illumina::bench(settings);
+    std::cout << results.total_nodes << " nodes " << results.nps << " nps" << std::endl;
+#endif
 }
 
 void State::perft(int depth, bool bulk) const {
@@ -379,11 +385,11 @@ static void add_tuning_option(UCIOptionManager& options,
                               int min = INT_MIN,
                               int max = INT_MAX) {
     options.register_option<UCIOptionSpin>(opt_name, default_value, min, max)
-            .add_update_handler([&opt_ref](const UCIOption& opt) {
-                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
-                opt_ref = spin.value();
-                recompute_search_constants();
-            });
+           .add_update_handler([&opt_ref](const UCIOption& opt) {
+               const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+               opt_ref = spin.value();
+               recompute_search_constants();
+           });
 }
 
 static void add_tuning_option(UCIOptionManager& options,
@@ -392,6 +398,7 @@ static void add_tuning_option(UCIOptionManager& options,
                               double default_value,
                               double min = -0x100000,
                               double max = 0x100000) {
+#ifndef OPENBENCH_COMPLIANCE
     options.register_option<UCIOptionSpin>(opt_name + std::string("_FP"),
                                            default_value * 1000,
                                            min * 1000,
@@ -401,6 +408,15 @@ static void add_tuning_option(UCIOptionManager& options,
                 opt_ref = double(spin.value()) / 1000.0;
                 recompute_search_constants();
             });
+#else
+    options.register_option<UCIOptionString>(opt_name + std::string("_FP"),
+                                             std::to_string(default_value))
+            .add_update_handler([&opt_ref](const UCIOption& opt) {
+                const auto& spin = dynamic_cast<const UCIOptionString&>(opt);
+                opt_ref = std::stod(spin.value());
+                recompute_search_constants();
+            });
+#endif
 }
 #endif
 

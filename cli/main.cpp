@@ -6,6 +6,15 @@
 
 using namespace illumina;
 
+static bool has_cli_arg(int argc, char* argv[], std::string_view arg) {
+    for (int i = 0; i < argc; ++i) {
+        if (std::string(argv[i]) == arg) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int main(int argc, char* argv[]) {
     try {
         // Setup some C++ stuff.
@@ -25,6 +34,12 @@ int main(int argc, char* argv[]) {
 
         // Initialize program state.
         initialize_global_state();
+
+        if (has_cli_arg(argc, argv, "bench")) {
+            server.handle("bench");
+            server.handle("quit");
+            return 0;
+        }
 
         // Finally, run.
         std::cout << "Illumina " << ILLUMINA_VERSION_NAME << std::endl;
