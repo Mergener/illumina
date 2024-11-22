@@ -20,8 +20,10 @@ foreach (ARCH ${ARCHS})
 
     if (INCLUDE_TRACING_MODULE)
         target_link_libraries(${TARGET} PRIVATE SQLiteCpp)
-        target_include_directories(${TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/ext/SQLiteCpp/include)
+        target_include_directories(${TARGET} PRIVATE ${ILLUMINA_EXT_DIR}/SQLiteCpp/include)
     endif()
+
+    target_include_directories(${TARGET} PRIVATE ${ILLUMINA_EXT_DIR}/rang)
 
     target_link_libraries(${TARGET} PRIVATE illumina_lib_${ARCH})
     target_include_directories(${TARGET} PRIVATE ${ILLUMINA_LIBRARY_SOURCE_DIR})

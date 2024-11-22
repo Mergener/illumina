@@ -4,16 +4,12 @@
 #include "cliapplication.h"
 #include "state.h"
 
+#include "rang.h"
+
 using namespace illumina;
 
-static bool has_cli_arg(int argc, char* argv[], std::string_view arg) {
-    for (int i = 0; i < argc; ++i) {
-        if (std::string(argv[i]) == arg) {
-            return true;
-        }
-    }
-    return false;
-}
+static bool has_cli_arg(int argc, char* argv[], std::string_view arg);
+static void display_hello_text();
 
 int main(int argc, char* argv[]) {
     try {
@@ -42,7 +38,8 @@ int main(int argc, char* argv[]) {
         }
 
         // Finally, run.
-        std::cout << "Illumina " << ILLUMINA_VERSION_NAME << std::endl;
+        display_hello_text();
+
 #ifdef TUNING_BUILD
         std::cout << "This is a tuning build. Engine constants can be changed using UCI options." << std::endl;
 #endif
@@ -58,4 +55,34 @@ int main(int argc, char* argv[]) {
         std::cerr << "Fatal:\n" << e.what() << std::endl;
         return EXIT_FAILURE;
     }
+}
+
+static bool has_cli_arg(int argc, char* argv[], std::string_view arg) {
+    for (int i = 0; i < argc; ++i) {
+        if (std::string(argv[i]) == arg) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void display_hello_text() {
+    using namespace rang;
+
+    std::cout << style::bold
+              << fg::yellow;
+
+    std::cout << R"(
+  ___ _ _                 _
+ |_ _| | |_   _ _ __ ___ (_)_ __   __ _
+  | || | | | | | '_ ` _ \| | '_ \ / _` |
+  | || | | |_| | | | | | | | | | | (_| |
+ |___|_|_|\__,_|_| |_| |_|_|_| |_|\__,_|
+
+)"
+    << " by Thomas Mergener" << std::endl
+    << " version " << ILLUMINA_VERSION_NAME << std::endl
+    << style::reset
+    << fg::reset
+    << std::endl;
 }

@@ -3,8 +3,8 @@ project(illumina)
 set(CMAKE_CXX_STANDARD 17)
 
 # Set illumina version.
-set(ILLUMINA_VERSION_MAJOR 1)
-set(ILLUMINA_VERSION_MINOR 1)
+set(ILLUMINA_VERSION_MAJOR 2)
+set(ILLUMINA_VERSION_MINOR 0)
 
 # Setup important paths.
 set(ILLUMINA_LIBRARY_SOURCE_DIR ${CMAKE_SOURCE_DIR}/illumina)
