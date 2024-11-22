@@ -10,6 +10,9 @@ on:
     branches:
       - '*'
       - '**'
+      
+  permissions:
+    contents: write
 
 jobs:
   run-bench:
@@ -38,7 +41,7 @@ jobs:
             git config --global user.name "GitHub Actions"
             git config --global user.email "actions@github.com"
             git add openbench/bench.txt
-            bench_message=$(cat openbench/bench.txt)
+            bench_message=$(head -n 1 openbench/bench.txt | grep -o '^[0-9]*')
             git commit -m "bench $bench_message"
             git push
           }
