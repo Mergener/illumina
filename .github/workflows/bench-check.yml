@@ -1,5 +1,8 @@
 name: Bench Validation
 
+permissions:
+  contents: write 
+  
 on:
   push:
     branches:
@@ -10,9 +13,6 @@ on:
     branches:
       - '*'
       - '**'
-      
-  permissions:
-    contents: write
 
 jobs:
   run-bench:
