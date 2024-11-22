@@ -1,6 +1,6 @@
 #include "search.h"
 
-#include <climits>
+#include <limits.h>
 #include <cmath>
 #include <thread>
 #include <sstream>
