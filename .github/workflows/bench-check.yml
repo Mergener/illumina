@@ -37,12 +37,10 @@ jobs:
 
       - name: Verify Bench File and Commit Changes
         run: |
-          git diff --exit-code openbench/bench.txt || {
-            pwd
-            git config --global user.name "GitHub Actions"
-            git config --global user.email "actions@github.com"
-            git add openbench/bench.txt
-            bench_message=$(cat openbench/bench.txt)
-            git commit -m "bench $bench_message"
-            git push
-          }
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          bench_message=$(cat openbench/bench.txt)
+          echo $(date) >> openbench/bench.txt
+          git add openbench/bench.txt
+          git commit -m "bench $bench_message"
+          git push
