@@ -57,7 +57,7 @@ option(INCLUDE_TRACING_MODULE
              Note that this includes the heavy SQLITE3 dependency.
              Not supposed to be used in regular Illumina builds."
         OFF)
-if (INCLUDE_TRACING_MODULE)
+if (INCLUDE_TRACING_MODULE OR NOT DEVELOPMENT)
     message("Tracing module included.")
     add_definitions(-DTRACING_ENABLED)
 endif()
