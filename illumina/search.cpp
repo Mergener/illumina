@@ -1,5 +1,6 @@
 #include "search.h"
 
+#include <atomic>
 #include <limits.h>
 #include <cmath>
 #include <thread>
@@ -59,7 +60,7 @@ public:
     bool should_stop() const;
 
     SearchContext(TranspositionTable* tt,
-                  bool* should_stop,
+                  std::atomic_bool* should_stop,
                   const Searcher::Listeners* listeners,
                   const RootInfo* root_info,
                   const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
@@ -69,7 +70,7 @@ private:
     TranspositionTable*        m_tt;
     const Searcher::Listeners* m_listeners;
     const RootInfo*            m_root_info;
-    bool*                      m_stop;
+    std::atomic_bool*             m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
     const std::vector<std::unique_ptr<SearchWorker>>* m_helper_workers;
@@ -92,7 +93,7 @@ const Searcher::Listeners& SearchContext::listeners() const {
 }
 
 SearchContext::SearchContext(TranspositionTable* tt,
-                             bool* should_stop,
+                             std::atomic_bool* should_stop,
                              const Searcher::Listeners* listeners,
                              const RootInfo* root_info,
                              const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
@@ -105,7 +106,7 @@ SearchContext::SearchContext(TranspositionTable* tt,
       m_search_start(now()) { }
 
 void SearchContext::stop_search() const {
-    *m_stop = true;
+    m_stop->store(true, std::memory_order_relaxed);
 }
 
 TimeManager& SearchContext::time_manager() const {
@@ -204,7 +205,7 @@ private:
 };
 
 void Searcher::stop() {
-    m_stop = true;
+    m_stop.store(true, std::memory_order_relaxed);
 }
 
 TranspositionTable& Searcher::tt() {
@@ -286,7 +287,7 @@ SearchResults Searcher::search(const Board& board,
 
     // Create search context.
     std::vector<std::unique_ptr<SearchWorker>> secondary_workers;
-    m_stop = false;
+    m_stop.store(false, std::memory_order::memory_order_seq_cst);
     m_tt.new_search();
     SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
 
@@ -317,7 +318,6 @@ SearchResults Searcher::search(const Board& board,
     int n_helper_threads = std::max(1, settings.n_threads) - 1;
 
     // Create secondary workers.
-    secondary_workers.clear();
     secondary_workers.resize(n_helper_threads);
 
     // Fire secondary threads.
