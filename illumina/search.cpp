@@ -672,7 +672,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Internal iterative reductions.
     if (   depth >= IIR_MIN_DEPTH
-        && !found_in_tt
+        && (!found_in_tt || tt_entry.move() == MOVE_NULL)
         && node->skip_move == MOVE_NULL) {
         depth -= IIR_DEPTH_RED;
     }
