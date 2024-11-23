@@ -670,6 +670,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
+    // Razoring.
+    if (   !PV
+        && !in_check
+        && node->skip_move == MOVE_NULL
+        && depth <= RAZOR_MAX_DEPTH
+        && static_eval + RAZOR_MARGIN * depth < beta) {
+        Score score = quiescence_search<TRACE, PV>(ply, alpha, beta);
+        if (score < beta) {
+            return score;
+        }
+    }
+
     // Internal iterative reductions.
     if (   depth >= IIR_MIN_DEPTH
         && !found_in_tt
