@@ -593,7 +593,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             && node->skip_move == MOVE_NULL
             && tt_entry.depth() >= depth) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
-                // TT Cuttoff.
+                // TT Cutoff.
                 TRACE_SET(Traceable::TT_CUTOFF, true);
                 return tt_entry.score();
             }
