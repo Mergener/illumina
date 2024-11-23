@@ -802,8 +802,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Depth reductions = 0;
         if (   n_searched_moves >= LMR_MIN_MOVE_IDX
             && depth >= LMR_MIN_DEPTH
-            && !in_check
-            && !m_board.in_check()) {
+            && !in_check) {
             reductions = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
                 // Further reduce moves that are not improving the static evaluation.
