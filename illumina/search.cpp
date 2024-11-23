@@ -143,7 +143,7 @@ public:
     const WorkerResults& results() const;
 
     SearchWorker(bool main,
-                 Board  board,
+                 const Board& board,
                  SearchContext* context,
                  const SearchSettings* settings);
     Board       m_board;
@@ -1182,11 +1182,11 @@ bool SearchWorker::should_stop() const {
 }
 
 SearchWorker::SearchWorker(bool main,
-                           Board board,
+                           const Board& board,
                            SearchContext* context,
                            const SearchSettings* settings)
     : m_main(main),
-      m_board(std::move(board)),
+      m_board(board),
       m_context(context),
       m_settings(settings),
       m_eval_random_margin(m_main
