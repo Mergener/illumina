@@ -81,7 +81,7 @@ TranspositionTable& SearchContext::tt() const {
 }
 
 bool SearchContext::should_stop() const {
-    return *m_stop;
+    return m_stop->load(std::memory_order_relaxed);
 }
 
 ui64 SearchContext::elapsed() const {
