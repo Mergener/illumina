@@ -14,7 +14,7 @@ namespace illumina {
 static constexpr int MAX_HISTORY = 16384;
 
 template <typename T>
-struct ButterflyArray : std::array<std::array<T, SQ_COUNT>, SQ_COUNT> {
+struct ButterflyArray : std::array<std::array<std::array<T, SQ_COUNT>, SQ_COUNT>, CL_COUNT> {
     T& get(Move move);
     const T& get(Move move) const;
 };
@@ -61,12 +61,12 @@ private:
 
 template<typename T>
 T& ButterflyArray<T>::get(Move move) {
-    return (*this)[move.source()][move.destination()];
+    return (*this)[move.source_piece().color()][move.source()][move.destination()];
 }
 
 template<typename T>
 const T& ButterflyArray<T>::get(Move move) const {
-    return (*this)[move.source()][move.destination()];
+    return (*this)[move.source_piece().color()][move.source()][move.destination()];
 }
 
 template<typename T>
