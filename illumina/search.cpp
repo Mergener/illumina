@@ -584,9 +584,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry, node->ply);
+    bool found_in_tt = tt.probe(board_key, tt_entry, node->ply)
+                    && m_board.is_move_pseudo_legal(hash_move)
+                    && m_board.is_move_legal(hash_move);
     if (found_in_tt) {
         hash_move = tt_entry.move();
+
         TRACE_SET(Traceable::FOUND_IN_TT, true);
 
         if (   !PV

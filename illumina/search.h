@@ -69,7 +69,6 @@ public:
 
     Searcher() = default;
     Searcher(const Searcher& other) = delete;
-    Searcher(Searcher&& other) = default;
     explicit Searcher(TranspositionTable&& tt);
     ~Searcher() = default;
 

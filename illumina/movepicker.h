@@ -397,9 +397,7 @@ inline SearchMove MovePicker<QUIESCE>::next() {
 
     // Prevent hash move revisits.
     if (move == m_hash_move) {
-        if (   m_stage == MPS_HASH_MOVE
-            && m_board->is_move_pseudo_legal(move)
-            && m_board->is_move_legal(move)) {
+        if (m_stage == MPS_HASH_MOVE) {
             return move;
         }
         return next();
