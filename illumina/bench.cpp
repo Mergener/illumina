@@ -38,7 +38,7 @@ BenchResults bench(const BenchSettings& settings) {
     TimePoint before = Clock::now();
     BenchResults results;
     for (const Board& board: settings.boards) {
-        searcher.tt().new_search();
+        searcher.new_game();
 
         TimePoint search_before = Clock::now();
         SearchResults search_results = searcher.search(board,
