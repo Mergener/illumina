@@ -70,7 +70,7 @@ private:
     TranspositionTable*        m_tt;
     const Searcher::Listeners* m_listeners;
     const RootInfo*            m_root_info;
-    std::atomic_bool*             m_stop;
+    std::atomic_bool*          m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
     const std::vector<std::unique_ptr<SearchWorker>>* m_helper_workers;
@@ -317,12 +317,11 @@ SearchResults Searcher::search(const Board& board,
     // Determine the number of helper threads to be used.
     int n_helper_threads = std::max(1, settings.n_threads) - 1;
 
-    // Create secondary workers.
-    secondary_workers.resize(n_helper_threads);
-
     // Fire secondary threads.
+    secondary_workers.clear();
     std::vector<std::thread> helper_threads;
     for (int i = 0; i < n_helper_threads; ++i) {
+        secondary_workers.push_back(nullptr);
         helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
             secondary_workers[i] = std::make_unique<SearchWorker>(false, board, &context, &settings);
             secondary_workers[i]->iterative_deepening();
@@ -350,6 +349,10 @@ SearchResults Searcher::search(const Board& board,
     std::vector<WorkerResults> all_results;
     all_results.push_back(main_worker.results());
     for (std::unique_ptr<SearchWorker>& worker: secondary_workers) {
+        if (worker == nullptr) {
+            continue;
+        }
+
         all_results.push_back(worker->results());
     }
 
@@ -398,11 +401,15 @@ SearchResults Searcher::search(const Board& board,
 void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
-        if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
-            // If we finished soft, we don't want to start a new iteration.
-            if (m_main) {
-                m_context->stop_search();
-            }
+        // If we finished soft, we don't want to start a new iteration.
+        if (   m_main
+            && m_root_depth > 2
+            && m_context->time_manager().finished_soft()) {
+            m_context->stop_search();
+        }
+
+        // Check if we need to interrupt the search.
+        if (should_stop()) {
             break;
         }
 
@@ -427,11 +434,16 @@ void SearchWorker::iterative_deepening() {
             aspiration_windows();
             m_results.searched_depth = m_root_depth;
             check_limits();
-            if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
-                // If we finished soft, we don't want to start a new iteration.
-                if (m_main) {
-                    m_context->stop_search();
-                }
+
+            // If we finished soft, we don't want to start a new iteration.
+            if (   m_main
+                && m_root_depth > 2
+                && m_context->time_manager().finished_soft()) {
+                m_context->stop_search();
+            }
+
+            // Check if we need to interrupt the search.
+            if (should_stop()) {
                 break;
             }
 
