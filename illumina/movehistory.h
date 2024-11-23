@@ -98,9 +98,9 @@ inline void MoveHistory::set_killer(Depth ply, Move killer) {
 }
 
 inline void MoveHistory::new_search() {
-    std::fill(m_data->m_killers.begin(),
-              m_data->m_killers.end(),
-              std::array<Move, 2> { MOVE_NULL, MOVE_NULL });
+    std::memset(m_data->m_check_history.data(), 0, sizeof(m_data->m_check_history));
+    std::memset(m_data->m_killers.data(), 0, sizeof(m_data->m_check_history));
+    std::memset(m_data->m_counter_move_history.data(), 0, sizeof(m_data->m_check_history));
 }
 
 inline void MoveHistory::reset() {
