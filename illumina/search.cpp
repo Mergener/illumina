@@ -139,16 +139,18 @@ public:
     bool should_stop() const;
     bool tracing() const;
     void check_limits();
+    void new_game();
 
     const WorkerResults& results() const;
 
-    SearchWorker(bool main,
-                 Board  board,
-                 SearchContext* context,
-                 const SearchSettings* settings);
-    Board       m_board;
+    SearchWorker(bool main);
+
+    void new_search(const Board& board,
+                    SearchContext* context,
+                    const SearchSettings* settings);
 
 private:
+    Board m_board;
     const SearchSettings* m_settings;
     const SearchContext*  m_context;
     WorkerResults         m_results;
@@ -292,7 +294,7 @@ SearchResults Searcher::search(const Board& board,
     SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
 
     // Create main worker.
-    SearchWorker main_worker(true, board, &context, &settings);
+    m_main_worker->new_search(board, &context, &settings);
 
     // Kickstart our time manager.
     ui64 our_time = UINT64_MAX;
@@ -324,7 +326,8 @@ SearchResults Searcher::search(const Board& board,
     std::vector<std::thread> helper_threads;
     for (int i = 0; i < n_helper_threads; ++i) {
         helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
-            secondary_workers[i] = std::make_unique<SearchWorker>(false, board, &context, &settings);
+            secondary_workers[i] = std::make_unique<SearchWorker>(false);
+            secondary_workers[i]->new_search(board, &context, &settings);
             secondary_workers[i]->iterative_deepening();
         });
     }
@@ -334,7 +337,7 @@ SearchResults Searcher::search(const Board& board,
         settings.tracer->new_search(board, tt().size() / (1024 * 1024), settings);
     }
 
-    main_worker.iterative_deepening();
+    m_main_worker->iterative_deepening();
 
     // Finish tracing search.
     if (settings.tracer != nullptr) {
@@ -348,7 +351,7 @@ SearchResults Searcher::search(const Board& board,
 
     // Save obtained results in vector and vote for the best afterwards.
     std::vector<WorkerResults> all_results;
-    all_results.push_back(main_worker.results());
+    all_results.push_back(m_main_worker->results());
     for (std::unique_ptr<SearchWorker>& worker: secondary_workers) {
         all_results.push_back(worker->results());
     }
@@ -1164,25 +1167,30 @@ bool SearchWorker::should_stop() const {
     return m_context->should_stop();
 }
 
-SearchWorker::SearchWorker(bool main,
-                           Board board,
-                           SearchContext* context,
-                           const SearchSettings* settings)
-    : m_main(main),
-      m_board(std::move(board)),
-      m_context(context),
-      m_settings(settings),
-      m_eval_random_margin(m_main
+void SearchWorker::new_game() {
+    m_hist.reset();
+}
+
+void SearchWorker::new_search(const Board& board,
+                              SearchContext* context,
+                              const SearchSettings* settings) {
+    m_board = board;
+    m_context = context;
+    m_settings = settings;
+
+    m_eval_random_margin = m_main
                            ? settings->eval_random_margin
-                           : std::max(SMP_EVAL_RANDOM_MARGIN, settings->eval_random_margin)),
-      m_eval_random_seed(m_main
+                           : std::max(SMP_EVAL_RANDOM_MARGIN, settings->eval_random_margin);
+
+    m_eval_random_seed = m_main
                          ? settings->eval_rand_seed
-                         : random(ui64(1), UINT64_MAX)) {
+                         : random(ui64(1), UINT64_MAX);
+
     m_eval.on_new_board(m_board);
 
     // Dispatch board callbacks to Worker's methods.
     BoardListener board_listener {};
-    if (!main || settings->tracer == nullptr) {
+    if (!m_main || settings->tracer == nullptr) {
         board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move<false>(b); };
         board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move<false>(b); };
         board_listener.on_make_move = [this](const Board& b, Move m) { on_make_move<false>(b, m); };
@@ -1198,8 +1206,14 @@ SearchWorker::SearchWorker(bool main,
         board_listener.on_add_piece = [this](const Board& b, Piece p, Square s) { on_piece_added<true>(b, p, s); };
         board_listener.on_remove_piece = [this](const Board& b, Piece p, Square s) { on_piece_removed<true>(b, p, s); };
     }
+
     m_board.set_listener(board_listener);
+
+    m_hist.new_search();
 }
+
+SearchWorker::SearchWorker(bool main)
+    : m_main(main) { }
 
 bool SearchWorker::tracing() const {
     return m_main && m_settings->tracer != nullptr;
@@ -1207,6 +1221,22 @@ bool SearchWorker::tracing() const {
 
 const WorkerResults& SearchWorker::results() const {
     return m_results;
+}
+
+void Searcher::new_game() {
+    m_tt.clear();
+    m_main_worker->new_game();
+}
+
+Searcher::Searcher() {
+    m_main_worker = new SearchWorker(true);
+}
+
+Searcher::Searcher(TranspositionTable&& tt)
+    : m_tt(std::move(tt)) { }
+
+Searcher::~Searcher() {
+    delete m_main_worker;
 }
 
 static void init_search_constants() {

@@ -31,6 +31,7 @@ public:
     bool is_killer(Depth ply, Move move) const;
     void set_killer(Depth ply, Move killer);
     void reset();
+    void new_search();
 
     int  quiet_history(Move move, Move last_move, bool gives_check) const;
     void update_quiet_history(Move move,
@@ -94,6 +95,12 @@ inline void MoveHistory::set_killer(Depth ply, Move killer) {
     }
     arr[1] = arr[0];
     arr[0] = killer;
+}
+
+inline void MoveHistory::new_search() {
+    std::fill(m_data->m_killers.begin(),
+              m_data->m_killers.end(),
+              std::array<Move, 2> { MOVE_NULL, MOVE_NULL });
 }
 
 inline void MoveHistory::reset() {

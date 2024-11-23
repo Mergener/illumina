@@ -50,6 +50,8 @@ struct SearchResults {
     ui64 total_nodes = 0;
 };
 
+class SearchWorker;
+
 class Searcher {
     friend class SearchContext;
     friend class SearchWorker;
@@ -63,15 +65,15 @@ public:
     SearchResults search(const Board& board,
                          const SearchSettings& settings);
     void stop();
+    void new_game();
 
     void set_pv_finish_listener(const PVFinishListener& listener);
     void set_currmove_listener(const CurrentMoveListener& listener);
 
-    Searcher() = default;
+    Searcher();
     Searcher(const Searcher& other) = delete;
-    Searcher(Searcher&& other) = default;
     explicit Searcher(TranspositionTable&& tt);
-    ~Searcher() = default;
+    ~Searcher();
 
 private:
     bool m_searching = false;
@@ -80,6 +82,10 @@ private:
     TranspositionTable m_tt;
 
     TimeManager m_tm;
+
+    // This could be a unique_ptr, but then it would require us to
+    // move a huge chunk of declarations to this header file.
+    SearchWorker* m_main_worker;
 
     struct Listeners {
         PVFinishListener    pv_finish = [](PVResults&) {};
@@ -94,9 +100,6 @@ inline void Searcher::set_pv_finish_listener(const PVFinishListener& listener) {
 inline void Searcher::set_currmove_listener(const CurrentMoveListener& listener) {
     m_listeners.curr_move_listener = listener;
 }
-
-inline Searcher::Searcher(TranspositionTable&& tt)
-    : m_tt(std::move(tt)) { }
 
 void recompute_search_constants();
 

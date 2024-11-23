@@ -29,7 +29,7 @@ void initialize_global_state() {
     }
 
     if (!illumina::initialized()) {
-        throw std::logic_error("Tried to initialize global state before initializing Illumina.");
+        throw std::logic_error("Tried to new_search global state before initializing Illumina.");
     }
 
     s_global_state = new State();
@@ -53,7 +53,7 @@ static std::string score_string(Score score) {
 }
 
 void State::new_game() {
-    m_searcher.tt().clear();
+    m_searcher.new_game();
     m_eval_random_seed = random(ui64(1), UINT64_MAX);
 }
 
