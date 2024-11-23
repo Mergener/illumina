@@ -70,7 +70,7 @@ private:
     TranspositionTable*        m_tt;
     const Searcher::Listeners* m_listeners;
     const RootInfo*            m_root_info;
-    std::atomic_bool*             m_stop;
+    std::atomic_bool*          m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
     const std::vector<std::unique_ptr<SearchWorker>>* m_helper_workers;
@@ -81,7 +81,7 @@ TranspositionTable& SearchContext::tt() const {
 }
 
 bool SearchContext::should_stop() const {
-    return *m_stop;
+    return m_stop->load(std::memory_order_relaxed);
 }
 
 ui64 SearchContext::elapsed() const {
@@ -143,7 +143,7 @@ public:
     const WorkerResults& results() const;
 
     SearchWorker(bool main,
-                 Board  board,
+                 const Board& board,
                  SearchContext* context,
                  const SearchSettings* settings);
     Board       m_board;
@@ -317,12 +317,11 @@ SearchResults Searcher::search(const Board& board,
     // Determine the number of helper threads to be used.
     int n_helper_threads = std::max(1, settings.n_threads) - 1;
 
-    // Create secondary workers.
-    secondary_workers.resize(n_helper_threads);
-
     // Fire secondary threads.
+    secondary_workers.clear();
     std::vector<std::thread> helper_threads;
     for (int i = 0; i < n_helper_threads; ++i) {
+        secondary_workers.push_back(nullptr);
         helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
             secondary_workers[i] = std::make_unique<SearchWorker>(false, board, &context, &settings);
             secondary_workers[i]->iterative_deepening();
@@ -350,6 +349,10 @@ SearchResults Searcher::search(const Board& board,
     std::vector<WorkerResults> all_results;
     all_results.push_back(main_worker.results());
     for (std::unique_ptr<SearchWorker>& worker: secondary_workers) {
+        if (worker == nullptr) {
+            continue;
+        }
+
         all_results.push_back(worker->results());
     }
 
@@ -398,11 +401,15 @@ SearchResults Searcher::search(const Board& board,
 void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
-        if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
-            // If we finished soft, we don't want to start a new iteration.
-            if (m_main) {
-                m_context->stop_search();
-            }
+        // If we finished soft, we don't want to start a new iteration.
+        if (   m_main
+            && m_root_depth > 2
+            && m_context->time_manager().finished_soft()) {
+            m_context->stop_search();
+        }
+
+        // Check if we need to interrupt the search.
+        if (should_stop()) {
             break;
         }
 
@@ -427,11 +434,16 @@ void SearchWorker::iterative_deepening() {
             aspiration_windows();
             m_results.searched_depth = m_root_depth;
             check_limits();
-            if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
-                // If we finished soft, we don't want to start a new iteration.
-                if (m_main) {
-                    m_context->stop_search();
-                }
+
+            // If we finished soft, we don't want to start a new iteration.
+            if (   m_main
+                && m_root_depth > 2
+                && m_context->time_manager().finished_soft()) {
+                m_context->stop_search();
+            }
+
+            // Check if we need to interrupt the search.
+            if (should_stop()) {
                 break;
             }
 
@@ -584,9 +596,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry, node->ply);
+    bool found_in_tt = tt.probe(board_key, tt_entry, node->ply)
+                    && (   hash_move == MOVE_NULL
+                        || (   m_board.is_move_pseudo_legal(hash_move)
+                            && m_board.is_move_legal(hash_move)));
+
     if (found_in_tt) {
         hash_move = tt_entry.move();
+
         TRACE_SET(Traceable::FOUND_IN_TT, true);
 
         if (   !PV
@@ -1165,11 +1182,11 @@ bool SearchWorker::should_stop() const {
 }
 
 SearchWorker::SearchWorker(bool main,
-                           Board board,
+                           const Board& board,
                            SearchContext* context,
                            const SearchSettings* settings)
     : m_main(main),
-      m_board(std::move(board)),
+      m_board(board),
       m_context(context),
       m_settings(settings),
       m_eval_random_margin(m_main
