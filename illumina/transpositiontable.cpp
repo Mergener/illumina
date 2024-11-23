@@ -109,6 +109,12 @@ void TranspositionTable::try_store(ui64 key,
         entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen);
         return;
     }
+
+    // Replace upperbounds, even when on lower depths.
+    if (bound_type != BT_UPPERBOUND && entry.bound_type() == BT_UPPERBOUND) {
+        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen);
+        return;
+    }
 }
 
 void TranspositionTable::clear() {
