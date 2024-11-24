@@ -74,7 +74,7 @@ private:
     ui8 m_gen = 0;
 
     TranspositionTableEntry& entry_ref(ui64 key);
-    const TranspositionTableEntry& entry_ref(ui64 key) const
+    const TranspositionTableEntry& entry_ref(ui64 key) const;
 };
 
 inline ui64 TranspositionTableEntry::key() const {
