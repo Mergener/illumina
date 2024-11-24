@@ -550,6 +550,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     TRACE_SET(Traceable::DEPTH, depth);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
 
+    // Prefetch tt entry as soon as possible.
+    TranspositionTable& tt = m_context->tt();
+    ui64 board_key         = m_board.hash_key();
+    tt.prefetch(board_key);
+
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
         node->pv[0] = MOVE_NULL;
@@ -581,12 +586,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Setup some important values.
-    TranspositionTable& tt = m_context->tt();
     Score original_alpha   = alpha;
     int n_searched_moves   = 0;
     Move best_move         = MOVE_NULL;
     Move hash_move         = MOVE_NULL;
-    ui64  board_key        = m_board.hash_key();
     bool in_check          = m_board.in_check();
     Color us               = m_board.color_to_move();
     Depth ply              = node->ply;
