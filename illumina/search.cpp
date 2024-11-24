@@ -1041,16 +1041,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 }
 
 Score SearchWorker::evaluate() const {
-    // Check if we're in a known endgame.
-    Endgame eg = identify_endgame(m_board);
-
-    // We're on a known endgame. Use its evaluation.
-    if (eg.type != EG_UNKNOWN) {
-        return eg.evaluation;
-    }
-
-    // If we're not in a known endgame, use our regular
-    // static evaluation function.
     Score score = m_eval.get();
     if (m_eval_random_margin != 0) {
         // User has requested evaluation randomness, apply the noise.
