@@ -838,6 +838,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 reductions -= !stable * (reductions / 2);
             }
 
+            reductions += !PV;
+
             // Prevent too high or below zero reductions.
             reductions = std::clamp(reductions, 0, depth);
         }
