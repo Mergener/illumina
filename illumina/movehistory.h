@@ -53,9 +53,12 @@ private:
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
+    static void update_history_by_depth(int& history,
+                                        Depth depth,
+                                        bool good);
+
     static void update_history(int& history,
-                               Depth depth,
-                               bool good);
+                               int bonus);
 };
 
 template<typename T>
@@ -117,24 +120,29 @@ inline void MoveHistory::update_quiet_history(Move move,
                                               Depth depth,
                                               bool gives_check,
                                               bool good) {
-    update_history(m_data->m_quiet_history.get(move), depth, good);
+    update_history_by_depth(m_data->m_quiet_history.get(move), depth, good);
     if (last_move != MOVE_NULL) {
-        update_history(m_data->m_counter_move_history.get(last_move).get(move), depth, good);
+        update_history_by_depth(m_data->m_counter_move_history.get(last_move).get(move), depth, good);
     }
 
     if (gives_check) {
-        update_history(m_data->m_check_history.get(move), depth, good);
+        update_history_by_depth(m_data->m_check_history.get(move), depth, good);
     }
 }
 
-inline void MoveHistory::update_history(int& history,
-                                        Depth depth,
-                                        bool good) {
+inline void MoveHistory::update_history_by_depth(int& history,
+                                                 Depth depth,
+                                                 bool good) {
     int delta = (depth < MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD)
               ? (depth * depth)
               : (MV_HIST_QUIET_HIGH_DEPTH_FACTOR * depth * depth);
     int sign  = good ? 1 : -1;
-    history  += (sign * delta) - std::min(history, MAX_HISTORY) * delta / MAX_HISTORY;
+    update_history(history, delta * sign);
+}
+
+inline void MoveHistory::update_history(int& history, int bonus) {
+    int clamped_bonus = std::clamp(bonus, -MAX_HISTORY, MAX_HISTORY);
+    history          += clamped_bonus - history * std::abs(clamped_bonus) / MAX_HISTORY;
 }
 
 inline MoveHistory::MoveHistory() {
