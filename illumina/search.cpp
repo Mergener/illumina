@@ -852,11 +852,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
             score = -pvs<TRACE, false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
-
-            if (score > alpha && reductions > 1) {
-                score = -pvs<TRACE, false>(depth - 1 + extensions, -alpha - 1, -alpha, node + 1);
-            }
-
             if (score > alpha && score < beta) {
                 TRACE_PUSH_SIBLING();
                 score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
