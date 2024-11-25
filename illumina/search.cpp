@@ -957,12 +957,26 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
             tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_LOWERBOUND);
+
+            // Update corrhist.
+            if (   !in_check
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha <= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
             tt.try_store(board_key,
                          ply, best_move,
                          n_searched_moves > 0 ? best_score : alpha,
                          depth, static_eval, BT_UPPERBOUND);
+
+            // Update corrhist.
+            if (   !in_check
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         } else {
             // We have an exact score.
             tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_EXACT);
@@ -1059,7 +1073,7 @@ Score SearchWorker::evaluate() const {
         i32 noise  = (seed % (margin * 2)) - margin;
         score += Score(noise);
     }
-    return score;
+    return m_hist.correct_eval_with_corrhist(m_board, score);
 }
 
 void SearchWorker::report_pv_results(const SearchNode* search_stack) {
