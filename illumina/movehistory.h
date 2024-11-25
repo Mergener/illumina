@@ -14,7 +14,7 @@ namespace illumina {
 static constexpr int MAX_HISTORY = 16384;
 static constexpr size_t CORRHIST_ENTRIES = 16384;
 static constexpr int CORRHIST_GRAIN = 256;
-static constexpr int CORRHIST_BASE_WEIGHT = 512;
+static constexpr int CORRHIST_BASE_WEIGHT = 1024;
 static constexpr int MAX_CORRHIST = 16384;
 
 template <typename T>
@@ -153,14 +153,14 @@ inline void MoveHistory::update_corrhist(const Board& board,
                                          Depth depth,
                                          int diff) {
     int scaled_diff = diff * CORRHIST_GRAIN;
-    int depth_score = std::min(depth * depth, 128);
+    int depth_score = std::min(depth * depth + 2 * depth + 1, 128);
 
     CorrhistEntry& entry = m_data->pawn_corrhist[board.color_to_move()]
                                                 [board.pawn_key() % CORRHIST_ENTRIES];
     entry.key_low = board.pawn_key() & BITMASK(16);
 
     i16& entry_value = entry.value;
-    entry_value = std::clamp((int(entry_value) * (CORRHIST_BASE_WEIGHT - depth_score) + scaled_diff + depth_score) / CORRHIST_BASE_WEIGHT,
+    entry_value = std::clamp((int(entry_value) * (CORRHIST_BASE_WEIGHT - depth_score) + scaled_diff * depth_score) / CORRHIST_BASE_WEIGHT,
                              -MAX_CORRHIST, MAX_CORRHIST);
 }
 
