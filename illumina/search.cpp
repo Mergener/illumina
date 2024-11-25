@@ -983,8 +983,24 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::ZOB_KEY, i64(m_board.hash_key()));
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
+
+    static ui64 i = 0;
     
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
+
+    // Probe from TT.
+    TranspositionTable& tt = m_context->tt();
+    TranspositionTableEntry tt_entry {};
+    ui64 board_key = m_board.hash_key();
+    bool found_in_tt = tt.probe(board_key, tt_entry, ply);
+    if (found_in_tt) {
+        if constexpr (!PV) {
+            if (tt_entry.bound_type() != BT_UPPERBOUND) {
+                return tt_entry.score();
+            }
+            beta = tt_entry.score();
+        }
+    }
 
     Score stand_pat = evaluate();
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
