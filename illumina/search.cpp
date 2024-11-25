@@ -993,16 +993,19 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TranspositionTableEntry tt_entry {};
     ui64 board_key = m_board.hash_key();
     bool found_in_tt = tt.probe(board_key, tt_entry, ply);
-    if (found_in_tt) {
-        if constexpr (!PV) {
-            if (tt_entry.bound_type() != BT_UPPERBOUND) {
-                return tt_entry.score();
-            }
-            beta = tt_entry.score();
-        }
-    }
+//    if (found_in_tt) {
+//        if constexpr (!PV) {
+//            if (tt_entry.bound_type() != BT_UPPERBOUND) {
+//                return tt_entry.score();
+//            }
+//            beta = tt_entry.score();
+//            if (alpha >= beta) {
+//                return beta;
+//            }
+//        }
+//    }
 
-    Score stand_pat = evaluate();
+    Score stand_pat = !found_in_tt ? evaluate() : tt_entry.static_eval();
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
     if (stand_pat >= beta) {
