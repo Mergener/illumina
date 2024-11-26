@@ -983,6 +983,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         } else {
             // We have an exact score.
             tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_EXACT);
+
+            // Update corrhist.
+            if (   !in_check
+                   && (best_move == MOVE_NULL || best_move.is_quiet())
+                   && alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         }
     }
 
