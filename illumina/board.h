@@ -368,7 +368,7 @@ inline void Board::piece_added(Square s, Piece p) {
 
     if constexpr (DO_ZOB) {
         m_state.hash_key ^= zob_piece_square_key(p, s);
-        m_state.pawn_key ^= (p.type() == PT_PAWN) ^ zob_piece_square_key(Piece(p.color(), PT_PAWN), s);
+        m_state.pawn_key ^= (p.type() == PT_PAWN) * zob_piece_square_key(Piece(p.color(), PT_PAWN), s);
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
@@ -394,7 +394,7 @@ inline void Board::piece_removed(Square s) {
 
     if constexpr (DO_ZOB) {
         m_state.hash_key ^= zob_piece_square_key(prev_piece, s);
-        m_state.pawn_key ^= (prev_piece.type() == PT_PAWN) ^ zob_piece_square_key(Piece(prev_piece.color(), PT_PAWN), s);
+        m_state.pawn_key ^= (prev_piece.type() == PT_PAWN) * zob_piece_square_key(Piece(prev_piece.color(), PT_PAWN), s);
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
