@@ -964,7 +964,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Update corrhist.
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
-                && alpha <= static_eval) {
+                && alpha >= static_eval) {
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else if (alpha <= original_alpha) {
@@ -977,7 +977,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Update corrhist.
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
-                && alpha >= static_eval) {
+                && alpha <= static_eval) {
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else {
