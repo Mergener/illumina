@@ -56,6 +56,7 @@ public:
     bool           in_check() const;
     bool           in_double_check() const;
     ui64           hash_key() const;
+    ui64           pawn_key() const;
     Square         castle_rook_square(Color color, Side side) const;
     void           set_castle_rook_square(Color color, Side side, Square square);
     int            rule50() const;
@@ -147,6 +148,7 @@ private:
         Move last_move   = MOVE_NULL;
         Square ep_square = SQ_NULL;
         ui64 hash_key    = EMPTY_BOARD_HASH_KEY;
+        ui64 pawn_key    = EMPTY_BOARD_HASH_KEY;
         ui16 rule50      = 0;
         ui8 n_checkers   = 0;
         CastlingRights castle_rights = CR_NONE;
@@ -222,6 +224,10 @@ inline bool Board::in_double_check() const {
 
 inline ui64 Board::hash_key() const {
     return m_state.hash_key;
+}
+
+inline ui64 Board::pawn_key() const {
+    return m_state.pawn_key;
 }
 
 inline int Board::ply_count() const {
@@ -362,6 +368,7 @@ inline void Board::piece_added(Square s, Piece p) {
 
     if constexpr (DO_ZOB) {
         m_state.hash_key ^= zob_piece_square_key(p, s);
+        m_state.pawn_key ^= (p.type() == PT_PAWN) * zob_piece_square_key(Piece(p.color(), PT_PAWN), s);
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
@@ -387,6 +394,7 @@ inline void Board::piece_removed(Square s) {
 
     if constexpr (DO_ZOB) {
         m_state.hash_key ^= zob_piece_square_key(prev_piece, s);
+        m_state.pawn_key ^= (prev_piece.type() == PT_PAWN) * zob_piece_square_key(Piece(prev_piece.color(), PT_PAWN), s);
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {

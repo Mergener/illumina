@@ -390,3 +390,19 @@ TEST_CASE(MoveGivesCheck) {
         test.run();
     }
 }
+
+TEST_CASE(PawnKeys) {
+    {
+        // Test for startpos.
+        Board startpos = Board::standard_startpos();
+        Board board = startpos;
+        board.make_move(Move::parse_uci(board, "g1f3"));
+        board.make_move(Move::parse_uci(board, "g8f6"));
+        EXPECT(board.pawn_key()).to_be(startpos.pawn_key());
+    }
+    {
+        // Other tests.
+        EXPECT(Board("rnbqkbnr/5p1p/1p1pp3/6p1/1PpPP3/6P1/P1P5/RNBQKBNR w KQkq - 0 1").pawn_key())
+            .to_be(Board("4k3/2b2p1p/1p1ppn2/r5pb/1PpPP2r/2n2qP1/PKP5/RNBQ1BNR w - - 0 1").pawn_key());
+    }
+}

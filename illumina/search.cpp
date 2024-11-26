@@ -635,10 +635,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     depth = std::min(std::min(MAX_DEPTH, depth), m_root_depth * 2 - ply);
 
     // Compute the static eval. Useful for many heuristics.
+    Score raw_eval;
     if (!in_check) {
-        static_eval = !found_in_tt ? evaluate() : tt_entry.static_eval();
+        raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
+        static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
+        TRACE_SET(Traceable::PAWN_CORRHIST, static_eval - raw_eval);
     }
     else {
+        raw_eval    = 0;
         static_eval = 0;
     }
     TRACE_SET(Traceable::STATIC_EVAL, static_eval);
@@ -956,16 +960,37 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_LOWERBOUND);
+            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_LOWERBOUND);
+
+            // Update corrhist.
+            if (   !in_check
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
             tt.try_store(board_key,
                          ply, best_move,
                          n_searched_moves > 0 ? best_score : alpha,
-                         depth, static_eval, BT_UPPERBOUND);
+                         depth, raw_eval, BT_UPPERBOUND);
+
+            // Update corrhist.
+            if (   !in_check
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha <= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         } else {
             // We have an exact score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_EXACT);
+            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_EXACT);
+
+            // Update corrhist.
+            if (   !in_check
+                   && (best_move == MOVE_NULL || best_move.is_quiet())
+                   && alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         }
     }
 
@@ -987,6 +1012,9 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
 
     Score stand_pat = evaluate();
+    if (!m_board.in_check()) {
+        stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
+    }
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
     if (stand_pat >= beta) {
