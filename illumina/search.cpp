@@ -638,7 +638,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (!in_check) {
         raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
         static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
-        TRACE_SET(Traceable::PAWN_CORRHIST, static_eval - raw_eval);
+        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
     }
     else {
         raw_eval    = 0;
