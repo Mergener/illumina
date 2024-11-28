@@ -947,6 +947,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Check if we have a checkmate or stalemate.
     if (!has_legal_moves) {
+        if (node->skip_move != MOVE_NULL) {
+            return alpha;
+        }
+
         Score score = m_board.in_check() ? (-MATE_SCORE + ply) : 0;
         TRACE_SET(Traceable::SCORE, score);
         return score;
