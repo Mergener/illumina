@@ -584,7 +584,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     TranspositionTable& tt = m_context->tt();
     Score original_alpha   = alpha;
     int n_searched_moves   = 0;
-    Move best_move         = MOVE_NULL;
     Move hash_move         = MOVE_NULL;
     ui64  board_key        = m_board.hash_key();
     bool in_check          = m_board.in_check();
@@ -639,7 +638,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (!in_check) {
         raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
         static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
-        TRACE_SET(Traceable::PAWN_CORRHIST, static_eval - raw_eval);
+        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
     }
     else {
         raw_eval    = 0;
@@ -716,6 +716,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     SearchMove move {};
+    Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
     Score best_score = -MATE_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
