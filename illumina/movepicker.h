@@ -149,8 +149,7 @@ void MovePicker<QUIESCE>::generate_simple_captures() {
         if (!a_good_see && b_good_see) {
             return false;
         }
-
-        return a.value() > b.value();
+        return false;
     });
 
     m_bad_captures_range = { bad_captures_begin, m_moves_end };
@@ -176,10 +175,6 @@ void MovePicker<QUIESCE>::generate_quiet_evasions() {
         score_move(m);
     }
 
-    insertion_sort(begin, m_moves_end, [](SearchMove& a, SearchMove& b) {
-        return a.value() > b.value();
-    });
-
     m_curr_move_range = { begin, m_moves_end };
 }
 
@@ -189,36 +184,14 @@ void MovePicker<QUIESCE>::generate_noisy_evasions() {
     SearchMove* begin = m_moves_end;
     m_moves_end = generate_evasions<MASK>(*m_board, m_moves_end);
 
-    bool see_table[SQ_COUNT][SQ_COUNT];
     for (auto it = begin; it != m_moves_end; ++it) {
         SearchMove& m = *it;
 
         bool good_see = has_good_see(*m_board, m.source(), m.destination());
-        see_table[m.source()][m.destination()] = good_see;
         score_move(m);
+        m.add_value(!good_see * MAX_HISTORY);
     }
 
-    insertion_sort(begin, m_moves_end, [&see_table](SearchMove& a, SearchMove& b) {
-        bool a_is_prom = a.is_promotion();
-        bool b_is_prom = b.is_promotion();
-        if (a_is_prom && !b_is_prom) {
-            return true;
-        }
-        if (!a_is_prom && b_is_prom) {
-            return false;
-        }
-
-        bool a_good_see = see_table[a.source()][a.destination()];
-        bool b_good_see = see_table[b.source()][b.destination()];
-        if (a_good_see && !b_good_see) {
-            return true;
-        }
-        if (!a_good_see && b_good_see) {
-            return false;
-        }
-
-        return a.value() > b.value();
-    });
     m_curr_move_range = { begin, m_moves_end };
 }
 
@@ -251,9 +224,6 @@ void MovePicker<QUIESCE>::generate_quiets() {
         score_move(*it);
     }
 
-    insertion_sort(begin, m_moves_end, [](SearchMove& a, SearchMove& b) {
-        return a.value() > b.value();
-    });
     m_curr_move_range = { begin, m_moves_end };
 }
 
@@ -393,7 +363,22 @@ inline SearchMove MovePicker<QUIESCE>::next() {
         return next();
     }
 
-    SearchMove move = *m_moves_it++;
+    SearchMove* move_ptr = m_moves_it;
+    i32 max_value = INT32_MIN;
+    for (auto it = move_ptr; it != m_curr_move_range.end; ++it) {
+        SearchMove& m = *it;
+        int value = m.value();
+        if (value <= max_value) {
+            continue;
+        }
+
+        max_value = value;
+        move_ptr = it;
+    }
+
+    SearchMove move = *move_ptr;
+    std::swap(*move_ptr, *m_moves_it);
+    m_moves_it++;
 
     // Prevent hash move revisits.
     if (move == m_hash_move) {

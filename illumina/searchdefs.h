@@ -63,6 +63,8 @@ enum BoundType : ui8 {
 // Search Moves
 //
 
+inline constexpr i32 UNINITIALIZED_SEARCHMOVE = INT32_MAX;
+
 class SearchMove : public Move {
 public:
     SearchMove(const Move& move = MOVE_NULL);
@@ -75,7 +77,7 @@ public:
     void reduce_value(i32 val);
 
 private:
-    i32 m_val;
+    i32 m_val = UNINITIALIZED_SEARCHMOVE;
 };
 
 inline SearchMove::SearchMove(const Move& move)
