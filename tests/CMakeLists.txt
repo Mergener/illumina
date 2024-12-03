@@ -1,4 +1,4 @@
-set(tests_src main.cpp suites/types.cpp suites/board.cpp suites/parsehelper.cpp suites/utils.cpp suites/attacks.cpp suites/perft.cpp suites/staticlist.cpp suites/boardutils.cpp suites/movepicker.cpp)
+set(tests_src main.cpp suites/types.cpp suites/board.cpp suites/parsehelper.cpp suites/utils.cpp suites/attacks.cpp suites/perft.cpp suites/staticlist.cpp suites/boardutils.cpp suites/movepicker.cpp suites/search.cpp)
 
 foreach(ARCH ${ARCHS})
     set(TARGET illumina_tests_${ARCH})
