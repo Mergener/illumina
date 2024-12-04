@@ -634,12 +634,19 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     depth = std::min(std::min(MAX_DEPTH, depth), m_root_depth * 2 - ply);
 
     // Compute the static eval. Useful for many heuristics.
+    // Note that raw_eval should not be used in singular searches.
     Score raw_eval;
     if (!in_check) {
-        raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
-        static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
-        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
-        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        if (node->skip_move == MOVE_NULL) {
+            raw_eval = !found_in_tt ? evaluate() : tt_entry.static_eval();
+            static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
+            TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
+            TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        }
+        else {
+            static_eval = node->static_eval;
+            raw_eval    = static_eval;
+        }
     }
     else {
         raw_eval    = 0;
