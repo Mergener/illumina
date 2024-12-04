@@ -438,6 +438,7 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         };
 
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
+        move.add_value(m_mv_hist->capture_history(move));
     }
     else {
         bool gives_check = m_board->gives_check(move);
