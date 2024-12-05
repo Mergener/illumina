@@ -22,10 +22,7 @@ public:
     void on_piece_removed(const Board& board, Piece p, Square s);
 
 private:
-    NNUE m_nnue;
-    Color m_ctm;
-
-    bool m_undoing_move = false;
+    Score m_eval;
 };
 
 } // illumina
