@@ -789,33 +789,33 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Singular extensions.
         Depth extensions = 0;
-        if (   !ROOT
-            && !in_check
-            && hash_move != MOVE_NULL
-            && node->skip_move == MOVE_NULL
-            && tt_entry.bound_type() != BT_UPPERBOUND
-            && depth >= 8
-            && move == hash_move
-            && tt_entry.depth() >= (depth - 3)
-            && std::abs(tt_entry.score()) < MATE_THRESHOLD
-            && !m_board.gives_check(move)) {
-            Score se_beta = tt_entry.score() - depth * 3;
-
-            node->skip_move = move;
-
-            TRACE_PUSH_SIBLING();
-            TRACE_SET(Traceable::SKIP_MOVE, node->skip_move);
-
-            Score score = pvs<TRACE, false>(depth / 2, se_beta - 1, se_beta, node);
-
-            TRACE_POP();
-
-            node->skip_move = MOVE_NULL;
-
-            if (score < se_beta) {
-                extensions++;
-            }
-        }
+//        if (   !ROOT
+//            && !in_check
+//            && hash_move != MOVE_NULL
+//            && node->skip_move == MOVE_NULL
+//            && tt_entry.bound_type() != BT_UPPERBOUND
+//            && depth >= 8
+//            && move == hash_move
+//            && tt_entry.depth() >= (depth - 3)
+//            && std::abs(tt_entry.score()) < MATE_THRESHOLD
+//            && !m_board.gives_check(move)) {
+//            Score se_beta = tt_entry.score() - depth * 3;
+//
+//            node->skip_move = move;
+//
+//            TRACE_PUSH_SIBLING();
+//            TRACE_SET(Traceable::SKIP_MOVE, node->skip_move);
+//
+//            Score score = pvs<TRACE, false>(depth / 2, se_beta - 1, se_beta, node);
+//
+//            TRACE_POP();
+//
+//            node->skip_move = MOVE_NULL;
+//
+//            if (score < se_beta) {
+//                extensions++;
+//            }
+//        }
 
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
@@ -990,7 +990,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // We have an exact score.
             tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_EXACT);
 
-            // Update corrhist.
+//            // Update corrhist.
             if (   !in_check
                    && (best_move == MOVE_NULL || best_move.is_quiet())
                    && alpha >= static_eval) {

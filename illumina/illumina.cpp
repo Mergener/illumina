@@ -10,7 +10,6 @@ void init_attacks();
 void init_types();
 void init_zob();
 void init_search();
-void init_nnue();
 
 void init() {
     if (s_initialized) {
@@ -19,7 +18,6 @@ void init() {
 
     s_initialized = true;
 
-    init_nnue();
     init_types();
     init_zob();
     init_attacks();

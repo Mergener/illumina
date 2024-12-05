@@ -1,12 +1,8 @@
 #ifndef ILLUMINA_EVALUATION_H
 #define ILLUMINA_EVALUATION_H
 
-#include <istream>
-#include <ostream>
-
 #include "board.h"
 #include "searchdefs.h"
-#include "nnue.h"
 
 namespace illumina {
 
@@ -18,12 +14,41 @@ public:
     void on_undo_move(const Board& board, Move move);
     void on_make_null_move(const Board& board);
     void on_undo_null_move(const Board& board);
-    void on_piece_added(const Board& board, Piece , Square s);
+    void on_piece_added(const Board& board, Piece p, Square s);
     void on_piece_removed(const Board& board, Piece p, Square s);
 
 private:
-    Score m_eval;
+    Score m_score_white = 0;
+    Color m_ctm = CL_WHITE;
 };
+
+inline Score Evaluation::get() const {
+    return m_ctm == CL_WHITE ? m_score_white : -m_score_white;
+}
+
+inline void Evaluation::on_make_move(const Board& board, Move move) {
+    on_new_board(board);
+    m_ctm = opposite_color(m_ctm);
+}
+
+inline void Evaluation::on_undo_move(const Board& board, Move move) {
+    on_new_board(board);
+    m_ctm = opposite_color(m_ctm);
+}
+
+inline void Evaluation::on_make_null_move(const Board& board) {
+    m_ctm = opposite_color(m_ctm);
+}
+
+inline void Evaluation::on_undo_null_move(const Board& board) {
+    m_ctm = opposite_color(m_ctm);
+}
+
+inline void Evaluation::on_piece_added(const Board& board, Piece p, Square s) {
+}
+
+inline void Evaluation::on_piece_removed(const Board& board, Piece p, Square s) {
+}
 
 } // illumina
 

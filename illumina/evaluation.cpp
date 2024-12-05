@@ -1,7 +1,5 @@
 #include "evaluation.h"
 
-#include "endgame.h"
-
 namespace illumina {
 
 constexpr int START_PHASE = 9 * 2  +
@@ -220,7 +218,8 @@ static Score count_positional(const Board& board, int phase) {
     return total;
 }
 
-int evaluate(const Board& board) {
+void Evaluation::on_new_board(const Board& board) {
+    m_ctm = board.color_to_move();
     Score white_eval = 0;
     int phase = compute_phase(board);
 
@@ -233,37 +232,7 @@ int evaluate(const Board& board) {
     white_eval += count_positional<CL_WHITE, PT_QUEEN>(board, phase)  - count_positional<CL_BLACK, PT_QUEEN>(board, phase);
     white_eval += count_positional<CL_WHITE, PT_KING>(board, phase)   - count_positional<CL_BLACK, PT_KING>(board, phase);
 
-    return board.color_to_move() == CL_WHITE ? white_eval : -white_eval;
-}
-
-void Evaluation::on_new_board(const Board& board) {
-    m_eval = evaluate(board);
-}
-
-void Evaluation::on_make_move(const Board& board, Move move) {
-    m_eval = -evaluate(board);
-}
-
-void Evaluation::on_undo_move(const Board& board, Move move) {
-    m_eval = -evaluate(board);
-}
-
-void Evaluation::on_make_null_move(const Board& board) {
-    m_eval = -m_eval;
-}
-
-void Evaluation::on_undo_null_move(const Board& board) {
-    m_eval = -m_eval;
-}
-
-void Evaluation::on_piece_added(const Board &board, Piece p, Square s) {
-}
-
-void Evaluation::on_piece_removed(const Board &board, Piece p, Square s) {
-}
-
-Score Evaluation::get() const {
-    return m_eval;
+    m_score_white = white_eval;
 }
 
 } // illumina
