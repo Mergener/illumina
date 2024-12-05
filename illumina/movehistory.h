@@ -210,6 +210,10 @@ inline int MoveHistory::non_pawn_corrhist(const Board& board) const {
 
 inline int MoveHistory::correct_eval_with_corrhist(const Board& board,
                                                    int static_eval) const {
+    if (std::abs(static_eval) >= KNOWN_WIN) {
+        return static_eval;
+    }
+
     int unscaled_correction = pawn_corrhist(board)
                             + non_pawn_corrhist(board);
 
