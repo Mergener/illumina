@@ -35,16 +35,24 @@ static size_t feature_index(Square square, Piece piece) {
 
 void NNUE::clear() {
     // Copy all biases.
-    std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), m_accum.white.begin());
-    std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), m_accum.black.begin());
+    m_accum_stack.clear();
+
+    m_accum_stack.resize(1);
+    m_accum_stack.reserve(32);
+    Accumulator& accum = accumulator();
+
+    std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), accum.white.begin());
+    std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), accum.black.begin());
 }
 
 int NNUE::forward(Color color) const {
+    const Accumulator& accum = accumulator();
+
     if constexpr (L1_ACTIVATION == ActivationFunction::CReLU) {
         int sum = 0;
 
-        auto our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
-        auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+        auto our_accum = color == CL_WHITE ? accum.white : accum.black;
+        auto their_accum = color == CL_WHITE ? accum.black : accum.white;
 
         for (size_t i = 0; i < L1_SIZE; ++i) {
             int activated = std::clamp(int(our_accum[i]), 0, Q1);
@@ -61,8 +69,8 @@ int NNUE::forward(Color color) const {
     else if constexpr (L1_ACTIVATION == ActivationFunction::SCReLU) {
         int sum = 0;
 
-        auto our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
-        auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+        auto our_accum = color == CL_WHITE ? accum.white : accum.black;
+        auto their_accum = color == CL_WHITE ? accum.black : accum.white;
 
         for (size_t i = 0; i < L1_SIZE; ++i) {
             int activated = std::clamp(int(our_accum[i]), 0, Q1);
@@ -81,35 +89,46 @@ int NNUE::forward(Color color) const {
 }
 
 void NNUE::enable_feature(Square square, Piece piece) {
+    Accumulator& accum = accumulator();
+
     size_t white_idx = feature_index<CL_WHITE>(square, piece);
     size_t black_idx = feature_index<CL_BLACK>(square, piece);
 
     for (size_t i = 0; i < L1_SIZE; ++i) {
-        m_accum.white[i] += m_net->l1_weights[N_INPUTS * i + white_idx];
-        m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + black_idx];
+        accum.white[i] += m_net->l1_weights[N_INPUTS * i + white_idx];
+        accum.black[i] += m_net->l1_weights[N_INPUTS * i + black_idx];
     }
 }
 
 void NNUE::disable_feature(Square square, Piece piece) {
+    Accumulator& accum = accumulator();
+
     size_t white_idx = feature_index<CL_WHITE>(square, piece);
     size_t black_idx = feature_index<CL_BLACK>(square, piece);
 
     for (size_t i = 0; i < L1_SIZE; ++i) {
-        m_accum.white[i] -= m_net->l1_weights[N_INPUTS * i + white_idx];
-        m_accum.black[i] -= m_net->l1_weights[N_INPUTS * i + black_idx];
+        accum.white[i] -= m_net->l1_weights[N_INPUTS * i + white_idx];
+        accum.black[i] -= m_net->l1_weights[N_INPUTS * i + black_idx];
     }
 }
 
 void NNUE::push_accumulator() {
-    m_accum_stack.push_back(m_accum);
+    m_accum_stack.push_back(accumulator());
 }
 
 void NNUE::pop_accumulator() {
-    ILLUMINA_ASSERT(!m_accum_stack.empty());
-
-    m_accum = m_accum_stack.back();
+    ILLUMINA_ASSERT(m_accum_idx >= 0);
     m_accum_stack.pop_back();
 }
+
+Accumulator& NNUE::accumulator() {
+    return m_accum_stack.back();
+}
+
+const Accumulator& NNUE::accumulator() const {
+    return m_accum_stack.back();
+}
+
 
 NNUE::NNUE()
     : m_net(s_default_network) {

@@ -49,8 +49,10 @@ public:
 
 private:
     const EvalNetwork* m_net;
-    Accumulator m_accum {};
     std::vector<Accumulator> m_accum_stack;
+
+    Accumulator& accumulator();
+    const Accumulator& accumulator() const;
 };
 
 } // illumina
