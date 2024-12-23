@@ -410,6 +410,7 @@ TEST_CASE(PawnKeys) {
 TEST_CASE(LastMove) {
     Board board = Board::standard_startpos();
     EXPECT(board.last_move()).to_be(MOVE_NULL);
+    EXPECT(board.last_move(0)).to_be(MOVE_NULL);
     EXPECT(board.last_move(1)).to_be(MOVE_NULL);
     EXPECT(board.last_move(2)).to_be(MOVE_NULL);
 
@@ -418,6 +419,25 @@ TEST_CASE(LastMove) {
     board.make_move(Move::parse_uci(board, "g1f3"));
     board.make_move(Move::parse_uci(board, "b8c6"));
 
+    EXPECT(board.last_move().to_uci()).to_be("b8c6");
+    EXPECT(board.last_move(0).to_uci()).to_be("b8c6");
+    EXPECT(board.last_move(1).to_uci()).to_be("g1f3");
+    EXPECT(board.last_move(2).to_uci()).to_be("e7e5");
+    EXPECT(board.last_move(3).to_uci()).to_be("e2e4");
+    EXPECT(board.last_move(4)).to_be(MOVE_NULL);
+
+    board.make_null_move();
+    EXPECT(board.last_move()).to_be(MOVE_NULL);
+    EXPECT(board.last_move(0)).to_be(MOVE_NULL);
+    board.make_move(Move::parse_uci(board, "g8f6"));
+    EXPECT(board.last_move().to_uci()).to_be("g8f6");
+    EXPECT(board.last_move(1)).to_be(MOVE_NULL);
+    EXPECT(board.last_move(2).to_uci()).to_be("b8c6");
+
+    board.undo_move();
+    EXPECT(board.last_move()).to_be(MOVE_NULL);
+    EXPECT(board.last_move(0)).to_be(MOVE_NULL);
+    board.undo_null_move();
     EXPECT(board.last_move().to_uci()).to_be("b8c6");
     EXPECT(board.last_move(0).to_uci()).to_be("b8c6");
     EXPECT(board.last_move(1).to_uci()).to_be("g1f3");

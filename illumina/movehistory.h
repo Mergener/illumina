@@ -132,8 +132,8 @@ inline void MoveHistory::reset() {
 }
 
 inline int MoveHistory::quiet_history(Move move, const Board& board) const {
-    bool gives_check = board.gives_check(move);
-    Move last_move = board.last_move();
+    bool gives_check    = board.gives_check(move);
+    Move last_move      = board.last_move();
     Move ply1_last_move = board.last_move(1);
 
     int weight_sum = MV_HIST_REGULAR_QHIST_WEIGHT
@@ -155,7 +155,6 @@ inline void MoveHistory::update_quiet_history(Move move,
     update_history_by_depth(m_data->quiet_history.get(move), depth, good);
 
     Move last_move = board.last_move();
-    bool gives_check = board.gives_check(move);
 
     if (last_move != MOVE_NULL) {
         update_history_by_depth(m_data->cont_hist[0].get(last_move).get(move), depth, good);
@@ -166,6 +165,7 @@ inline void MoveHistory::update_quiet_history(Move move,
         update_history_by_depth(m_data->cont_hist[1].get(ply1_last_move).get(move), depth, good);
     }
 
+    bool gives_check = board.gives_check(move);
     if (gives_check) {
         update_history_by_depth(m_data->check_history.get(move), depth, good);
     }
