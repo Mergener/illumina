@@ -12,6 +12,7 @@
 namespace illumina {
 
 static constexpr int MAX_HISTORY = 16384;
+static constexpr int N_CONTHIST_PLIES = 1;
 
 template <typename T>
 struct ButterflyArray : std::array<std::array<T, SQ_COUNT>, SQ_COUNT> {
@@ -46,10 +47,10 @@ private:
     // stack allocations, all history data is kept in an indirect fashion,
     // with its lifetime managed by a unique_ptr.
     struct Data {
-        std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
-        ButterflyArray<int> m_quiet_history {};
-        PieceToArray<PieceToArray<int>> m_counter_move_history {};
-        PieceToArray<int> m_check_history {};
+        std::array<std::array<Move, 2>, MAX_DEPTH> killers {};
+        ButterflyArray<int> quiet_history {};
+        std::array<PieceToArray<PieceToArray<int>>, 1> cont_hist {};
+        PieceToArray<int> check_history {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
@@ -79,7 +80,7 @@ const T& PieceToArray<T>::get(Move move) const {
 }
 
 inline const std::array<Move, 2>& MoveHistory::killers(Depth ply) const {
-    return m_data->m_killers[ply];
+    return m_data->killers[ply];
 }
 
 inline bool MoveHistory::is_killer(Depth ply, Move move) const {
@@ -88,7 +89,7 @@ inline bool MoveHistory::is_killer(Depth ply, Move move) const {
 }
 
 inline void MoveHistory::set_killer(Depth ply, Move killer) {
-    std::array<Move, 2>& arr = m_data->m_killers[ply];
+    std::array<Move, 2>& arr = m_data->killers[ply];
     if (killer == arr[0]) {
         return;
     }
@@ -106,9 +107,9 @@ inline int MoveHistory::quiet_history(Move move, Move last_move, bool gives_chec
                    + MV_HIST_CHECK_QHIST_WEIGHT;
 
     return int(
-               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->m_quiet_history.get(move))
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->m_counter_move_history.get(last_move).get(move))
-             + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? m_data->m_check_history.get(move) : 0))
+               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->quiet_history.get(move))
+             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->cont_hist[0].get(last_move).get(move))
+             + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? m_data->check_history.get(move) : 0))
              ) / weight_sum;
 }
 
@@ -117,13 +118,13 @@ inline void MoveHistory::update_quiet_history(Move move,
                                               Depth depth,
                                               bool gives_check,
                                               bool good) {
-    update_history(m_data->m_quiet_history.get(move), depth, good);
+    update_history(m_data->quiet_history.get(move), depth, good);
     if (last_move != MOVE_NULL) {
-        update_history(m_data->m_counter_move_history.get(last_move).get(move), depth, good);
+        update_history(m_data->cont_hist[0].get(last_move).get(move), depth, good);
     }
 
     if (gives_check) {
-        update_history(m_data->m_check_history.get(move), depth, good);
+        update_history(m_data->check_history.get(move), depth, good);
     }
 }
 
