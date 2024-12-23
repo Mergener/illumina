@@ -12,7 +12,7 @@
 namespace illumina {
 
 static constexpr int MAX_HISTORY = 16384;
-static constexpr int N_CONTHIST_PLIES = 1;
+static constexpr int N_CONTHIST_PLIES = 2;
 static constexpr size_t CORRHIST_ENTRIES = 16384;
 static constexpr int CORRHIST_GRAIN = 256;
 static constexpr int CORRHIST_BASE_WEIGHT = 1024;
@@ -53,11 +53,10 @@ public:
     int correct_eval_with_corrhist(const Board& board,
                                    int static_eval) const;
 
-    int  quiet_history(Move move, Move last_move, bool gives_check) const;
+    int  quiet_history(Move move, const Board& board) const;
     void update_quiet_history(Move move,
-                              Move last_move,
                               Depth depth,
-                              bool gives_check,
+                              const Board& board,
                               bool good);
 
     MoveHistory();
@@ -69,7 +68,7 @@ private:
     struct Data {
         std::array<std::array<Move, 2>, MAX_DEPTH> killers {};
         ButterflyArray<int> quiet_history {};
-        std::array<PieceToArray<PieceToArray<int>>, 1> cont_hist {};
+        std::array<PieceToArray<PieceToArray<int>>, N_CONTHIST_PLIES> cont_hist {};
         PieceToArray<int> check_history {};
         CorrhistTable pawn_corrhist;
         CorrhistTable non_pawn_corrhist;
@@ -132,26 +131,39 @@ inline void MoveHistory::reset() {
     std::memset(m_data.get(), 0, sizeof(Data));
 }
 
-inline int MoveHistory::quiet_history(Move move, Move last_move, bool gives_check) const {
+inline int MoveHistory::quiet_history(Move move, const Board& board) const {
+    bool gives_check = board.gives_check(move);
+    Move last_move = board.last_move();
+    Move ply1_last_move = board.last_move(1);
+
     int weight_sum = MV_HIST_REGULAR_QHIST_WEIGHT
-                   + MV_HIST_COUNTER_MOVE_WEIGHT
+                   + MV_HIST_CONTHIST_PLY_0_WEIGHT
                    + MV_HIST_CHECK_QHIST_WEIGHT;
 
     return int(
-               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->quiet_history.get(move))
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->cont_hist[0].get(last_move).get(move))
-             + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? m_data->check_history.get(move) : 0))
+               i64(MV_HIST_REGULAR_QHIST_WEIGHT  * m_data->quiet_history.get(move))
+             + i64(MV_HIST_CONTHIST_PLY_0_WEIGHT * m_data->cont_hist[0].get(last_move).get(move))
+             + i64(MV_HIST_CONTHIST_PLY_1_WEIGHT * m_data->cont_hist[1].get(ply1_last_move).get(move))
+             + i64(MV_HIST_CHECK_QHIST_WEIGHT    * (gives_check ? m_data->check_history.get(move) : 0))
              ) / weight_sum;
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
-                                              Move last_move,
                                               Depth depth,
-                                              bool gives_check,
+                                              const Board& board,
                                               bool good) {
     update_history_by_depth(m_data->quiet_history.get(move), depth, good);
+
+    Move last_move = board.last_move();
+    bool gives_check = board.gives_check(move);
+
     if (last_move != MOVE_NULL) {
         update_history_by_depth(m_data->cont_hist[0].get(last_move).get(move), depth, good);
+    }
+
+    Move ply1_last_move = board.last_move(1);
+    if (ply1_last_move != MOVE_NULL) {
+        update_history_by_depth(m_data->cont_hist[1].get(ply1_last_move).get(move), depth, good);
     }
 
     if (gives_check) {

@@ -406,3 +406,22 @@ TEST_CASE(PawnKeys) {
             .to_be(Board("4k3/2b2p1p/1p1ppn2/r5pb/1PpPP2r/2n2qP1/PKP5/RNBQ1BNR w - - 0 1").pawn_key());
     }
 }
+
+TEST_CASE(LastMove) {
+    Board board = Board::standard_startpos();
+    EXPECT(board.last_move()).to_be(MOVE_NULL);
+    EXPECT(board.last_move(1)).to_be(MOVE_NULL);
+    EXPECT(board.last_move(2)).to_be(MOVE_NULL);
+
+    board.make_move(Move::parse_uci(board, "e2e4"));
+    board.make_move(Move::parse_uci(board, "e7e5"));
+    board.make_move(Move::parse_uci(board, "g1f3"));
+    board.make_move(Move::parse_uci(board, "b8c6"));
+
+    EXPECT(board.last_move().to_uci()).to_be("b8c6");
+    EXPECT(board.last_move(0).to_uci()).to_be("b8c6");
+    EXPECT(board.last_move(1).to_uci()).to_be("g1f3");
+    EXPECT(board.last_move(2).to_uci()).to_be("e7e5");
+    EXPECT(board.last_move(3).to_uci()).to_be("e2e4");
+    EXPECT(board.last_move(4)).to_be(MOVE_NULL);
+}

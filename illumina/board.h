@@ -272,7 +272,7 @@ inline Move Board::last_move(int plies_before) const {
     auto it = m_prev_states.rbegin();
     while (plies_before--) {
         if (it == m_prev_states.rend()) {
-            break;
+            return MOVE_NULL;
         }
 
         state = &*it;

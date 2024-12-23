@@ -443,7 +443,7 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         bool gives_check = m_board->gives_check(move);
 
         // Adjust score based on move history.
-        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move(), gives_check));
+        move.add_value(m_mv_hist->quiet_history(move, *m_board));
 
         // Increase score of moves that give check.
         move.add_value(MV_PICKER_QUIET_CHECK_BONUS * gives_check);
