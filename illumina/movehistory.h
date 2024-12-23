@@ -53,9 +53,12 @@ public:
     int correct_eval_with_corrhist(const Board& board,
                                    int static_eval) const;
 
-    int  quiet_history(Move move, const Board& board) const;
+    int  quiet_history(Move move,
+                       Depth ply,
+                       const Board& board) const;
     void update_quiet_history(Move move,
                               Depth depth,
+                              Depth ply,
                               const Board& board,
                               bool good);
 
@@ -131,10 +134,12 @@ inline void MoveHistory::reset() {
     std::memset(m_data.get(), 0, sizeof(Data));
 }
 
-inline int MoveHistory::quiet_history(Move move, const Board& board) const {
+inline int MoveHistory::quiet_history(Move move,
+                                      Depth ply,
+                                      const Board& board) const {
     bool gives_check    = board.gives_check(move);
-    Move last_move      = board.last_move();
-    Move ply1_last_move = board.last_move(1);
+    Move last_move      = ply > 0 ? board.last_move()  : MOVE_NULL;
+    Move ply1_last_move = ply > 1 ? board.last_move(1) : MOVE_NULL;
 
     int weight_sum = MV_HIST_REGULAR_QHIST_WEIGHT
                    + MV_HIST_CONTHIST_PLY_0_WEIGHT
@@ -150,17 +155,17 @@ inline int MoveHistory::quiet_history(Move move, const Board& board) const {
 
 inline void MoveHistory::update_quiet_history(Move move,
                                               Depth depth,
+                                              Depth ply,
                                               const Board& board,
                                               bool good) {
     update_history_by_depth(m_data->quiet_history.get(move), depth, good);
 
-    Move last_move = board.last_move();
-
+    Move last_move = ply > 0 ? board.last_move() : MOVE_NULL;
     if (last_move != MOVE_NULL) {
         update_history_by_depth(m_data->cont_hist[0].get(last_move).get(move), depth, good);
     }
 
-    Move ply1_last_move = board.last_move(1);
+    Move ply1_last_move = ply > 1 ? board.last_move(1) : MOVE_NULL;
     if (ply1_last_move != MOVE_NULL) {
         update_history_by_depth(m_data->cont_hist[1].get(ply1_last_move).get(move), depth, good);
     }

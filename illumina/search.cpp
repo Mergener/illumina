@@ -833,6 +833,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
                 // Further reduce moves that have been historically very bad.
                 reductions += m_hist.quiet_history(move,
+                                                   ply,
                                                    m_board) <= LMR_BAD_HISTORY_THRESHOLD;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
@@ -897,6 +898,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 for (Move quiet: quiets_played) {
                     m_hist.update_quiet_history(quiet,
                                                 depth,
+                                                ply,
                                                 m_board,
                                                 quiet == best_move);
                 }
