@@ -1,5 +1,7 @@
 #include "search.h"
 
+#include <atomic>
+#include <limits.h>
 #include <cmath>
 #include <thread>
 #include <sstream>
@@ -58,7 +60,7 @@ public:
     bool should_stop() const;
 
     SearchContext(TranspositionTable* tt,
-                  bool* should_stop,
+                  std::atomic_bool* should_stop,
                   const Searcher::Listeners* listeners,
                   const RootInfo* root_info,
                   const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
@@ -68,7 +70,7 @@ private:
     TranspositionTable*        m_tt;
     const Searcher::Listeners* m_listeners;
     const RootInfo*            m_root_info;
-    bool*                      m_stop;
+    std::atomic_bool*          m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
     const std::vector<std::unique_ptr<SearchWorker>>* m_helper_workers;
@@ -79,7 +81,7 @@ TranspositionTable& SearchContext::tt() const {
 }
 
 bool SearchContext::should_stop() const {
-    return *m_stop;
+    return m_stop->load(std::memory_order_relaxed);
 }
 
 ui64 SearchContext::elapsed() const {
@@ -91,7 +93,7 @@ const Searcher::Listeners& SearchContext::listeners() const {
 }
 
 SearchContext::SearchContext(TranspositionTable* tt,
-                             bool* should_stop,
+                             std::atomic_bool* should_stop,
                              const Searcher::Listeners* listeners,
                              const RootInfo* root_info,
                              const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
@@ -104,7 +106,7 @@ SearchContext::SearchContext(TranspositionTable* tt,
       m_search_start(now()) { }
 
 void SearchContext::stop_search() const {
-    *m_stop = true;
+    m_stop->store(true, std::memory_order_relaxed);
 }
 
 TimeManager& SearchContext::time_manager() const {
@@ -141,7 +143,7 @@ public:
     const WorkerResults& results() const;
 
     SearchWorker(bool main,
-                 Board  board,
+                 const Board& board,
                  SearchContext* context,
                  const SearchSettings* settings);
     Board       m_board;
@@ -203,7 +205,7 @@ private:
 };
 
 void Searcher::stop() {
-    m_stop = true;
+    m_stop.store(true, std::memory_order_relaxed);
 }
 
 TranspositionTable& Searcher::tt() {
@@ -285,7 +287,7 @@ SearchResults Searcher::search(const Board& board,
 
     // Create search context.
     std::vector<std::unique_ptr<SearchWorker>> secondary_workers;
-    m_stop = false;
+    m_stop.store(false, std::memory_order::memory_order_seq_cst);
     m_tt.new_search();
     SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
 
@@ -315,12 +317,11 @@ SearchResults Searcher::search(const Board& board,
     // Determine the number of helper threads to be used.
     int n_helper_threads = std::max(1, settings.n_threads) - 1;
 
-    // Create secondary workers.
-    secondary_workers.resize(n_helper_threads);
-
     // Fire secondary threads.
+    secondary_workers.clear();
     std::vector<std::thread> helper_threads;
     for (int i = 0; i < n_helper_threads; ++i) {
+        secondary_workers.push_back(nullptr);
         helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
             secondary_workers[i] = std::make_unique<SearchWorker>(false, board, &context, &settings);
             secondary_workers[i]->iterative_deepening();
@@ -348,6 +349,10 @@ SearchResults Searcher::search(const Board& board,
     std::vector<WorkerResults> all_results;
     all_results.push_back(main_worker.results());
     for (std::unique_ptr<SearchWorker>& worker: secondary_workers) {
+        if (worker == nullptr) {
+            continue;
+        }
+
         all_results.push_back(worker->results());
     }
 
@@ -396,11 +401,15 @@ SearchResults Searcher::search(const Board& board,
 void SearchWorker::iterative_deepening() {
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
-        if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
-            // If we finished soft, we don't want to start a new iteration.
-            if (m_main) {
-                m_context->stop_search();
-            }
+        // If we finished soft, we don't want to start a new iteration.
+        if (   m_main
+            && m_root_depth > 2
+            && m_context->time_manager().finished_soft()) {
+            m_context->stop_search();
+        }
+
+        // Check if we need to interrupt the search.
+        if (should_stop()) {
             break;
         }
 
@@ -425,11 +434,16 @@ void SearchWorker::iterative_deepening() {
             aspiration_windows();
             m_results.searched_depth = m_root_depth;
             check_limits();
-            if (should_stop() || (m_root_depth > 2 && m_context->time_manager().finished_soft())) {
-                // If we finished soft, we don't want to start a new iteration.
-                if (m_main) {
-                    m_context->stop_search();
-                }
+
+            // If we finished soft, we don't want to start a new iteration.
+            if (   m_main
+                && m_root_depth > 2
+                && m_context->time_manager().finished_soft()) {
+                m_context->stop_search();
+            }
+
+            // Check if we need to interrupt the search.
+            if (should_stop()) {
                 break;
             }
 
@@ -570,7 +584,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     TranspositionTable& tt = m_context->tt();
     Score original_alpha   = alpha;
     int n_searched_moves   = 0;
-    Move best_move         = MOVE_NULL;
     Move hash_move         = MOVE_NULL;
     ui64  board_key        = m_board.hash_key();
     bool in_check          = m_board.in_check();
@@ -582,16 +595,21 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry, node->ply);
+    bool found_in_tt = tt.probe(board_key, tt_entry, node->ply)
+                    && (   hash_move == MOVE_NULL
+                        || (   m_board.is_move_pseudo_legal(hash_move)
+                            && m_board.is_move_legal(hash_move)));
+
     if (found_in_tt) {
         hash_move = tt_entry.move();
+
         TRACE_SET(Traceable::FOUND_IN_TT, true);
 
         if (   !PV
             && node->skip_move == MOVE_NULL
             && tt_entry.depth() >= depth) {
             if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
-                // TT Cuttoff.
+                // TT Cutoff.
                 TRACE_SET(Traceable::TT_CUTOFF, true);
                 return tt_entry.score();
             }
@@ -616,10 +634,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     depth = std::min(std::min(MAX_DEPTH, depth), m_root_depth * 2 - ply);
 
     // Compute the static eval. Useful for many heuristics.
+    Score raw_eval;
     if (!in_check) {
-        static_eval = !found_in_tt ? evaluate() : tt_entry.static_eval();
+        raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
+        static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
+        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
     }
     else {
+        raw_eval    = 0;
         static_eval = 0;
     }
     TRACE_SET(Traceable::STATIC_EVAL, static_eval);
@@ -693,6 +716,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     SearchMove move {};
+    Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
     Score best_score = -MATE_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
@@ -833,6 +857,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
             score = -pvs<TRACE, false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
+
+            if (score > alpha && reductions > 1) {
+                TRACE_PUSH_SIBLING();
+                score = -pvs<TRACE, false>(depth - 1 + extensions, -alpha - 1, -alpha, node + 1);
+                TRACE_POP();
+            }
+
             if (score > alpha && score < beta) {
                 TRACE_PUSH_SIBLING();
                 score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
@@ -916,6 +947,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Check if we have a checkmate or stalemate.
     if (!has_legal_moves) {
+        if (node->skip_move != MOVE_NULL) {
+            return alpha;
+        }
+
         Score score = m_board.in_check() ? (-MATE_SCORE + ply) : 0;
         TRACE_SET(Traceable::SCORE, score);
         return score;
@@ -930,16 +965,37 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_LOWERBOUND);
+            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_LOWERBOUND);
+
+            // Update corrhist.
+            if (   !in_check
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
             tt.try_store(board_key,
                          ply, best_move,
                          n_searched_moves > 0 ? best_score : alpha,
-                         depth, static_eval, BT_UPPERBOUND);
+                         depth, raw_eval, BT_UPPERBOUND);
+
+            // Update corrhist.
+            if (   !in_check
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha <= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         } else {
             // We have an exact score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_EXACT);
+            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_EXACT);
+
+            // Update corrhist.
+            if (   !in_check
+                   && (best_move == MOVE_NULL || best_move.is_quiet())
+                   && alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         }
     }
 
@@ -961,6 +1017,9 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
 
     Score stand_pat = evaluate();
+    if (!m_board.in_check()) {
+        stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
+    }
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
     if (stand_pat >= beta) {
@@ -1163,11 +1222,11 @@ bool SearchWorker::should_stop() const {
 }
 
 SearchWorker::SearchWorker(bool main,
-                           Board board,
+                           const Board& board,
                            SearchContext* context,
                            const SearchSettings* settings)
     : m_main(main),
-      m_board(std::move(board)),
+      m_board(board),
       m_context(context),
       m_settings(settings),
       m_eval_random_margin(m_main

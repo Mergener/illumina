@@ -4,6 +4,7 @@
 #include <functional>
 #include <optional>
 #include <memory>
+#include <atomic>
 
 #include "board.h"
 #include "timemanager.h"
@@ -68,14 +69,13 @@ public:
 
     Searcher() = default;
     Searcher(const Searcher& other) = delete;
-    Searcher(Searcher&& other) = default;
     explicit Searcher(TranspositionTable&& tt);
     ~Searcher() = default;
 
 private:
     bool m_searching = false;
 
-    bool m_stop = false;
+    std::atomic_bool m_stop = false;
     TranspositionTable m_tt;
 
     TimeManager m_tm;
