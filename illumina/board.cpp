@@ -917,6 +917,134 @@ Board Board::random_frc_startpos(bool mirrored) {
     return board;
 }
 
+bool Board::detect_frc() const {
+    constexpr Square STANDARD_KING_SQUARE[] = { SQ_E1, SQ_E8 };
+
+    for (Side side: SIDES) {
+        for (Color color: COLORS) {
+            if (!has_castling_rights(color, side)) {
+                continue;
+            }
+
+            if (   king_square(color) != STANDARD_KING_SQUARE[color]
+                || castle_rook_square(color, side) != standard_castle_rook_src_square(color, side)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool Board::is_repetition_draw(int max_appearances) const {
+    int appearances = 1;
+
+    for (auto it = m_prev_states.crbegin(); it != m_prev_states.crend(); ++it) {
+        const auto& state = *it;
+
+        if (state.last_move.makes_progress()) {
+            break;
+        }
+        if (state.hash_key == m_state.hash_key) {
+            appearances++;
+            if (appearances == max_appearances) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+bool Board::color_has_sufficient_material(Color color) const {
+    Bitboard pawns = piece_bb(Piece(color, PT_PAWN));
+    if (pawns) {
+        return true;
+    }
+
+    Bitboard heavy_pieces = piece_bb(Piece(color, PT_ROOK)) | piece_bb(Piece(color, PT_QUEEN));
+    if (heavy_pieces) {
+        return true;
+    }
+
+    Bitboard minor_pieces_and_king = color_bb(color);
+    ui64 n_minor_pieces = popcount(minor_pieces_and_king) - 1;
+    if (n_minor_pieces > 2) {
+        return true;
+    }
+
+    if (n_minor_pieces == 2) {
+        // We have two minor pieces. We can deliver mate with either knight + bishop
+        // or two opposite colored bishops.
+        Bitboard knight_bb = piece_bb(Piece(color, PT_KNIGHT));
+        Bitboard bishop_bb = piece_bb(Piece(color, PT_BISHOP));
+
+        if (bishop_bb && knight_bb) {
+            return true;
+        }
+
+        if (bishop_bb) {
+            return (bishop_bb & LIGHT_SQUARES) && (bishop_bb & DARK_SQUARES);
+        }
+    }
+
+    return false;
+}
+
+bool Board::gives_check(Move move) const {
+    // Normal check.
+    Piece p      = move.source_piece();
+    Color c      = p.color();
+    Square ks    = king_square(opposite_color(c));
+    Bitboard occ = occupancy();
+    Bitboard atks_from_dest = piece_attacks(p, move.destination(), occ);
+
+    if (bit_is_set(atks_from_dest, ks)) {
+        return true;
+    }
+
+    // Check if we can have a potential discovered check.
+    Bitboard between = between_bb(move.source(), ks);
+    if (bit_is_set(between, move.destination())) {
+        // Piece is moving along the line between it and the king.
+        // No discovered check is happening.
+        return false;
+    }
+
+    // Discovered check -- remove the piece from the occupancy and see
+    // if a slider would attack the king.
+    Bitboard disc_occ = unset_bit(occ, move.source());
+    Bitboard queens = piece_bb(Piece(c, PT_QUEEN));
+    Bitboard vert_sliders = queens | piece_bb(Piece(c, PT_ROOK));
+    Bitboard diag_sliders = queens | piece_bb(Piece(c, PT_BISHOP));
+
+    if (move.type() == MT_EN_PASSANT) {
+        disc_occ = unset_bit(disc_occ, ep_square() - pawn_push_direction(c));
+    }
+
+    if ((bishop_attacks(ks, disc_occ) & diag_sliders) != 0) {
+        // Discovered diagonal attack.
+        return true;
+    }
+    if ((rook_attacks(ks, disc_occ) & vert_sliders) != 0) {
+        // Discovered diagonal attack.
+        return true;
+    }
+
+    // Promotion check -- check if the newly promoted piece
+    // checks the king. We can use the discovered attacks occupancy
+    // since the square previously occupied by the pawn won't
+    // be occupied after the promotion.
+    if (move.is_promotion()) {
+        if (bit_is_set(piece_attacks(Piece(c, move.promotion_piece_type()), move.destination(), disc_occ), ks)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // Board constructors below.
 // We don't use default copy/assignment constructor implementations since
 // we don't want listeners to be copied from a board object to another.

@@ -25,21 +25,28 @@ static void flush_logs(bool sort) {
     }
 }
 
-template <bool ROOT = false, bool LOG = false>
+template <bool BULK, bool ROOT = false, bool LOG = false>
 static ui64 perft(Board& board, int depth) {
     Move moves[MAX_GENERATED_MOVES];
 
     Move* end = generate_moves(board, moves);
 
-    if (depth <= 1) {
-        if constexpr (ROOT && LOG) {
-            for (Move* it = moves; it != end; ++it) {
-                Move move = *it;
-                log_move(move, 1);
+    if constexpr (BULK) {
+        if (depth <= 1) {
+            if constexpr (ROOT && LOG) {
+                for (Move* it = moves; it != end; ++it) {
+                    Move move = *it;
+                    log_move(move, 1);
+                }
             }
-        }
 
-        return end - moves;
+            return end - moves;
+        }
+    }
+    else {
+        if (depth <= 0) {
+            return 1;
+        }
     }
 
     ui64 n = 0;
@@ -47,7 +54,7 @@ static ui64 perft(Board& board, int depth) {
         Move move = *it;
 
         board.make_move(move);
-        ui64 it_leaves = perft<false, false>(board, depth - 1);
+        ui64 it_leaves = perft<BULK, false, false>(board, depth - 1);
         board.undo_move();
 
         if constexpr (ROOT && LOG) {
@@ -66,7 +73,13 @@ ui64 perft(const Board& board, int depth, PerftArgs args) {
         log_init();
 
         TimePoint before = now();
-        ui64 res         = perft<true, true>(replica, depth);
+        ui64 res;
+        if (args.bulk) {
+            res = perft<true, true, true>(replica, depth);
+        }
+        else {
+            res = perft<false, true, true>(replica, depth);
+        }
         TimePoint after  = now();
         ui64 time_delta  = delta_ms(after, before);
 

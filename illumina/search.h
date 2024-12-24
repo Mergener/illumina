@@ -4,9 +4,11 @@
 #include <functional>
 #include <optional>
 #include <memory>
+#include <atomic>
 
 #include "board.h"
 #include "timemanager.h"
+#include "tracing.h"
 #include "types.h"
 #include "transpositiontable.h"
 
@@ -38,6 +40,7 @@ struct SearchSettings {
     std::optional<i64>   black_inc;
     std::optional<i64>   move_time;
     std::optional<std::vector<Move>> search_moves;
+    ISearchTracer* tracer = nullptr;
 };
 
 struct SearchResults {
@@ -66,14 +69,13 @@ public:
 
     Searcher() = default;
     Searcher(const Searcher& other) = delete;
-    Searcher(Searcher&& other) = default;
     explicit Searcher(TranspositionTable&& tt);
     ~Searcher() = default;
 
 private:
     bool m_searching = false;
 
-    bool m_stop = false;
+    std::atomic_bool m_stop = false;
     TranspositionTable m_tt;
 
     TimeManager m_tm;

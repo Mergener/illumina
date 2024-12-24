@@ -3,6 +3,8 @@
 
 #include <array>
 #include <vector>
+#include <istream>
+#include <sstream>
 
 #include "types.h"
 

@@ -56,6 +56,8 @@ public:
     bool           in_check() const;
     bool           in_double_check() const;
     ui64           hash_key() const;
+    ui64           pawn_key() const;
+    ui64           non_pawn_key() const;
     Square         castle_rook_square(Color color, Side side) const;
     void           set_castle_rook_square(Color color, Side side, Square square);
     int            rule50() const;
@@ -78,6 +80,7 @@ public:
     bool           is_insufficient_material_draw() const;
     bool           color_has_sufficient_material(Color color) const;
     BoardResult    result() const;
+    bool           detect_frc() const;
 
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
@@ -146,6 +149,8 @@ private:
         Move last_move   = MOVE_NULL;
         Square ep_square = SQ_NULL;
         ui64 hash_key    = EMPTY_BOARD_HASH_KEY;
+        ui64 pawn_key    = EMPTY_BOARD_HASH_KEY;
+        ui64 non_pawn_key = EMPTY_BOARD_HASH_KEY;
         ui16 rule50      = 0;
         ui8 n_checkers   = 0;
         CastlingRights castle_rights = CR_NONE;
@@ -221,6 +226,14 @@ inline bool Board::in_double_check() const {
 
 inline ui64 Board::hash_key() const {
     return m_state.hash_key;
+}
+
+inline ui64 Board::pawn_key() const {
+    return m_state.pawn_key;
+}
+
+inline ui64 Board::non_pawn_key() const {
+    return m_state.pawn_key;
 }
 
 inline int Board::ply_count() const {
@@ -361,6 +374,8 @@ inline void Board::piece_added(Square s, Piece p) {
 
     if constexpr (DO_ZOB) {
         m_state.hash_key ^= zob_piece_square_key(p, s);
+        m_state.pawn_key ^= (p.type() == PT_PAWN) * zob_piece_square_key(Piece(p.color(), PT_PAWN), s);
+        m_state.non_pawn_key ^= (p.type() != PT_PAWN) * zob_piece_square_key(Piece(p.color(), PT_PAWN), s);
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
@@ -386,6 +401,8 @@ inline void Board::piece_removed(Square s) {
 
     if constexpr (DO_ZOB) {
         m_state.hash_key ^= zob_piece_square_key(prev_piece, s);
+        m_state.pawn_key ^= (prev_piece.type() == PT_PAWN) * zob_piece_square_key(Piece(prev_piece.color(), PT_PAWN), s);
+        m_state.non_pawn_key ^= (prev_piece.type() != PT_PAWN) * zob_piece_square_key(Piece(prev_piece.color(), PT_PAWN), s);
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
@@ -394,120 +411,12 @@ inline void Board::piece_removed(Square s) {
     }
 }
 
-inline bool Board::is_repetition_draw(int max_appearances) const {
-    int appearances = 1;
-
-    for (auto it = m_prev_states.crbegin(); it != m_prev_states.crend(); ++it) {
-        const auto& state = *it;
-
-        if (state.last_move.makes_progress()) {
-            break;
-        }
-        if (state.hash_key == m_state.hash_key) {
-            appearances++;
-            if (appearances == max_appearances) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 inline bool Board::is_50_move_rule_draw() const {
     return rule50() >= 100;
 }
 
-inline bool Board::color_has_sufficient_material(Color color) const {
-    Bitboard pawns = piece_bb(Piece(color, PT_PAWN));
-    if (pawns) {
-        return true;
-    }
-
-    Bitboard heavy_pieces = piece_bb(Piece(color, PT_ROOK)) | piece_bb(Piece(color, PT_QUEEN));
-    if (heavy_pieces) {
-        return true;
-    }
-
-    Bitboard minor_pieces_and_king = color_bb(color);
-    ui64 n_minor_pieces = popcount(minor_pieces_and_king) - 1;
-    if (n_minor_pieces > 2) {
-        return true;
-    }
-
-    if (n_minor_pieces == 2) {
-        // We have two minor pieces. We can deliver mate with either knight + bishop
-        // or two opposite colored bishops.
-        Bitboard knight_bb = piece_bb(Piece(color, PT_KNIGHT));
-        Bitboard bishop_bb = piece_bb(Piece(color, PT_BISHOP));
-
-        if (bishop_bb && knight_bb) {
-            return true;
-        }
-
-        if (bishop_bb) {
-            return (bishop_bb & LIGHT_SQUARES) && (bishop_bb & DARK_SQUARES);
-        }
-    }
-
-    return false;
-}
-
 inline bool Board::is_insufficient_material_draw() const {
     return !color_has_sufficient_material(CL_WHITE) && !color_has_sufficient_material(CL_BLACK);
-}
-
-inline bool Board::gives_check(Move move) const {
-    // Normal check.
-    Piece p      = move.source_piece();
-    Color c      = p.color();
-    Square ks    = king_square(opposite_color(c));
-    Bitboard occ = occupancy();
-    Bitboard atks_from_dest = piece_attacks(p, move.destination(), occ);
-
-    if (bit_is_set(atks_from_dest, ks)) {
-        return true;
-    }
-
-    // Check if we can have a potential discovered check.
-    Bitboard between = between_bb(move.source(), ks);
-    if (bit_is_set(between, move.destination())) {
-        // Piece is moving along the line between it and the king.
-        // No discovered check is happening.
-        return false;
-    }
-
-    // Discovered check -- remove the piece from the occupancy and see
-    // if a slider would attack the king.
-    Bitboard disc_occ = unset_bit(occ, move.source());
-    Bitboard queens = piece_bb(Piece(c, PT_QUEEN));
-    Bitboard vert_sliders = queens | piece_bb(Piece(c, PT_ROOK));
-    Bitboard diag_sliders = queens | piece_bb(Piece(c, PT_BISHOP));
-
-    if (move.type() == MT_EN_PASSANT) {
-        disc_occ = unset_bit(disc_occ, ep_square() - pawn_push_direction(c));
-    }
-
-    if ((bishop_attacks(ks, disc_occ) & diag_sliders) != 0) {
-        // Discovered diagonal attack.
-        return true;
-    }
-    if ((rook_attacks(ks, disc_occ) & vert_sliders) != 0) {
-        // Discovered diagonal attack.
-        return true;
-    }
-
-    // Promotion check -- check if the newly promoted piece
-    // checks the king. We can use the discovered attacks occupancy
-    // since the square previously occupied by the pawn won't
-    // be occupied after the promotion.
-    if (move.is_promotion()) {
-        if (bit_is_set(piece_attacks(Piece(c, move.promotion_piece_type()), move.destination(), disc_occ), ks)) {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>

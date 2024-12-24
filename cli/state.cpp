@@ -11,6 +11,10 @@
 #include "transpositiontable.h"
 #include "tunablevalues.h"
 
+#ifdef TRACING_ENABLED
+#include "searchtracer.h"
+#endif
+
 namespace illumina {
 
 //
@@ -56,6 +60,8 @@ void State::new_game() {
 void State::display_board() const {
     std::cout << m_board.pretty()         << std::endl;
     std::cout << "FEN: " << m_board.fen(m_options.option<UCIOptionCheck>("UCI_Chess960").value()) << std::endl;
+    std::cout << "Zob Key: 0x" << std::hex << m_board.hash_key() << std::dec << std::endl;
+    std::cout << "Zob Key (i64, base 10): " << i64(m_board.hash_key()) << std::endl;
 }
 
 const Board& State::board() const {
@@ -67,6 +73,7 @@ void State::set_board(const Board& board) {
 }
 
 void State::bench() const {
+#ifndef OPENBENCH_COMPLIANCE
     BenchSettings settings = default_bench_settings();
 
     std::cout << "Starting bench...\n" << std::endl;
@@ -89,10 +96,15 @@ void State::bench() const {
     std::cout << "\tTotal search time:    "  << results.search_time_ms << " ms" << std::endl;
     std::cout << "\tTotal searched nodes: "  << results.total_nodes << std::endl;
     std::cout << "\tNodes/sec:            "  << results.nps << std::endl;
+#else
+    BenchSettings settings = default_bench_settings();
+    BenchResults results = illumina::bench(settings);
+    std::cout << results.total_nodes << " nodes " << results.nps << " nps" << std::endl;
+#endif
 }
 
-void State::perft(int depth) const {
-    illumina::perft(m_board, depth, { true });
+void State::perft(int depth, bool bulk) const {
+    illumina::perft(m_board, depth, { true, false, bulk });
 }
 
 void State::mperft(int depth) const {
@@ -284,7 +296,43 @@ void State::setup_searcher() {
     });
 }
 
-void State::search(SearchSettings settings) {
+void State::search(SearchSettings settings, bool trace) {
+    // Prepare some search settings before searching based on UCI options.
+    settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
+    settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
+    settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
+    settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
+    settings.eval_rand_seed     = m_eval_random_seed;
+
+    // User might want to override number of search nodes.
+    // This is useful when performing node-odds testing on a GUI that
+    // doesn't support this type of odds. The GUI can send go nodes X
+    // and OverrideNodesLimit allows Illumina to bypass this instruction.
+    ui64 node_option = m_options.option<UCIOptionSpin>("OverrideNodesLimit").value();
+    if (node_option != 0) {
+        settings.max_nodes = node_option;
+    }
+
+    // Setup search tracing (if build supports it).
+    std::shared_ptr<ISearchTracer> tracer = nullptr;
+    if (trace) {
+#ifndef TRACING_ENABLED
+        std::cout << "info string Tracing is not enabled in this version -- option skipped." << std::endl;
+#else
+        try {
+            std::string trace_path = m_options.option<UCIOptionString>("TraceFile").value();
+            size_t trace_batch_size = m_options.option<UCIOptionSpin>("TraceBatchSize").value();
+            tracer = std::make_shared<SearchTracer>(trace_path, trace_batch_size);
+            settings.tracer = tracer.get();
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Caught exception when initializing tracer (search will continue but tracing will be disabled):\n" << e.what() << std::endl;
+            settings.tracer = nullptr;
+        }
+#endif
+    }
+
+    // Prevent invoking two simultaneous searches.
     if (m_searching) {
         std::cerr << "Already searching." << std::endl;
         return;
@@ -295,19 +343,10 @@ void State::search(SearchSettings settings) {
         delete m_search_thread;
     }
 
-    settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
-    settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
-    settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
-    settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
-    settings.eval_rand_seed     = m_eval_random_seed;
-
-    // User might want to override number of search nodes.
-    ui64 node_option = m_options.option<UCIOptionSpin>("OverrideNodesLimit").value();
-    if (node_option != 0) {
-        settings.max_nodes = node_option;
-    }
-
-    m_search_thread = new std::thread([this, settings]() {
+    // Finally, fire the search thread.
+    // Note that we need to capture the tracer in the lambda in order
+    // to keep the tracer object alive.
+    m_search_thread = new std::thread([this, settings, tracer]() {
         try {
             m_search_start = Clock::now();
             SearchResults results = m_searcher.search(m_board, settings);
@@ -346,11 +385,11 @@ static void add_tuning_option(UCIOptionManager& options,
                               int min = INT_MIN,
                               int max = INT_MAX) {
     options.register_option<UCIOptionSpin>(opt_name, default_value, min, max)
-            .add_update_handler([&opt_ref](const UCIOption& opt) {
-                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
-                opt_ref = spin.value();
-                recompute_search_constants();
-            });
+           .add_update_handler([&opt_ref](const UCIOption& opt) {
+               const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+               opt_ref = spin.value();
+               recompute_search_constants();
+           });
 }
 
 static void add_tuning_option(UCIOptionManager& options,
@@ -359,6 +398,7 @@ static void add_tuning_option(UCIOptionManager& options,
                               double default_value,
                               double min = -0x100000,
                               double max = 0x100000) {
+#ifndef OPENBENCH_COMPLIANCE
     options.register_option<UCIOptionSpin>(opt_name + std::string("_FP"),
                                            default_value * 1000,
                                            min * 1000,
@@ -368,6 +408,15 @@ static void add_tuning_option(UCIOptionManager& options,
                 opt_ref = double(spin.value()) / 1000.0;
                 recompute_search_constants();
             });
+#else
+    options.register_option<UCIOptionString>(opt_name + std::string("_FP"),
+                                             std::to_string(default_value))
+            .add_update_handler([&opt_ref](const UCIOption& opt) {
+                const auto& spin = dynamic_cast<const UCIOptionString&>(opt);
+                opt_ref = std::stod(spin.value());
+                recompute_search_constants();
+            });
+#endif
 }
 #endif
 
@@ -395,6 +444,11 @@ void State::register_options() {
                                                          name, \
                                                          __VA_ARGS__);
 #include "tunablevalues.def"
+#endif
+
+#ifdef TRACING_ENABLED
+    m_options.register_option<UCIOptionString>("TraceFile", "traces.db");
+    m_options.register_option<UCIOptionSpin>("TraceBatchSize", DEFAULT_TRACER_BATCH_SIZE, 0, INT32_MAX);
 #endif
 }
 

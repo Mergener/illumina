@@ -99,7 +99,12 @@ void register_commands(CLIApplication& server) {
     });
 
     server.register_command("perft", [](const CommandContext& ctx) {
-        global_state().perft(int(ctx.int_after("")));
+        if (ctx.has_arg("nobulk")) {
+            global_state().perft(int(ctx.int_after("nobulk")), false);
+        }
+        else {
+            global_state().perft(int(ctx.int_after("")), true);
+        }
     });
 
     server.register_command("mperft", [](const CommandContext& ctx) {
@@ -142,6 +147,11 @@ void register_commands(CLIApplication& server) {
             settings.max_nodes = ctx.int_after("nodes");
         }
 
+        bool trace = false;
+        if (ctx.has_arg("trace")) {
+            trace = true;
+        }
+
         if (ctx.has_arg("searchmoves")) {
             // Parse all searchmoves.
             std::vector<Move> search_moves;
@@ -158,7 +168,7 @@ void register_commands(CLIApplication& server) {
             settings.search_moves = search_moves;
         }
 
-        global_state().search(settings);
+        global_state().search(settings, trace);
     });
 
     server.register_command("stop", [](const CommandContext& ctx) {

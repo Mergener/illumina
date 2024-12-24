@@ -2,6 +2,7 @@
 
 #include <random>
 #include <mutex>
+#include <algorithm>
 
 namespace illumina {
 
@@ -70,6 +71,18 @@ Square random_square(Bitboard allowed_squares) {
     }
 
     return ret;
+}
+
+std::string lower_case(std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+    return str;
+}
+
+std::string upper_case(std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(),
+                   [](unsigned char c){ return std::toupper(c); });
+    return str;
 }
 
 } // illumina

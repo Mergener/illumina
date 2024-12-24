@@ -1,5 +1,9 @@
 set(cli_src main.cpp cliapplication.cpp cliapplication.h commands.h commands.cpp state.cpp state.h ucioption.h ucioption.cpp)
 
+if (INCLUDE_TRACING_MODULE OR NOT DEVELOPMENT)
+    set(cli_src ${cli_src} searchtracer.cpp searchtracer.h)
+endif()
+
 foreach (ARCH ${ARCHS})
     set(TARGET illumina_cli_${ARCH})
     add_executable(${TARGET} ${cli_src})
@@ -13,6 +17,13 @@ foreach (ARCH ${ARCHS})
     else()
         set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME illumina_${ILLUMINA_VERSION_NAME}_${ARCH}_${SYS_NAME}_${SYS_BITS}-bit)
     endif()
+
+    if (INCLUDE_TRACING_MODULE OR NOT DEVELOPMENT)
+        target_link_libraries(${TARGET} PRIVATE SQLiteCpp)
+        target_include_directories(${TARGET} PRIVATE ${ILLUMINA_EXT_DIR}/SQLiteCpp/include)
+    endif()
+
+    target_include_directories(${TARGET} PRIVATE ${ILLUMINA_EXT_DIR}/rang)
 
     target_link_libraries(${TARGET} PRIVATE illumina_lib_${ARCH})
     target_include_directories(${TARGET} PRIVATE ${ILLUMINA_LIBRARY_SOURCE_DIR})

@@ -19,14 +19,14 @@ public:
 
     // Debug
     void bench() const;
-    void perft(int depth) const;
+    void perft(int depth, bool bulk) const;
     void mperft(int depth) const;
 
     // Evaluation
     void evaluate() const;
 
     // Search
-    void search(SearchSettings settings);
+    void search(SearchSettings settings, bool trace);
     void stop_search();
 
     // Misc
