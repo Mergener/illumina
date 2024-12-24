@@ -48,8 +48,8 @@ int NNUE::forward(Color color) const {
     constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
     __m256i sum = _mm256_setzero_si256();
 
-    auto our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
-    auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+    auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
+    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
     for (int i = 0; i < L1_SIZE / STRIDE; ++i)
     {
@@ -85,8 +85,8 @@ int NNUE::forward(Color color) const {
 #else
     int sum = 0;
 
-    auto our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
-    auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+    auto& our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
+    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
     for (size_t i = 0; i < L1_SIZE; ++i) {
         int activated = std::clamp(int(our_accum[i]), 0, Q1);
