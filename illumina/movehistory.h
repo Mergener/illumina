@@ -141,9 +141,10 @@ inline int MoveHistory::quiet_history(Move move,
     Move last_move      = ply > 0 ? board.last_move()  : MOVE_NULL;
     Move ply1_last_move = ply > 1 ? board.last_move(1) : MOVE_NULL;
 
-    int weight_sum = MV_HIST_REGULAR_QHIST_WEIGHT
-                   + MV_HIST_CONTHIST_PLY_0_WEIGHT
-                   + MV_HIST_CHECK_QHIST_WEIGHT;
+    constexpr int weight_sum = MV_HIST_REGULAR_QHIST_WEIGHT
+                             + MV_HIST_CONTHIST_PLY_0_WEIGHT
+                             + MV_HIST_CONTHIST_PLY_1_WEIGHT
+                             + MV_HIST_CHECK_QHIST_WEIGHT;
 
     return int(
                i64(MV_HIST_REGULAR_QHIST_WEIGHT  * m_data->quiet_history.get(move))
