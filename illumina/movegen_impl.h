@@ -588,7 +588,7 @@ TMOVE* generate_evasions_by_color(const Board& board, TMOVE* moves) {
             while (ep_blockers) {
                 Square pawn_sq = lsb(ep_blockers);
 
-                if (!bit_is_set(board.pinned_bb(), pawn_sq)) {
+                if (!board.is_pinned(pawn_sq)) {
                     *moves++ = Move::new_en_passant_capture(pawn_sq, board.ep_square(), C);
                 }
 
@@ -609,7 +609,7 @@ TMOVE* generate_evasions_by_color(const Board& board, TMOVE* moves) {
 
                 // A piece can only block a check if it's not being pinned
                 // from another angle.
-                if (!bit_is_set(board.pinned_bb(), blocker_sq)) {
+                if (!board.is_pinned(blocker_sq)) {
                     // Blocker is not pinned.
                     if (blocker_piece.type() != PT_PAWN || square_rank(s) != promotion_rank(C)) {
                         if constexpr (GEN_QUIET) {
@@ -651,7 +651,7 @@ TMOVE* generate_evasions_by_color(const Board& board, TMOVE* moves) {
 
             // A piece can only block a check if it's not being pinned
             // from another angle.
-            if (!bit_is_set(board.pinned_bb(), blocker_sq)) {
+            if (!board.is_pinned(blocker_sq)) {
                 // Blocker is not pinned
                 if (blocker_piece.type() != PT_PAWN || square_rank(checker_sq) != promotion_rank(C)) {
                     if constexpr (GEN_SIMPLE_CAPTURES) {

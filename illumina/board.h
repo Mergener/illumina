@@ -66,7 +66,6 @@ public:
     CastlingRights castling_rights() const;
     bool           has_castling_rights(Color color, Side side) const;
     Move           last_move() const;
-    Bitboard       pinned_bb() const;
     bool           is_pinned(Square s) const;
     Square         pinner_square(Square pinned_sq) const;
     Square         king_square(Color color) const;
@@ -129,9 +128,6 @@ private:
     Color m_ctm = CL_WHITE;
     Bitboard m_occ = 0;
 
-    std::array<Square, SQ_COUNT> m_pinners;
-    Bitboard m_pinned_bb = 0;
-
     int m_base_ply_count = 0; // Gets added by m_prev_states.size()
 
     std::array<std::array<Square, SIDE_COUNT>, CL_COUNT> m_castle_rook_squares = {
@@ -180,8 +176,6 @@ private:
     bool is_castles_pseudo_legal(Square king_square, Color c, Side castling_side) const;
 
     void compute_checkers();
-    void compute_pins();
-    void scan_pins(Bitboard attackers, Square king_square, Color pinned_color);
 };
 
 inline Color Board::color_to_move() const {
@@ -265,16 +259,42 @@ inline Move Board::last_move() const {
     return m_state.last_move;
 }
 
-inline Bitboard Board::pinned_bb() const {
-    return m_pinned_bb;
-}
-
 inline bool Board::is_pinned(Square s) const {
-    return bit_is_set(pinned_bb(), s);
+    return pinner_square(s) != SQ_NULL;
 }
 
 inline Square Board::pinner_square(Square pinned_sq) const {
-    return m_pinners[pinned_sq];
+    Piece pinned_piece = piece_at(pinned_sq);
+    if (pinned_piece == PIECE_NULL) {
+        return SQ_NULL;
+    }
+
+    Color pinned_color = pinned_piece.color();
+    Square king_sq     = king_square(pinned_color);
+
+    Bitboard between_pinned = between_bb_inclusive(pinned_sq, king_sq);
+    if (!between_pinned) {
+        // Cannot be pinned.
+        return SQ_NULL;
+    }
+
+    Color pinner_color = opposite_color(pinned_color);
+    Bitboard attackers = all_attackers_of_type<PT_QUEEN>(pinner_color, pinned_sq)
+                       | all_attackers_of_type<PT_BISHOP>(pinner_color, pinned_sq)
+                       | all_attackers_of_type<PT_ROOK>(pinner_color, pinned_sq);
+
+
+    while (attackers) {
+        Square attacker = lsb(attackers);
+
+        if ((between_bb_inclusive(attacker, king_sq) & between_pinned) == between_pinned) {
+            return attacker;
+        }
+
+        attackers = unset_lsb(attackers);
+    }
+
+    return SQ_NULL;
 }
 
 inline Square Board::king_square(Color color) const {
@@ -350,10 +370,6 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
         }
         piece_added<DO_ZOB, false>(s, p);
     }
-
-    if constexpr (DO_PINS_AND_CHECKS) {
-        compute_pins();
-    }
 }
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
@@ -379,7 +395,6 @@ inline void Board::piece_added(Square s, Piece p) {
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
-        compute_pins();
         compute_checkers();
     }
 }
@@ -406,7 +421,6 @@ inline void Board::piece_removed(Square s) {
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
-        compute_pins();
         compute_checkers();
     }
 }
@@ -546,8 +560,8 @@ inline bool Board::is_move_legal(Move move) const {
 
     // Regardless of the position being a check or not, pinned
     // pieces can only move alongside their pins.
-    if (is_pinned(src)) {
-        Square pinner    = m_pinners[src];
+    Square pinner = pinner_square(src);
+    if (pinner != SQ_NULL) {
         Bitboard between = between_bb(our_king, pinner);
         between          = set_bit(between, pinner);
 

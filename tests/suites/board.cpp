@@ -406,3 +406,23 @@ TEST_CASE(PawnKeys) {
             .to_be(Board("4k3/2b2p1p/1p1ppn2/r5pb/1PpPP2r/2n2qP1/PKP5/RNBQ1BNR w - - 0 1").pawn_key());
     }
 }
+
+TEST_CASE(PinsAndPinners) {
+    struct {
+        std::string fen;
+        Square pinned;
+        Square pinner;
+
+        void run() const {
+            Board board(fen);
+            EXPECT(board.pinner_square(pinned)).to_be(pinner);
+            EXPECT(board.is_pinned(pinned)).to_be(true);
+        }
+    } tests[] = {
+        { "rnbqkbnr/1ppppppp/p7/8/Q7/2P5/PP1PPPPP/RNB1KBNR b KQkq - 1 2", SQ_D7, SQ_A4 }
+    };
+
+    for (const auto& test: tests) {
+        test.run();
+    }
+}

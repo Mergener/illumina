@@ -38,14 +38,12 @@ Board::Board(std::string_view fen_str) {
             }
         }
     }
-    compute_pins();
     compute_checkers();
 
     // Read and parse color to move.
     {
         std::string_view chunk = parse_helper.read_chunk();
         if (chunk.empty()) {
-            compute_pins();
             compute_checkers();
             return;
         }
@@ -60,7 +58,6 @@ Board::Board(std::string_view fen_str) {
 
     // We know the color to move and the piece placements.
     // We now need to compute all pins and checkers.
-    compute_pins();
     compute_checkers();
 
     // Read and parse castling rights.
@@ -407,7 +404,6 @@ void Board::make_move(Move move) {
 
     set_color_to_move(opposite_color(moving_color));
 
-    compute_pins();
     compute_checkers();
 }
 
@@ -465,8 +461,6 @@ void Board::undo_move() {
 
     m_state = m_prev_states.back();
     m_prev_states.pop_back();
-
-    compute_pins();
 }
 
 bool Board::is_attacked_by(Color c, Square s) const {
@@ -530,7 +524,6 @@ void Board::make_null_move() {
     set_ep_square(SQ_NULL);
 
     compute_checkers();
-    compute_pins();
 }
 
 void Board::undo_null_move() {
@@ -542,57 +535,7 @@ void Board::undo_null_move() {
 
     m_state = m_prev_states.back();
     m_prev_states.pop_back();
-
-    compute_pins();
 }
-
-void Board::compute_pins() {
-    m_pinned_bb = 0;
-
-    for (Color c: COLORS) {
-        Color them      = opposite_color(c);
-        if (piece_bb(Piece(c, PT_KING)) == 0) {
-            continue;
-        }
-        Square our_king = king_square(c);
-
-        Bitboard their_bishops = piece_bb(Piece(them, PT_BISHOP));
-        Bitboard their_rooks   = piece_bb(Piece(them, PT_ROOK));
-        Bitboard their_queens  = piece_bb(Piece(them, PT_QUEEN));
-
-        Bitboard their_diagonal_atks = (their_bishops | their_queens) & bishop_attacks(our_king, 0);
-        Bitboard their_line_atks     = (their_rooks   | their_queens) & rook_attacks(our_king, 0);
-
-        scan_pins(their_diagonal_atks, our_king, c);
-        scan_pins(their_line_atks, our_king, c);
-    }
-}
-
-void Board::scan_pins(Bitboard attackers, Square king_square, Color pinned_color) {
-    Bitboard occ = occupancy();
-
-    while (attackers) {
-        Square s  = lsb(attackers);
-        attackers = unset_lsb(attackers);
-
-        Bitboard between = between_bb(s, king_square) & occ;
-
-        if (between == 0 || unset_lsb(between) != 0) {
-            // More than one piece (or none) in between, none being pinned just yet.
-            continue;
-        }
-
-        // A piece might be pinned
-        Square pinned_sq = lsb(between);
-        Piece piece      = piece_at(pinned_sq);
-        if (piece.color() == pinned_color) {
-            // Piece is being pinned
-            m_pinned_bb          = set_bit(m_pinned_bb, pinned_sq);
-            m_pinners[pinned_sq] = s;
-        }
-    }
-}
-
 
 BoardResult Board::result() const {
     BoardResult result;
@@ -1053,8 +996,6 @@ Board::Board(const illumina::Board &rhs)
           m_bbs(rhs.m_bbs),
           m_ctm(rhs.m_ctm),
           m_occ(rhs.m_occ),
-          m_pinners(rhs.m_pinners),
-          m_pinned_bb(rhs.m_pinned_bb),
           m_base_ply_count(rhs.m_base_ply_count),
           m_castle_rook_squares(rhs.m_castle_rook_squares),
           m_prev_states(rhs.m_prev_states),
@@ -1067,8 +1008,6 @@ Board& Board::operator=(const illumina::Board &rhs) {
         m_bbs                 = rhs.m_bbs;
         m_ctm                 = rhs.m_ctm;
         m_occ                 = rhs.m_occ;
-        m_pinners             = rhs.m_pinners;
-        m_pinned_bb           = rhs.m_pinned_bb;
         m_base_ply_count      = rhs.m_base_ply_count;
         m_castle_rook_squares = rhs.m_castle_rook_squares;
         m_state               = rhs.m_state;
@@ -1084,8 +1023,6 @@ Board::Board(Board&& rhs) noexcept
       m_bbs(rhs.m_bbs),
       m_ctm(rhs.m_ctm),
       m_occ(rhs.m_occ),
-      m_pinners(rhs.m_pinners),
-      m_pinned_bb(rhs.m_pinned_bb),
       m_base_ply_count(rhs.m_base_ply_count),
       m_castle_rook_squares(rhs.m_castle_rook_squares),
       m_prev_states(std::move(rhs.m_prev_states)),
