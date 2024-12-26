@@ -19,6 +19,11 @@ enum EndgameType {
     // Drawn endgames.
     EG_KR_KB,
     EG_KR_KN,
+    EG_KRN_KR,
+    EG_KRB_KR,
+    EG_KQ_KNN,
+    EG_KQ_KBB,
+    EG_KQB_KQ,
 
     // Unknown endgame.
     EG_UNKNOWN

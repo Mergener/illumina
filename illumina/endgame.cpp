@@ -1,7 +1,6 @@
 #include "endgame.h"
 
 #include <unordered_map>
-#include <algorithm>
 
 namespace illumina {
 
@@ -23,6 +22,11 @@ static ui64 create_endgame_key(int our_pawns, int our_knights, int our_bishops, 
 
 static std::unordered_map<ui64, EndgameType> s_eg_table = {
     //                   P  N  B  R  Q  p  n  b  r  q
+    { create_endgame_key(0, 0, 1, 0, 1, 0, 0, 0, 0, 1), EG_KQB_KQ },
+    { create_endgame_key(0, 0, 0, 0, 1, 0, 0, 2, 0, 0), EG_KQ_KBB },
+    { create_endgame_key(0, 0, 0, 0, 1, 0, 2, 0, 0, 0), EG_KQ_KNN },
+    { create_endgame_key(0, 1, 0, 1, 0, 0, 0, 0, 1, 0), EG_KRN_KR },
+    { create_endgame_key(0, 0, 1, 1, 0, 0, 0, 0, 1, 0), EG_KRB_KR },
     { create_endgame_key(0, 0, 0, 0, 1, 0, 0, 0, 0, 0), EG_KQ_K },
     { create_endgame_key(0, 0, 0, 1, 0, 0, 0, 0, 0, 0), EG_KR_K },
     { create_endgame_key(0, 1, 1, 0, 0, 0, 0, 0, 0, 0), EG_KBN_K },
@@ -142,6 +146,28 @@ static Score evaluate_endgame(const Board& board,
                    manhattan_distance(their_king_sq, their_other_piece_sq) * 2;
         }
 
+        case EG_KQ_KBB: {
+            // Check if bishops are on the same color complex.
+            Bitboard bishops = board.piece_type_bb(PT_BISHOP);
+            if (popcount(bishops & LIGHT_SQUARES) != 1) {
+                // Bishops are in the same color complex.
+                int eval = 0;
+
+                // Add points for sending their king to the corner and
+                // approaching with our king.
+                eval += corner_king_evaluation(board, stronger_player);
+
+                // Malus if their bishops see each other (defended).
+                Square bishop_sq = lsb(bishops);
+                if (bishop_attacks(bishop_sq, bishops) & bishops) {
+                    eval -= 10;
+                }
+
+                return eval + KNOWN_WIN / 2;
+            }
+            return 0;
+        }
+
         default:
             return 0;
     }
@@ -150,7 +176,7 @@ static Score evaluate_endgame(const Board& board,
 Endgame identify_endgame(const Board& board) {
     Endgame endgame {};
 
-    if (popcount(board.occupancy()) > 4) {
+    if (popcount(board.occupancy()) > 5) {
         // Speedup: return unknown endgame since we know our most advanced
         // endgame only has 4 pieces (including kings).
         return endgame;
