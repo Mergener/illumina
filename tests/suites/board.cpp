@@ -416,10 +416,11 @@ TEST_CASE(PinsAndPinners) {
         void run() const {
             Board board(fen);
             EXPECT(board.pinner_square(pinned)).to_be(pinner);
-            EXPECT(board.is_pinned(pinned)).to_be(true);
+            EXPECT(board.is_pinned(pinned)).to_be(pinner != SQ_NULL);
         }
     } tests[] = {
-        { "rnbqkbnr/1ppppppp/p7/8/Q7/2P5/PP1PPPPP/RNB1KBNR b KQkq - 1 2", SQ_D7, SQ_A4 }
+        { "rnbqkbnr/1ppppppp/p7/8/Q7/2P5/PP1PPPPP/RNB1KBNR b KQkq - 1 2", SQ_D7, SQ_A4 },
+        { "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", SQ_E7, SQ_NULL }
     };
 
     for (const auto& test: tests) {

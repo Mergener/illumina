@@ -108,6 +108,9 @@ public:
     template <PieceType pt, bool QUIET_PAWN_MOVES = false>
     Bitboard all_attackers_of_type(Color c, Square s) const;
 
+    template <PieceType pt, bool QUIET_PAWN_MOVES = false>
+    Bitboard all_attackers_of_type(Color c, Square s, Bitboard occ) const;
+
     Board() = default;
     Board(const Board& rhs);
     explicit Board(std::string_view fen_str);
@@ -264,34 +267,52 @@ inline bool Board::is_pinned(Square s) const {
 }
 
 inline Square Board::pinner_square(Square pinned_sq) const {
+    // Make sure only occupied squares are checked.
     Piece pinned_piece = piece_at(pinned_sq);
     if (pinned_piece == PIECE_NULL) {
         return SQ_NULL;
     }
 
+    // Gather info.
     Color pinned_color = pinned_piece.color();
+    Color pinner_color = opposite_color(pinned_color);
     Square king_sq     = king_square(pinned_color);
+    Bitboard occ       = occupancy();
 
-    Bitboard between_pinned = between_bb_inclusive(pinned_sq, king_sq);
-    if (!between_pinned) {
-        // Cannot be pinned.
+    // Check if the square can even be aligned with their own king.
+    Bitboard slider_attacks_from_pinned = queen_attacks(pinned_sq, occ);
+    if (!bit_is_set(slider_attacks_from_pinned, king_sq)) {
         return SQ_NULL;
     }
 
-    Color pinner_color = opposite_color(pinned_color);
-    Bitboard attackers = all_attackers_of_type<PT_QUEEN>(pinner_color, pinned_sq)
-                       | all_attackers_of_type<PT_BISHOP>(pinner_color, pinned_sq)
-                       | all_attackers_of_type<PT_ROOK>(pinner_color, pinned_sq);
+    // We know the square is aligned with their king, either
+    // in straight or diagonal lines.
+    // Check for potential pinners.
+    Bitboard occ_without_pinned = unset_bit(occ, pinned_sq);
+    Bitboard king_direct_attackers = queen_attacks(king_sq, occ);
 
+    // Potentially pinner queens: a queen that xrays the king and attacks the pinned square.
+    Bitboard queens = all_attackers_of_type<PT_QUEEN>(pinner_color, king_sq, occ_without_pinned)
+                    & all_attackers_of_type<PT_QUEEN>(pinner_color, pinned_sq)
+                    & ~king_direct_attackers;
+    if (queens) {
+        return lsb(queens);
+    }
 
-    while (attackers) {
-        Square attacker = lsb(attackers);
+    // Potentially pinner bishops: a bishop that xray the king and attacks the pinned square.
+    Bitboard bishops = all_attackers_of_type<PT_BISHOP>(pinner_color, king_sq, occ_without_pinned)
+                     & all_attackers_of_type<PT_BISHOP>(pinner_color, pinned_sq)
+                     & ~king_direct_attackers;;
+    if (bishops) {
+        return lsb(bishops);
+    }
 
-        if ((between_bb_inclusive(attacker, king_sq) & between_pinned) == between_pinned) {
-            return attacker;
-        }
-
-        attackers = unset_lsb(attackers);
+    // Potentially pinner rooks: a rook that xray the king and attacks the pinned square.
+    Bitboard rooks = all_attackers_of_type<PT_ROOK>(pinner_color, king_sq, occ_without_pinned)
+                   & all_attackers_of_type<PT_ROOK>(pinner_color, pinned_sq)
+                   & ~king_direct_attackers;;
+    if (rooks) {
+        return lsb(rooks);
     }
 
     return SQ_NULL;
@@ -495,13 +516,17 @@ inline Square Board::first_attacker_of(Color c, Square s, Bitboard occ) const {
 
 template <PieceType pt, bool QUIET_PAWN_MOVES>
 inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
+    return all_attackers_of_type<pt, QUIET_PAWN_MOVES>(c, s, occupancy());
+}
+
+template <PieceType pt, bool QUIET_PAWN_MOVES>
+inline Bitboard Board::all_attackers_of_type(Color c, Square s, Bitboard occ) const {
     if constexpr (pt == PT_KNIGHT) {
         return piece_bb(Piece(c, PT_KNIGHT)) & knight_attacks(s);
     }
     if constexpr (pt == PT_KING) {
         return piece_bb(Piece(c, PT_KING)) & king_attacks(s);
     }
-    Bitboard occ = occupancy();
     if constexpr (pt == PT_PAWN) {
         Bitboard pawn_targets;
         Bitboard our_pawns = piece_bb(Piece(c, PT_PAWN));
