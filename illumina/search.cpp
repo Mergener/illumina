@@ -613,11 +613,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 TRACE_SET(Traceable::TT_CUTOFF, true);
                 return tt_entry.score();
             }
-            else if (tt_entry.bound_type() == BT_LOWERBOUND) {
-                alpha = std::max(alpha, tt_entry.score());
+            else if (   tt_entry.bound_type() == BT_UPPERBOUND
+                     && tt_entry.score() <= alpha) {
+                return tt_entry.score();
             }
-            else {
-                beta = std::min(beta, tt_entry.score());
+            else if (   tt_entry.bound_type() == BT_LOWERBOUND
+                     && tt_entry.score() >= beta) {
+                return tt_entry.score();
             }
 
             if (alpha >= beta) {
