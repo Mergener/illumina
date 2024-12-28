@@ -39,8 +39,8 @@ void TimeManager::start_tourney_time(ui64 our_time_ms,
     setup(true);
 
     if (moves_to_go != 1) {
-        set_starting_bounds(std::min(max_time, our_time_ms / 12),
-                            std::min(max_time, our_time_ms / 3));
+        set_starting_bounds(std::min(max_time, ui64(double(our_time_ms) * 0.083)),
+                            std::min(max_time, ui64(double(our_time_ms) * 0.333)));
     }
     else {
         set_starting_bounds(max_time, max_time);
@@ -59,7 +59,7 @@ void TimeManager::on_new_pv(Depth depth,
     // If we think that our next search won't be finished
     // before the next depth ends, interrupt the search.
     if (depth >= TM_CUTOFF_MIN_DEPTH
-        && elapsed() > (m_hard_bound * TM_CUTOFF_HARD_BOUND_FACTOR / TM_CUTOFF_HARD_BOUND_DIVISOR)) {
+        && elapsed() > ui64(double(m_hard_bound) * TM_CUTOFF_HARD_BOUND_FACTOR)) {
         m_soft_bound = 0;
         m_hard_bound = 0;
         return;
@@ -82,13 +82,13 @@ void TimeManager::on_new_pv(Depth depth,
 
         if (m_stable_iterations >= TM_STABILITY_SB_RED_MIN_ITER) {
             // Search has been stable for a while, decrease our soft bound.
-            m_soft_bound = m_soft_bound * TM_STABILITY_SB_RED_FACTOR / TM_STABILITY_SB_RED_DIVISOR;
+            m_soft_bound = ui64(double(m_soft_bound) * TM_STABILITY_SB_RED_FACTOR);
         }
     }
     else {
         // Our search deviated a bit from what we were expecting.
         // Give it some more thought.
-        m_soft_bound = (m_soft_bound + m_orig_soft_bound * TM_STABILITY_SB_EXT_FACTOR) / TM_STABILITY_SB_EXT_DIVISOR;
+        m_soft_bound = (m_soft_bound + m_orig_soft_bound * TM_STABILITY_SB_EXT_FACTOR) / 128;
         m_last_best_move = best_move;
         m_last_best_score = score;
     }
