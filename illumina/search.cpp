@@ -870,10 +870,12 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 TRACE_POP();
             }
 
-            if (score > alpha && score < beta) {
-                TRACE_PUSH_SIBLING();
-                score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
-                TRACE_POP();
+            if constexpr (PV) {
+                if (score > alpha && score < beta) {
+                    TRACE_PUSH_SIBLING();
+                    score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
+                    TRACE_POP();
+                }
             }
         }
 
