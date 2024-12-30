@@ -1,0 +1,7 @@
+[submodule "ext/litetest"]
+	path = ext/litetest
+	url = https://github.com/mergener/litetest
+	branch = main
+[submodule "ext/SQLiteCpp"]
+	path = ext/SQLiteCpp
+	url = https://github.com/SRombauts/SQLiteCpp

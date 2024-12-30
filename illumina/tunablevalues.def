@@ -1,0 +1,99 @@
+//
+// Declare here any desired tunable constants. These tunable constants will be exposed as
+// UCI options on builds in which TUNING_BUILD is defined. On non-tuning builds, tunable
+// constants become constexpr values instead.
+//
+// To declare a tunable constant, simply add a line (min_value and max_value are optional):
+//    TUNABLE_VALUE(name, type, base_value, min_value, max_value).
+// The only supported tunable value types are int and double.
+// Double tunable values will be exposed as spin (integer) UCI options, but with their values
+// multiplied by 1000. For example: a double tunable value of 3.652, will be exposed as an integer
+// 3652, just like a double of value 0.0541 will be exposed as 54.
+//
+
+#ifndef TUNABLE_VALUE
+#define TUNABLE_VALUE(name, type, base_value, min_value, max_value)
+#endif
+
+//
+// Search constants
+//
+
+// Aspiration windows
+TUNABLE_VALUE(ASP_WIN_WINDOW, int, 42, 0);
+TUNABLE_VALUE(ASP_WIN_MIN_DEPTH, int, 6);
+
+// Reverse futility pruning
+TUNABLE_VALUE(RFP_MAX_DEPTH, int, 7);
+TUNABLE_VALUE(RFP_MARGIN_BASE, int, 35);
+TUNABLE_VALUE(RFP_DEPTH_MULT, int, 70);
+
+// Null move pruning
+TUNABLE_VALUE(NMP_MIN_PIECES, int, 4, 0);
+TUNABLE_VALUE(NMP_MIN_DEPTH, int, 2, 1);
+TUNABLE_VALUE(NMP_EVAL_DELTA_DIVISOR, int, 212, 1);
+TUNABLE_VALUE(NMP_BASE_DEPTH_RED, int, 2);
+
+// Late move pruning
+TUNABLE_VALUE(LMP_BASE_MAX_DEPTH, int, 7);
+TUNABLE_VALUE(LMP_BASE_IDX_NON_IMPROVING, double, 3.072);
+TUNABLE_VALUE(LMP_DEPTH_FACTOR_NON_IMPROVING, double, 0.566);
+TUNABLE_VALUE(LMP_BASE_IDX_IMPROVING, double, 4.197);
+TUNABLE_VALUE(LMP_DEPTH_FACTOR_IMPROVING, double, 1.240);
+
+// Futility pruning
+TUNABLE_VALUE(FP_MAX_DEPTH, int, 6);
+TUNABLE_VALUE(FP_MARGIN, int, 90);
+
+// Late move reductions
+TUNABLE_VALUE(LMR_MIN_DEPTH, int, 2);
+TUNABLE_VALUE(LMR_MIN_MOVE_IDX, int, 1);
+TUNABLE_VALUE(LMR_REDUCTIONS_BASE, double, 1.117);
+TUNABLE_VALUE(LMR_REDUCTIONS_DIVISOR, double, 262.6, 1);
+TUNABLE_VALUE(LMR_BAD_HISTORY_THRESHOLD, int, -397);
+TUNABLE_VALUE(LMR_STABLE_ALPHA_THRESHOLD, int, 233);
+
+// Internal iterative reductions
+TUNABLE_VALUE(IIR_MIN_DEPTH, int, 4);
+TUNABLE_VALUE(IIR_DEPTH_RED, int, 1);
+
+// SEE pruning (pvs())
+TUNABLE_VALUE(SEE_PRUNING_MAX_DEPTH, int, 8);
+TUNABLE_VALUE(SEE_PRUNING_THRESHOLD, int, -1);
+
+// QSEE pruning
+TUNABLE_VALUE(QSEE_PRUNING_THRESHOLD, int, -1);
+
+// Lazy SMP
+TUNABLE_VALUE(SMP_EVAL_RANDOM_MARGIN, int, 0);
+
+//
+// Time manager constants
+//
+
+// Depth cutoff
+TUNABLE_VALUE(TM_CUTOFF_MIN_DEPTH, int, 10);
+TUNABLE_VALUE(TM_CUTOFF_HARD_BOUND_FACTOR, double, 0.667);
+
+// Stable iterations
+TUNABLE_VALUE(TM_STABILITY_MIN_CP_DELTA, int, -15);
+TUNABLE_VALUE(TM_STABILITY_MAX_CP_DELTA, int, 52);
+TUNABLE_VALUE(TM_STABILITY_MIN_DEPTH, int, 10);
+TUNABLE_VALUE(TM_STABILITY_SB_RED_MIN_ITER, int, 7);
+TUNABLE_VALUE(TM_STABILITY_SB_RED_FACTOR, double, 0.722);
+TUNABLE_VALUE(TM_STABILITY_SB_EXT_FACTOR, int, 114);
+
+//
+// Move history constants
+//
+TUNABLE_VALUE(MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD, int, 12);
+TUNABLE_VALUE(MV_HIST_QUIET_HIGH_DEPTH_FACTOR, int, 32);
+TUNABLE_VALUE(MV_HIST_REGULAR_QHIST_WEIGHT, int, 967);
+TUNABLE_VALUE(MV_HIST_CHECK_QHIST_WEIGHT, int, 516);
+TUNABLE_VALUE(MV_HIST_COUNTER_MOVE_WEIGHT, int, 1595);
+
+//
+// Move picker constants
+//
+TUNABLE_VALUE(MV_PICKER_QUIET_CHECK_BONUS, int, 16);
+TUNABLE_VALUE(MV_PICKER_QUIET_DANGER_MALUS, int, 1973);

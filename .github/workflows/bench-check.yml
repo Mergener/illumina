@@ -1,0 +1,42 @@
+name: Bench Validation
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - '*'
+      - '**'
+
+jobs:
+  run-bench:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up C++ compiler and CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Build and Run Bench
+        run: |
+          cd openbench
+          make -j2 EXE=illumina  # Adjust the number of jobs as needed
+          output=$(./illumina bench)
+          bench_nodes=$(echo "$output" | grep -o '^[0-9]*' | head -n 1)
+          bench_message="$bench_nodes"
+
+      - name: Edit Last Commit Message and Push Changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          commit_message=$(git log -1 --pretty=%B)
+          
+          printf "%s\nbench %s\n" "$commit_message" "$bench_message" | git commit --amend --no-edit -F -
+
+          git push origin HEAD --force
