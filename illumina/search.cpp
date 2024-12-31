@@ -553,7 +553,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Prefetch tt entry as soon as possible.
     TranspositionTable& tt = m_context->tt();
     ui64 board_key         = m_board.hash_key();
-    tt.prefetch(board_key);
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV) {
@@ -1191,6 +1190,7 @@ template <bool TRACE>
 void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
     TRACE_PUSH();
     m_results.nodes++;
+    m_context->tt().prefetch(board.estimate_hash_key_after(move));
     m_eval.on_make_move(board, move);
 }
 

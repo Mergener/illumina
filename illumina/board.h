@@ -82,6 +82,14 @@ public:
     BoardResult    result() const;
     bool           detect_frc() const;
 
+    /**
+     * Tries to compute the hash key after a move.
+     * The computed hash key is always valid for
+     * non-king non-rook moves of type NORMAL or
+     * SIMPLE_CAPTURE.
+     */
+    ui64 estimate_hash_key_after(Move move) const;
+
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
     void set_ep_square(Square s);

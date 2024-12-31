@@ -54,6 +54,12 @@ void init_zob() {
     fill_keys(g_castling_rights_keys, sizeof(g_castling_rights_keys));
     fill_keys(g_color_to_move_keys, sizeof(g_color_to_move_keys));
     fill_keys(g_en_passant_square_keys, sizeof(g_en_passant_square_keys));
+
+    // Make sure empty pieces' key is 0.
+    for (Square s = 0; s < SQ_COUNT; ++s) {
+        g_piece_square_keys[PT_NULL][CL_WHITE][s] = 0;
+        g_piece_square_keys[PT_NULL][CL_BLACK][s] = 0;
+    }
 }
 
 } // illumina
