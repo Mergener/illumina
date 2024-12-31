@@ -71,6 +71,16 @@ if (OPENBENCH_COMPLIANCE_MODE)
     add_definitions(-DOPENBENCH_COMPLIANCE)
 endif()
 
+option(PROFILING
+        "Generates profilable executables. Use only for profiling purposes, as this option
+        will decrease performance significantly.")
+if (PROFILING)
+    message("Profiling support enabled.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -pg -fno-omit-frame-pointer")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g -pg")
+    add_definitions(-DPROFILING)
+endif()
+
 # For GCC-derived compilers, we need to specify some flags in order
 # to have <thread> and <filesystem> properly working.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

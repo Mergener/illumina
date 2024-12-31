@@ -588,7 +588,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Setup some important values.
     Score original_alpha   = alpha;
     int n_searched_moves   = 0;
-    Move best_move         = MOVE_NULL;
     Move hash_move         = MOVE_NULL;
     bool in_check          = m_board.in_check();
     Color us               = m_board.color_to_move();
@@ -617,11 +616,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 TRACE_SET(Traceable::TT_CUTOFF, true);
                 return tt_entry.score();
             }
-            else if (tt_entry.bound_type() == BT_LOWERBOUND) {
-                alpha = std::max(alpha, tt_entry.score());
+            else if (   tt_entry.bound_type() == BT_UPPERBOUND
+                     && tt_entry.score() <= alpha) {
+                return tt_entry.score();
             }
-            else {
-                beta = std::min(beta, tt_entry.score());
+            else if (   tt_entry.bound_type() == BT_LOWERBOUND
+                     && tt_entry.score() >= beta) {
+                return tt_entry.score();
             }
 
             if (alpha >= beta) {
@@ -638,10 +639,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     depth = std::min(std::min(MAX_DEPTH, depth), m_root_depth * 2 - ply);
 
     // Compute the static eval. Useful for many heuristics.
+    Score raw_eval;
     if (!in_check) {
-        static_eval = !found_in_tt ? evaluate() : tt_entry.static_eval();
+        raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
+        static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
+        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
     }
     else {
+        raw_eval    = 0;
         static_eval = 0;
     }
     TRACE_SET(Traceable::STATIC_EVAL, static_eval);
@@ -715,6 +721,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     MovePicker move_picker(m_board, ply, m_hist, hash_move);
     SearchMove move {};
+    Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
     Score best_score = -MATE_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
@@ -813,6 +820,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             if (score < se_beta) {
                 extensions++;
             }
+            // Multi-cut pruning.
+            else if (score >= beta) {
+                return score;
+            }
         }
 
         m_board.make_move(move);
@@ -855,6 +866,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
             score = -pvs<TRACE, false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
+
+            if (score > alpha && reductions > 1) {
+                TRACE_PUSH_SIBLING();
+                score = -pvs<TRACE, false>(depth - 1 + extensions, -alpha - 1, -alpha, node + 1);
+                TRACE_POP();
+            }
+
             if (score > alpha && score < beta) {
                 TRACE_PUSH_SIBLING();
                 score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
@@ -938,6 +956,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Check if we have a checkmate or stalemate.
     if (!has_legal_moves) {
+        if (node->skip_move != MOVE_NULL) {
+            return alpha;
+        }
+
         Score score = m_board.in_check() ? (-MATE_SCORE + ply) : 0;
         TRACE_SET(Traceable::SCORE, score);
         return score;
@@ -952,16 +974,37 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     if (node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_LOWERBOUND);
+            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_LOWERBOUND);
+
+            // Update corrhist.
+            if (   !in_check
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
             tt.try_store(board_key,
                          ply, best_move,
                          n_searched_moves > 0 ? best_score : alpha,
-                         depth, static_eval, BT_UPPERBOUND);
+                         depth, raw_eval, BT_UPPERBOUND);
+
+            // Update corrhist.
+            if (   !in_check
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha <= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         } else {
             // We have an exact score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, static_eval, BT_EXACT);
+            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_EXACT);
+
+            // Update corrhist.
+            if (   !in_check
+                   && (best_move == MOVE_NULL || best_move.is_quiet())
+                   && alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
         }
     }
 
@@ -983,6 +1026,9 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
 
     Score stand_pat = evaluate();
+    if (!m_board.in_check()) {
+        stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
+    }
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
     if (stand_pat >= beta) {
