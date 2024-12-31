@@ -607,25 +607,17 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         TRACE_SET(Traceable::FOUND_IN_TT, true);
 
+        // TT Cutoff.
         if (   !PV
             && node->skip_move == MOVE_NULL
             && tt_entry.depth() >= depth) {
-            if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
-                // TT Cutoff.
+            BoundType bt = tt_entry.bound_type();
+            Score score  = tt_entry.score();
+            if (   bt == BT_EXACT
+                || (bt == BT_UPPERBOUND && score <= alpha)
+                || (bt == BT_LOWERBOUND && score >= beta)) {
                 TRACE_SET(Traceable::TT_CUTOFF, true);
-                return tt_entry.score();
-            }
-            else if (   tt_entry.bound_type() == BT_UPPERBOUND
-                     && tt_entry.score() <= alpha) {
-                return tt_entry.score();
-            }
-            else if (   tt_entry.bound_type() == BT_LOWERBOUND
-                     && tt_entry.score() >= beta) {
-                return tt_entry.score();
-            }
-
-            if (alpha >= beta) {
-                return alpha;
+                return score;
             }
         }
     }
