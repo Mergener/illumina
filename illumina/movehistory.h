@@ -37,7 +37,7 @@ using CorrhistTable = std::array<std::array<CorrhistEntry, CORRHIST_ENTRIES>, CL
 
 class MoveHistory {
 public:
-    const std::array<Move, 2>& killers(Depth ply) const;
+    Move killer(Depth ply) const;
     bool is_killer(Depth ply, Move move) const;
     void set_killer(Depth ply, Move killer);
     void reset();
@@ -68,7 +68,7 @@ private:
     struct Data {
         CorrhistTable pawn_corrhist;
         CorrhistTable non_pawn_corrhist;
-        std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
+        std::array<Move, MAX_DEPTH> killers {};
         ButterflyArray<int> m_quiet_history {};
         PieceToArray<PieceToArray<int>> m_counter_move_history {};
         PieceToArray<int> m_check_history {};
@@ -109,22 +109,16 @@ const T& PieceToArray<T>::get(Move move) const {
     return (*this)[move.source_piece().color()][move.source_piece().type()][move.destination()];
 }
 
-inline const std::array<Move, 2>& MoveHistory::killers(Depth ply) const {
-    return m_data->m_killers[ply];
+inline Move MoveHistory::killer(Depth ply) const {
+    return m_data->killers[ply];
 }
 
 inline bool MoveHistory::is_killer(Depth ply, Move move) const {
-    const std::array<Move, 2>& arr = killers(ply);
-    return arr[0] == move || arr[1] == move;
+    return m_data->killers[ply] == move;
 }
 
 inline void MoveHistory::set_killer(Depth ply, Move killer) {
-    std::array<Move, 2>& arr = m_data->m_killers[ply];
-    if (killer == arr[0]) {
-        return;
-    }
-    arr[1] = arr[0];
-    arr[0] = killer;
+    m_data->killers[ply] = killer;
 }
 
 inline void MoveHistory::reset() {
