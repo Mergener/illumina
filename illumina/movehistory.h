@@ -11,7 +11,7 @@
 
 namespace illumina {
 
-static constexpr int MAX_HISTORY = 16384;
+static constexpr int MAX_HISTORY = 8192;
 static constexpr size_t CORRHIST_ENTRIES = 16384;
 static constexpr int CORRHIST_GRAIN = 256;
 static constexpr int CORRHIST_BASE_WEIGHT = 1024;
