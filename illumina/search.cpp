@@ -617,6 +617,16 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 || (bt == BT_UPPERBOUND && score <= alpha)
                 || (bt == BT_LOWERBOUND && score >= beta)) {
                 TRACE_SET(Traceable::TT_CUTOFF, true);
+
+                if (   hash_move.is_quiet()
+                    && score >= beta) {
+                    m_hist.update_quiet_history(hash_move,
+                                                m_board.last_move(),
+                                                depth,
+                                                m_board.gives_check(hash_move),
+                                                true);
+                }
+
                 return score;
             }
         }
