@@ -87,7 +87,12 @@ void TranspositionTable::try_store(ui64 key,
 
     // We can replace entries, but we don't overwrite the move if
     // the new entry doesn't have one.
-    move = move != MOVE_NULL ? move : entry.move();
+    if (move == MOVE_NULL) {
+        if (entry.key() != key) {
+            return;
+        }
+        move = entry.move();
+    }
 
     // Always replace older generations.
     if (entry.generation() != m_gen) {
