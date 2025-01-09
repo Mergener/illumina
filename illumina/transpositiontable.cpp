@@ -85,10 +85,9 @@ void TranspositionTable::try_store(ui64 key,
         return;
     }
 
-    // Never replace a tt entry with a move for another without a move.
-    if (entry.move() != MOVE_NULL && move == MOVE_NULL) {
-        return;
-    }
+    // We can replace entries, but we don't overwrite the move if
+    // the new entry doesn't have one.
+    move = move != MOVE_NULL ? move : entry.move();
 
     // Always replace older generations.
     if (entry.generation() != m_gen) {
@@ -104,8 +103,8 @@ void TranspositionTable::try_store(ui64 key,
 
     // Replace when we're getting a more accurate score on the same depth.
     if (depth == entry.depth()
-        && ((bound_type == BT_EXACT      && entry.bound_type() != BT_EXACT)
-        ||   bound_type != BT_UPPERBOUND && entry.bound_type() == BT_UPPERBOUND)) {
+        && ((  bound_type == BT_EXACT      && entry.bound_type() != BT_EXACT)
+            || bound_type != BT_UPPERBOUND && entry.bound_type() == BT_UPPERBOUND)) {
         entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen);
         return;
     }
