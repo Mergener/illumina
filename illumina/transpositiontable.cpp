@@ -3,6 +3,8 @@
 #include <cmath>
 #include <cstring>
 
+#include <cstdint>
+
 namespace illumina {
 
 static Score search_score_to_tt(Score search_score, Depth ply) {
@@ -117,7 +119,12 @@ void TranspositionTable::clear() {
 }
 
 inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
+#ifdef __SIZEOF_INT128__
+    typedef unsigned int ui128 __attribute__((mode(TI)));
+    return m_buf[ui64((ui128(key) * ui128(m_max_entry_count)) >> 64)];
+#else
     return m_buf[key % m_max_entry_count];
+#endif
 }
 
 void TranspositionTable::resize(size_t new_size) {
