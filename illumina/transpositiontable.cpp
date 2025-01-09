@@ -118,7 +118,7 @@ void TranspositionTable::clear() {
     m_entry_count = 0;
 }
 
-inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
+TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
 #ifdef __SIZEOF_INT128__
     typedef unsigned int ui128 __attribute__((mode(TI)));
     return m_buf[ui64((ui128(key) * ui128(m_max_entry_count)) >> 64)];
