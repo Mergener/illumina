@@ -5,7 +5,6 @@
 namespace illumina {
 
 void Evaluation::on_new_board(const Board& board) {
-    m_undoing_move = false;
     m_nnue.clear();
     m_ctm = board.color_to_move();
 
@@ -19,13 +18,57 @@ void Evaluation::on_new_board(const Board& board) {
 }
 
 void Evaluation::on_make_move(const Board& board, Move move) {
-    m_undoing_move = false;
     m_nnue.push_accumulator();
+    Color moved_color = m_ctm;
     m_ctm = opposite_color(m_ctm);
+
+    switch (move.type()) {
+        case MT_EN_PASSANT:
+            m_nnue.update_features<1, 2>(
+                    {move.destination()},
+                    {move.source_piece()},
+                    {move.source(), move.destination() - pawn_push_direction(moved_color)},
+                    {move.source_piece(), Piece(m_ctm, PT_PAWN)});
+            break;
+        case MT_CASTLES:
+            m_nnue.update_features<2, 2>(
+                    {castled_rook_square(moved_color, move.castles_side()), move.destination()},
+                    {Piece(moved_color, PT_ROOK), move.source_piece()},
+                    {move.castles_rook_src_square(), move.source()},
+                    {Piece(moved_color, PT_ROOK), move.source_piece()});
+            break;
+        case MT_PROMOTION_CAPTURE:
+            m_nnue.update_features<1, 2>(
+                    {move.destination()},
+                    {Piece(moved_color, move.promotion_piece_type())},
+                    {move.source(), move.destination()},
+                    {move.source_piece(), move.captured_piece()});
+            break;
+        case MT_SIMPLE_CAPTURE:
+            m_nnue.update_features<1, 2>(
+                    {move.destination()},
+                    {move.source_piece()},
+                    {move.source(), move.destination()},
+                    {move.source_piece(), move.captured_piece()});
+            break;
+        case MT_SIMPLE_PROMOTION:
+            m_nnue.update_features<1, 1>(
+                    {move.destination()},
+                    {move.source_piece()},
+                    {move.source()},
+                    {Piece(moved_color, move.promotion_piece_type())});
+            break;
+        default:
+            m_nnue.update_features<1, 1>(
+                    {move.destination()},
+                    {move.source_piece()},
+                    {move.source()},
+                    {move.source_piece()});
+            break;
+    }
 }
 
 void Evaluation::on_undo_move(const Board& board, Move move) {
-    m_undoing_move = true;
     m_ctm = opposite_color(m_ctm);
     m_nnue.pop_accumulator();
 }
@@ -39,19 +82,9 @@ void Evaluation::on_undo_null_move(const Board& board) {
 }
 
 void Evaluation::on_piece_added(const Board &board, Piece p, Square s) {
-    if (m_undoing_move) {
-        return;
-    }
-
-    m_nnue.enable_feature(s, p);
 }
 
 void Evaluation::on_piece_removed(const Board &board, Piece p, Square s) {
-    if (m_undoing_move) {
-        return;
-    }
-
-    m_nnue.disable_feature(s, p);
 }
 
 Score Evaluation::get() const {

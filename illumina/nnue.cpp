@@ -20,23 +20,6 @@ constexpr int Q     = L1_ACTIVATION == ActivationFunction::CReLU
                       ? (Q1 * Q2)
                       : (Q1 * Q1 * Q2);
 
-template <Color C>
-static size_t feature_index(Square square, Piece piece) {
-    Color color     = piece.color();
-    size_t type_idx = piece.type() - 1;
-
-    if constexpr (C == CL_BLACK) {
-        square = mirror_vertical(square);
-        color  = opposite_color(color);
-    }
-
-    size_t index = 0;
-    index = index * CL_COUNT + color;
-    index = index * (PT_COUNT - 1) + type_idx;
-    index = index * SQ_COUNT + square;
-    return index;
-}
-
 void NNUE::clear() {
     // Copy all biases.
     std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), m_accum.white.begin());
@@ -103,23 +86,11 @@ int NNUE::forward(Color color) const {
 }
 
 void NNUE::enable_feature(Square square, Piece piece) {
-    size_t white_idx = feature_index<CL_WHITE>(square, piece);
-    size_t black_idx = feature_index<CL_BLACK>(square, piece);
-
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        m_accum.white[i] += m_net->l1_weights[N_INPUTS * i + white_idx];
-        m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + black_idx];
-    }
+    update_features<1, 0>({square}, {piece}, {}, {});
 }
 
 void NNUE::disable_feature(Square square, Piece piece) {
-    size_t white_idx = feature_index<CL_WHITE>(square, piece);
-    size_t black_idx = feature_index<CL_BLACK>(square, piece);
-
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        m_accum.white[i] -= m_net->l1_weights[N_INPUTS * i + white_idx];
-        m_accum.black[i] -= m_net->l1_weights[N_INPUTS * i + black_idx];
-    }
+    update_features<0, 1>({}, {}, {square}, {piece});
 }
 
 void NNUE::push_accumulator() {
