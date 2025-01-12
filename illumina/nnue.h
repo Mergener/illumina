@@ -106,8 +106,8 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
         en_black_idxs[0] = feature_index<CL_BLACK>(enabled_squares[0], enabled_pieces[0]);
     }
     if constexpr (N_ENABLED >= 2) {
-        en_white_idxs[0] = feature_index<CL_WHITE>(enabled_squares[1], enabled_pieces[1]);
-        en_black_idxs[0] = feature_index<CL_BLACK>(enabled_squares[1], enabled_pieces[1]);
+        en_white_idxs[1] = feature_index<CL_WHITE>(enabled_squares[1], enabled_pieces[1]);
+        en_black_idxs[1] = feature_index<CL_BLACK>(enabled_squares[1], enabled_pieces[1]);
     }
     if constexpr (N_DISABLED >= 1) {
         dis_white_idxs[0] = feature_index<CL_WHITE>(disabled_squares[0], disabled_pieces[0]);
@@ -121,18 +121,26 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
     for (size_t i = 0; i < L1_SIZE; ++i) {
         if constexpr (N_ENABLED >= 1) {
             m_accum.white[i] += m_net->l1_weights[N_INPUTS * i + en_white_idxs[0]];
-            m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + en_black_idxs[0]];
         }
         if constexpr (N_ENABLED >= 2) {
             m_accum.white[i] += m_net->l1_weights[N_INPUTS * i + en_white_idxs[1]];
-            m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + en_black_idxs[1]];
         }
         if constexpr (N_DISABLED >= 1) {
             m_accum.white[i] -= m_net->l1_weights[N_INPUTS * i + dis_white_idxs[0]];
-            m_accum.black[i] -= m_net->l1_weights[N_INPUTS * i + dis_black_idxs[0]];
         }
         if constexpr (N_DISABLED >= 2) {
             m_accum.white[i] -= m_net->l1_weights[N_INPUTS * i + dis_white_idxs[1]];
+        }
+        if constexpr (N_ENABLED >= 1) {
+            m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + en_black_idxs[0]];
+        }
+        if constexpr (N_ENABLED >= 2) {
+            m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + en_black_idxs[1]];
+        }
+        if constexpr (N_DISABLED >= 1) {
+            m_accum.black[i] -= m_net->l1_weights[N_INPUTS * i + dis_black_idxs[0]];
+        }
+        if constexpr (N_DISABLED >= 2) {
             m_accum.black[i] -= m_net->l1_weights[N_INPUTS * i + dis_black_idxs[1]];
         }
     }

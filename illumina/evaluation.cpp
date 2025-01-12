@@ -54,9 +54,9 @@ void Evaluation::on_make_move(const Board& board, Move move) {
         case MT_SIMPLE_PROMOTION:
             m_nnue.update_features<1, 1>(
                     {move.destination()},
-                    {move.source_piece()},
+                    {Piece(moved_color, move.promotion_piece_type())},
                     {move.source()},
-                    {Piece(moved_color, move.promotion_piece_type())});
+                    {move.source_piece()});
             break;
         default:
             m_nnue.update_features<1, 1>(
