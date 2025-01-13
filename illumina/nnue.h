@@ -6,6 +6,7 @@
 #include <istream>
 #include <sstream>
 #include <type_traits>
+#include <immintrin.h>
 
 #include "types.h"
 
@@ -89,12 +90,12 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
     static_assert(N_DISABLED >= 0 && N_DISABLED <= 2);
 
     using EnabledIndexesArray  = typename std::conditional_t<(N_ENABLED > 0),
-                                                           std::array<size_t, N_ENABLED>,
-                                                           std::nullptr_t>;
+            std::array<size_t, N_ENABLED>,
+            std::nullptr_t>;
 
     using DisabledIndexesArray = typename std::conditional_t<(N_DISABLED > 0),
-                                                             std::array<size_t, N_DISABLED>,
-                                                             std::nullptr_t>;
+            std::array<size_t, N_DISABLED>,
+            std::nullptr_t>;
 
     EnabledIndexesArray  en_white_idxs;
     EnabledIndexesArray  en_black_idxs;
@@ -118,32 +119,98 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
         dis_black_idxs[1] = feature_index<CL_BLACK>(disabled_squares[1], disabled_pieces[1]);
     }
 
-    for (size_t i = 0; i < L1_SIZE; ++i) {
+#ifdef HAS_AVX2
+    constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
+    for (size_t i = 0; i < L1_SIZE; i += STRIDE) {
+        __m256i* white_accum_ptr = reinterpret_cast<__m256i*>(&m_accum.white[i]);
+        __m256i* black_accum_ptr = reinterpret_cast<__m256i*>(&m_accum.black[i]);
+
         if constexpr (N_ENABLED >= 1) {
-            m_accum.white[i] += m_net->l1_weights[N_INPUTS * i + en_white_idxs[0]];
+            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_white_idxs[0] * L1_SIZE + i]);
+            __m256i weights = _mm256_load_si256(weights_ptr);
+            __m256i accum   = _mm256_load_si256(white_accum_ptr);
+            __m256i sum     = _mm256_add_epi16(accum, weights);
+            _mm256_store_si256(white_accum_ptr, sum);
         }
         if constexpr (N_ENABLED >= 2) {
-            m_accum.white[i] += m_net->l1_weights[N_INPUTS * i + en_white_idxs[1]];
+            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_white_idxs[1] * L1_SIZE + i]);
+            __m256i weights = _mm256_load_si256(weights_ptr);
+            __m256i accum   = _mm256_load_si256(white_accum_ptr);
+            __m256i sum     = _mm256_add_epi16(accum, weights);
+            _mm256_store_si256(white_accum_ptr, sum);
         }
         if constexpr (N_DISABLED >= 1) {
-            m_accum.white[i] -= m_net->l1_weights[N_INPUTS * i + dis_white_idxs[0]];
+            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_white_idxs[0] * L1_SIZE + i]);
+            __m256i weights = _mm256_load_si256(weights_ptr);
+            __m256i accum   = _mm256_load_si256(white_accum_ptr);
+            __m256i sub     = _mm256_sub_epi16(accum, weights);
+            _mm256_store_si256(white_accum_ptr, sub);
         }
         if constexpr (N_DISABLED >= 2) {
-            m_accum.white[i] -= m_net->l1_weights[N_INPUTS * i + dis_white_idxs[1]];
+            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_white_idxs[1] * L1_SIZE + i]);
+            __m256i weights = _mm256_load_si256(weights_ptr);
+            __m256i accum   = _mm256_load_si256(white_accum_ptr);
+            __m256i sub     = _mm256_sub_epi16(accum, weights);
+            _mm256_store_si256(white_accum_ptr, sub);
         }
+
         if constexpr (N_ENABLED >= 1) {
-            m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + en_black_idxs[0]];
+            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_black_idxs[0] * L1_SIZE + i]);
+            __m256i weights = _mm256_load_si256(weights_ptr);
+            __m256i accum   = _mm256_load_si256(black_accum_ptr);
+            __m256i sum     = _mm256_add_epi16(accum, weights);
+            _mm256_store_si256(black_accum_ptr, sum);
         }
         if constexpr (N_ENABLED >= 2) {
-            m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + en_black_idxs[1]];
+            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_black_idxs[1] * L1_SIZE + i]);
+            __m256i weights = _mm256_load_si256(weights_ptr);
+            __m256i accum   = _mm256_load_si256(black_accum_ptr);
+            __m256i sum     = _mm256_add_epi16(accum, weights);
+            _mm256_store_si256(black_accum_ptr, sum);
         }
         if constexpr (N_DISABLED >= 1) {
-            m_accum.black[i] -= m_net->l1_weights[N_INPUTS * i + dis_black_idxs[0]];
+            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_black_idxs[0] * L1_SIZE + i]);
+            __m256i weights = _mm256_load_si256(weights_ptr);
+            __m256i accum   = _mm256_load_si256(black_accum_ptr);
+            __m256i sub     = _mm256_sub_epi16(accum, weights);
+            _mm256_store_si256(black_accum_ptr, sub);
         }
         if constexpr (N_DISABLED >= 2) {
-            m_accum.black[i] -= m_net->l1_weights[N_INPUTS * i + dis_black_idxs[1]];
+            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_black_idxs[1] * L1_SIZE + i]);
+            __m256i weights = _mm256_load_si256(weights_ptr);
+            __m256i accum   = _mm256_load_si256(black_accum_ptr);
+            __m256i sub     = _mm256_sub_epi16(accum, weights);
+            _mm256_store_si256(black_accum_ptr, sub);
         }
     }
+#else
+    for (size_t i = 0; i < L1_SIZE; ++i) {
+        if constexpr (N_ENABLED >= 1) {
+            m_accum.white[i] += m_net->l1_weights[en_white_idxs[0] * L1_SIZE + i];
+        }
+        if constexpr (N_ENABLED >= 2) {
+            m_accum.white[i] += m_net->l1_weights[en_white_idxs[1] * L1_SIZE + i];
+        }
+        if constexpr (N_DISABLED >= 1) {
+            m_accum.white[i] -= m_net->l1_weights[dis_white_idxs[0] * L1_SIZE + i];
+        }
+        if constexpr (N_DISABLED >= 2) {
+            m_accum.white[i] -= m_net->l1_weights[dis_white_idxs[1] * L1_SIZE + i];
+        }
+        if constexpr (N_ENABLED >= 1) {
+            m_accum.black[i] += m_net->l1_weights[en_black_idxs[0] * L1_SIZE + i];
+        }
+        if constexpr (N_ENABLED >= 2) {
+            m_accum.black[i] += m_net->l1_weights[en_black_idxs[1] * L1_SIZE + i];
+        }
+        if constexpr (N_DISABLED >= 1) {
+            m_accum.black[i] -= m_net->l1_weights[dis_black_idxs[0] * L1_SIZE + i];
+        }
+        if constexpr (N_DISABLED >= 2) {
+            m_accum.black[i] -= m_net->l1_weights[dis_black_idxs[1] * L1_SIZE + i];
+        }
+    }
+#endif
 }
 
 } // illumina
