@@ -36,6 +36,7 @@ public:
                     std::string_view value_str);
     void check_if_ready();
     void quit();
+    bool searching() const;
 
     State();
 
