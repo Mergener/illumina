@@ -72,13 +72,13 @@ int NNUE::forward(Color color) const {
     auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
     for (size_t i = 0; i < L1_SIZE; ++i) {
-        int activated = std::clamp(int(our_accum[i]), 0, Q1);
-        sum += activated * m_net->output_weights[i];
-    }
+        int our_activated = std::clamp(int(our_accum[i]), 0, Q1);
+        our_activated *= our_activated;
+        sum += our_activated * m_net->output_weights[i];
 
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        int activated = std::clamp(int(their_accum[i]), 0, Q1);
-        sum += activated * m_net->output_weights[L1_SIZE + i];
+        int their_activated = std::clamp(int(their_accum[i]), 0, Q1);
+        their_activated *= their_activated;
+        sum += their_activated * m_net->output_weights[L1_SIZE + i];
     }
 
     return (sum + m_net->output_bias) * SCALE / Q;
