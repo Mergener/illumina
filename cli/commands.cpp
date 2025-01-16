@@ -188,7 +188,7 @@ void register_commands(CLIApplication& server) {
 
         std::optional<std::string> book;
         if (ctx.has_arg("book")) {
-            std::string arg = ctx.all_after("book");
+            std::string arg = ctx.word_after("book");
             if (arg.substr(0, 4) != "None") {
                 book = arg;
             }
