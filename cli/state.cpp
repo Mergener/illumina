@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <climits>
 #include <iomanip>
+#include <random>
 
 #include "bench.h"
 #include "cliapplication.h"
@@ -377,6 +378,65 @@ void State::stop_search() {
     m_searcher.stop();
 }
 
+
+void State::genfens(ui64 n,
+                    ui64 seed,
+                    std::optional<std::string> book_path,
+                    const GenfensOptions& options) {
+    // Setup random engine with provided seed.
+    std::mt19937_64 rnd(seed);
+
+    // Compute some stuff before we move to generating FENs.
+    int ply_interval = options.max_random_plies - options.min_random_plies;
+
+    // Create a searcher that will validate whether the generated positions
+    // are too imbalanced or not.
+    Searcher validator;
+    SearchSettings val_settings;
+    val_settings.max_nodes = options.validator_nodes;
+
+    while (n--) {
+        // We start with the startpos and play some random moves.
+        Board board = Board::standard_startpos();
+
+        // Determine how many random moves to be played.
+        int n_random_plies = (rnd() % ply_interval) + options.min_random_plies;
+
+        // Play the random moves.
+        for (int i = 0; i < n_random_plies; ++i) {
+            Move moves[MAX_GENERATED_MOVES];
+            Move* end = generate_moves(board, moves);
+            size_t n_moves = end - &moves[0];
+
+            if (n_moves == 0) {
+                // Whoops, we got checkmated/stalemated.
+                // Rollback to the start for this iteration.
+                i = -1;
+                board = Board::standard_startpos();
+                continue;
+            }
+
+            // Pick a random move and play it.
+            Move move = moves[rnd() % n_moves];
+            board.make_move(move);
+        }
+
+        // We have reached a generated position.
+        // Now, check with the validator if is too imbalanced or not.
+        // Make sure the validator is fresh before using it.
+        validator.tt().new_search();
+        SearchResults validator_results = validator.search(board, val_settings);
+        if (std::abs(validator_results.score) > options.max_imbalance) {
+            // Position is too imbalanced, skip.
+            continue;
+        }
+
+        // Position is just OK, use it.
+        std::cout << "info string genfens " << board.fen() << std::endl;
+    }
+}
+
+
 void State::quit() {
     std::exit(EXIT_SUCCESS);
 }
@@ -414,7 +474,7 @@ static void add_tuning_option(UCIOptionManager& options,
             });
 #else
     options.register_option<UCIOptionString>(opt_name + std::string("_FP"),
-                                             std::to_string(default_value))
+                                              std::to_string(default_value))
             .add_update_handler([&opt_ref](const UCIOption& opt) {
                 const auto& spin = dynamic_cast<const UCIOptionString&>(opt);
                 opt_ref = std::stod(spin.value());

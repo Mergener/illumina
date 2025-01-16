@@ -1,6 +1,7 @@
 #include "commands.h"
 
 #include <iostream>
+#include <random>
 
 #include "illumina.h"
 #include "state.h"
@@ -177,6 +178,29 @@ void register_commands(CLIApplication& server) {
 
     server.register_command("quit", [](const CommandContext& ctx) {
         global_state().quit();
+    });
+
+    server.register_command("genfens", [](const CommandContext& ctx) {
+
+        ui64 n = ctx.int_after("");
+
+        ui64 seed = ctx.int_after("seed", std::random_device()());
+
+        std::optional<std::string> book;
+        if (ctx.has_arg("book")) {
+            std::string arg = ctx.all_after("book");
+            if (arg.substr(0, 4) != "None") {
+                book = arg;
+            }
+        }
+
+        GenfensOptions options {};
+        options.min_random_plies = ctx.int_after("minplies", options.min_random_plies);
+        options.max_random_plies = ctx.int_after("maxplies", options.max_random_plies);
+        options.validator_nodes  = ctx.int_after("valnodes", options.validator_nodes);
+        options.max_imbalance    = ctx.int_after("imbalance", options.max_imbalance);
+
+        global_state().genfens(n, seed, book, options);
     });
 
 }

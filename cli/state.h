@@ -9,6 +9,8 @@
 
 namespace illumina {
 
+struct GenfensOptions;
+
 class State {
 public:
     // Board-related operations
@@ -37,6 +39,10 @@ public:
     void check_if_ready();
     void quit();
     bool searching() const;
+    void genfens(ui64 n,
+                 ui64 seed,
+                 std::optional<std::string> book,
+                 const GenfensOptions& options);
 
     State();
 
@@ -56,6 +62,13 @@ private:
 
 void initialize_global_state();
 State& global_state();
+
+struct GenfensOptions {
+    int min_random_plies = 6;
+    int max_random_plies = 8;
+    int max_imbalance = 150;
+    int validator_nodes = 6000;
+};
 
 }
 
