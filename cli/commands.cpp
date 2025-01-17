@@ -188,8 +188,8 @@ void register_commands(CLIApplication& server) {
 
         std::optional<std::string> book;
         if (ctx.has_arg("book")) {
-            std::string arg = ctx.word_after("book");
-            if (arg.substr(0, 4) != "None") {
+            std::string arg = ctx.path_after("book");
+            if (lower_case(arg.substr(0, 4)) != "none") {
                 book = arg;
             }
         }

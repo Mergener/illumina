@@ -78,6 +78,34 @@ std::string CommandContext::word_after(std::string_view arg_name,
     return std::string(parser.read_chunk());
 }
 
+std::string CommandContext::path_after(std::string_view arg_name,
+                                       std::optional<std::string> default_val) const {
+    ParseHelper parser(m_arg);
+    if (!goto_arg(parser, arg_name)) {
+        // Argument not found, try to use default value.
+        if (default_val.has_value()) {
+            return *default_val;
+        }
+
+        // No argument and no default value, throw.
+        throw BadCommandArgument(m_cmd_name, arg_name, "string");
+    }
+    // Argument found, parse and return it.
+    // If it starts with double quotes, read until the next one.
+    std::string str = std::string(parser.remainder());
+    ltrim(str);
+    if (str.empty()) {
+        return *default_val;
+    }
+    if (str[0] == '"') {
+        // Parse until the next " is found.
+        size_t end;
+        for (end = 1; str[end] != '\0' && str[end] != '"'; ++end);
+        return str.substr(1, end - 1);
+    }
+    return std::string(parser.read_chunk());
+}
+
 i64 CommandContext::int_after(std::string_view arg_name,
                               std::optional<i64> default_val) const {
     ParseHelper parser(m_arg);

@@ -34,6 +34,8 @@ public:
                           std::optional<std::string> default_val = std::nullopt) const;
     i64         int_after(std::string_view arg_name,
                           std::optional<i64> default_val = std::nullopt) const;
+    std::string path_after(std::string_view arg_name,
+                           std::optional<std::string> default_val = std::nullopt) const;
 
 private:
     std::string m_cmd_name;

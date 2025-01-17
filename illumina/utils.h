@@ -4,6 +4,7 @@
 #include <cctype>
 #include <string_view>
 #include <stdexcept>
+#include <algorithm>
 
 #include "types.h"
 
@@ -98,6 +99,12 @@ inline Color random_color() {
 std::string lower_case(std::string str);
 
 std::string upper_case(std::string str);
+
+inline void ltrim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }));
+}
 
 
 } // illumina

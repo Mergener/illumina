@@ -4,6 +4,7 @@
 #include <climits>
 #include <iomanip>
 #include <random>
+#include <fstream>
 
 #include "bench.h"
 #include "cliapplication.h"
@@ -395,17 +396,50 @@ void State::genfens(ui64 n,
     SearchSettings val_settings;
     val_settings.max_nodes = options.validator_nodes;
 
+    // Parse specified opening book.
+    std::vector<std::ifstream::pos_type> book_offsets;
+    std::ifstream book_file;
+    if (book_path.has_value()) {
+        book_file.open(book_path.value());
+        if (!book_file.bad() && !book_file.fail()) {
+            std::string line;
+            book_offsets.push_back(book_file.tellg());
+
+            while (std::getline(book_file, line)) {
+                book_offsets.push_back(book_file.tellg());
+            }
+
+            book_file.clear();
+            book_file.seekg(0);
+        }
+    }
+    std::cout << "info string found " << book_offsets.size() << " book lines" << std::endl;
+
     while (n--) {
-        // We start with the startpos and play some random moves.
-        Board board = Board::standard_startpos();
+        // Generate initial position. We either use a position from the book
+        // or fallback to startpos.
+        Board board;
+        if (!book_offsets.empty()) {
+            // We have a book, try to use from it.
+            size_t line_idx = rnd() % book_offsets.size();
+            auto line_pos = book_offsets[line_idx];
+            book_file.seekg(line_pos);
+            std::string fen;
+            std::getline(book_file, fen);
+            board = Board(fen);
+        }
+        else {
+            // No book, start with initial position.
+            board = Board::standard_startpos();
+        }
 
         // Determine how many random moves to be played.
         int n_random_plies = (rnd() % ply_interval) + options.min_random_plies;
 
         // Play the random moves.
+        Move moves[MAX_GENERATED_MOVES];
+        Move* end = generate_moves(board, moves);
         for (int i = 0; i < n_random_plies; ++i) {
-            Move moves[MAX_GENERATED_MOVES];
-            Move* end = generate_moves(board, moves);
             size_t n_moves = end - &moves[0];
 
             if (n_moves == 0) {
@@ -419,6 +453,7 @@ void State::genfens(ui64 n,
             // Pick a random move and play it.
             Move move = moves[rnd() % n_moves];
             board.make_move(move);
+            end = generate_moves(board, moves);
         }
 
         // We have reached a generated position.
