@@ -487,6 +487,9 @@ void SearchWorker::aspiration_windows() {
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
+        prev_score = m_results.pv_results[m_curr_pv_idx].score;
+        best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
+
         Score score;
         if (tracing()) {
             ISearchTracer* tracer = m_settings->tracer;
@@ -498,6 +501,17 @@ void SearchWorker::aspiration_windows() {
         }
         else {
             score = pvs<false, true, false, true>(depth, alpha, beta, &search_stack[0]);
+        }
+
+        // If we've reached a hard limit, don't use incomplete search data.
+        if (   m_main
+            && best_move != MOVE_NULL
+            && should_stop()
+            && !tracing()) {
+            report_pv_results(search_stack);
+            m_results.pv_results[m_curr_pv_idx].score = prev_score;
+            m_results.pv_results[m_curr_pv_idx].best_move = best_move;
+            break;
         }
 
         if (score > alpha && score < beta) {
@@ -513,14 +527,12 @@ void SearchWorker::aspiration_windows() {
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_root_depth;
 
-            m_results.pv_results[m_curr_pv_idx].score     = prev_score;
-            m_results.pv_results[m_curr_pv_idx].best_move = best_move;
+            m_results.pv_results[m_curr_pv_idx].score      = prev_score;
+            m_results.pv_results[m_curr_pv_idx].best_move  = best_move;
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
 
-            prev_score = score;
-            best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
             m_results.pv_results[m_curr_pv_idx].bound_type = BT_LOWERBOUND;
             report_pv_results(search_stack);
         }
