@@ -3,6 +3,10 @@
 #include <incbin/incbin.h>
 #include <nlohmann/json/json.hpp>
 
+#ifdef HAS_AVX2
+#include <immintrin.h>
+#endif
+
 namespace illumina {
 
 INCTXT(_default_network, NNUE_PATH);
@@ -16,23 +20,6 @@ constexpr int Q     = L1_ACTIVATION == ActivationFunction::CReLU
                       ? (Q1 * Q2)
                       : (Q1 * Q1 * Q2);
 
-template <Color C>
-static size_t feature_index(Square square, Piece piece) {
-    Color color     = piece.color();
-    size_t type_idx = piece.type() - 1;
-
-    if constexpr (C == CL_BLACK) {
-        square = mirror_vertical(square);
-        color  = opposite_color(color);
-    }
-
-    size_t index = 0;
-    index = index * CL_COUNT + color;
-    index = index * (PT_COUNT - 1) + type_idx;
-    index = index * SQ_COUNT + square;
-    return index;
-}
-
 void NNUE::clear() {
     // Copy all biases.
     std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), m_accum.white.begin());
@@ -40,64 +27,70 @@ void NNUE::clear() {
 }
 
 int NNUE::forward(Color color) const {
-    if constexpr (L1_ACTIVATION == ActivationFunction::CReLU) {
-        int sum = 0;
+#ifdef HAS_AVX2
+    constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
+    __m256i sum = _mm256_setzero_si256();
 
-        auto our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
-        auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+    auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
+    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
-        for (size_t i = 0; i < L1_SIZE; ++i) {
-            int activated = std::clamp(int(our_accum[i]), 0, Q1);
-            sum += activated * m_net->output_weights[i];
-        }
+    for (int i = 0; i < L1_SIZE / STRIDE; ++i)
+    {
+        __m256i accum_val;
+        __m256i clamped;
+        __m256i squared;
 
-        for (size_t i = 0; i < L1_SIZE; ++i) {
-            int activated = std::clamp(int(their_accum[i]), 0, Q1);
-            sum += activated * m_net->output_weights[L1_SIZE + i];
-        }
+        accum_val = _mm256_load_si256(reinterpret_cast<const __m256i*>(&our_accum[i * STRIDE]));
+        clamped   = _mm256_max_epi16(_mm256_min_epi16(accum_val, _mm256_set1_epi16(Q1)), _mm256_setzero_si256());
+        squared   = _mm256_mullo_epi16(clamped, _mm256_load_si256(reinterpret_cast<const __m256i *>(&m_net->output_weights[i * STRIDE])));
+        squared   = _mm256_madd_epi16(clamped, squared);
+        sum       = _mm256_add_epi32(sum, squared);
 
-        return (sum + m_net->output_bias) * SCALE / Q;
+        accum_val = _mm256_load_si256(reinterpret_cast<const __m256i*>(&their_accum[i * STRIDE]));
+        clamped   = _mm256_max_epi16(_mm256_min_epi16(accum_val, _mm256_set1_epi16(Q1)), _mm256_setzero_si256());
+        squared   = _mm256_mullo_epi16(clamped, _mm256_load_si256(reinterpret_cast<const __m256i *>(&m_net->output_weights[L1_SIZE + i * STRIDE])));
+        squared   = _mm256_madd_epi16(clamped, squared);
+        sum       = _mm256_add_epi32(sum, squared);
     }
-    else if constexpr (L1_ACTIVATION == ActivationFunction::SCReLU) {
-        int sum = 0;
 
-        auto our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
-        auto their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+    __m128i sum0;
+    __m128i sum1;
 
-        for (size_t i = 0; i < L1_SIZE; ++i) {
-            int activated = std::clamp(int(our_accum[i]), 0, Q1);
-            activated = activated * activated;
-            sum += activated * m_net->output_weights[i];
-        }
+    sum0 = _mm256_castsi256_si128(sum);
+    sum1 = _mm256_extracti128_si256(sum, 1);
+    sum0 = _mm_add_epi32(sum0, sum1);
+    sum1 = _mm_unpackhi_epi64(sum0, sum0);
+    sum0 = _mm_add_epi32(sum0, sum1);
+    sum1 = _mm_shuffle_epi32(sum0, _MM_SHUFFLE(2, 3, 0, 1));
+    sum0 = _mm_add_epi32(sum0, sum1);
 
-        for (size_t i = 0; i < L1_SIZE; ++i) {
-            int activated = std::clamp(int(their_accum[i]), 0, Q1);
-            activated = activated * activated;
-            sum += activated * m_net->output_weights[L1_SIZE + i];
-        }
+    return (_mm_cvtsi128_si32(sum0) + m_net->output_bias) * SCALE / Q;
+#else
+    int sum = 0;
 
-        return (sum + m_net->output_bias) * SCALE / Q;
+    auto& our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
+    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+
+    for (size_t i = 0; i < L1_SIZE; ++i) {
+        int our_activated = std::clamp(int(our_accum[i]), 0, Q1);
+        our_activated *= our_activated;
+        sum += our_activated * m_net->output_weights[i];
+
+        int their_activated = std::clamp(int(their_accum[i]), 0, Q1);
+        their_activated *= their_activated;
+        sum += their_activated * m_net->output_weights[L1_SIZE + i];
     }
+
+    return (sum + m_net->output_bias) * SCALE / Q;
+#endif
 }
 
 void NNUE::enable_feature(Square square, Piece piece) {
-    size_t white_idx = feature_index<CL_WHITE>(square, piece);
-    size_t black_idx = feature_index<CL_BLACK>(square, piece);
-
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        m_accum.white[i] += m_net->l1_weights[N_INPUTS * i + white_idx];
-        m_accum.black[i] += m_net->l1_weights[N_INPUTS * i + black_idx];
-    }
+    update_features<1, 0>({square}, {piece}, {}, {});
 }
 
 void NNUE::disable_feature(Square square, Piece piece) {
-    size_t white_idx = feature_index<CL_WHITE>(square, piece);
-    size_t black_idx = feature_index<CL_BLACK>(square, piece);
-
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        m_accum.white[i] -= m_net->l1_weights[N_INPUTS * i + white_idx];
-        m_accum.black[i] -= m_net->l1_weights[N_INPUTS * i + black_idx];
-    }
+    update_features<0, 1>({}, {}, {square}, {piece});
 }
 
 void NNUE::push_accumulator() {

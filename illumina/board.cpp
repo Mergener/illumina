@@ -1045,6 +1045,27 @@ bool Board::gives_check(Move move) const {
     return false;
 }
 
+ui64 Board::estimate_hash_key_after(Move move) const {
+    ILLUMINA_ASSERT(is_move_pseudo_legal(move));
+
+    ui64 key = hash_key();
+
+    key ^= zob_color_to_move_key(color_to_move());
+    key ^= zob_color_to_move_key(opposite_color(color_to_move()));
+
+    Square src = move.source();
+    Square dst = move.destination();
+
+    Piece src_piece = move.source_piece();
+    key ^= zob_piece_square_key(src_piece, src);
+    key ^= zob_piece_square_key(src_piece, dst);
+
+    Piece dst_piece = piece_at(dst);
+    key ^= zob_piece_square_key(dst_piece, dst);
+
+    return key;
+}
+
 // Board constructors below.
 // We don't use default copy/assignment constructor implementations since
 // we don't want listeners to be copied from a board object to another.

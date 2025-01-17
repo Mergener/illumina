@@ -35,6 +35,10 @@ void initialize_global_state() {
     s_global_state = new State();
 }
 
+bool State::searching() const {
+    return m_searching;
+}
+
 State& global_state() {
     ILLUMINA_ASSERT(s_global_state != nullptr);
     return *s_global_state;
