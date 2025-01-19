@@ -142,6 +142,7 @@ add_subdirectory(ext)
 # Add Illumina's modules.
 add_subdirectory(illumina)
 add_subdirectory(cli)
+add_subdirectory(datagen)
 
 if (HAS_LITETEST)
     add_subdirectory(tests)
