@@ -19,7 +19,7 @@ enum class ActivationFunction {
 
 static constexpr size_t N_INPUTS = 768;
 static constexpr ActivationFunction L1_ACTIVATION = ActivationFunction::SCReLU;
-static constexpr size_t L1_SIZE  = 128;
+static constexpr size_t L1_SIZE  = 256;
 
 struct EvalNetwork {
     alignas(32) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
