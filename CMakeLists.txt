@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.15)
 project(illumina)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -69,6 +69,16 @@ option(OPENBENCH_COMPLIANCE_MODE
 if (OPENBENCH_COMPLIANCE_MODE)
     message("OpenBench compliance mode enabled.")
     add_definitions(-DOPENBENCH_COMPLIANCE)
+endif()
+
+option(PROFILING
+        "Generates profilable executables. Use only for profiling purposes, as this option
+        will decrease performance significantly.")
+if (PROFILING)
+    message("Profiling support enabled.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -pg -fno-omit-frame-pointer")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g -pg")
+    add_definitions(-DPROFILING)
 endif()
 
 # For GCC-derived compilers, we need to specify some flags in order

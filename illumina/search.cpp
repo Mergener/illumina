@@ -582,10 +582,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Setup some important values.
     TranspositionTable& tt = m_context->tt();
+    ui64 board_key         = m_board.hash_key();
     Score original_alpha   = alpha;
     int n_searched_moves   = 0;
     Move hash_move         = MOVE_NULL;
-    ui64  board_key        = m_board.hash_key();
     bool in_check          = m_board.in_check();
     Color us               = m_board.color_to_move();
     Depth ply              = node->ply;
@@ -605,23 +605,17 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         TRACE_SET(Traceable::FOUND_IN_TT, true);
 
+        // TT Cutoff.
         if (   !PV
             && node->skip_move == MOVE_NULL
             && tt_entry.depth() >= depth) {
-            if (!ROOT && tt_entry.bound_type() == BT_EXACT) {
-                // TT Cutoff.
+            BoundType bt = tt_entry.bound_type();
+            Score score  = tt_entry.score();
+            if (   bt == BT_EXACT
+                || (bt == BT_UPPERBOUND && score <= alpha)
+                || (bt == BT_LOWERBOUND && score >= beta)) {
                 TRACE_SET(Traceable::TT_CUTOFF, true);
-                return tt_entry.score();
-            }
-            else if (tt_entry.bound_type() == BT_LOWERBOUND) {
-                alpha = std::max(alpha, tt_entry.score());
-            }
-            else {
-                beta = std::min(beta, tt_entry.score());
-            }
-
-            if (alpha >= beta) {
-                return alpha;
+                return score;
             }
         }
     }
@@ -814,6 +808,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             if (score < se_beta) {
                 extensions++;
+            }
+            // Multi-cut pruning.
+            else if (score >= beta) {
+                return score;
             }
         }
 
@@ -1182,6 +1180,7 @@ template <bool TRACE>
 void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
     TRACE_PUSH();
     m_results.nodes++;
+    m_context->tt().prefetch(board.estimate_hash_key_after(move));
     m_eval.on_make_move(board, move);
 }
 

@@ -20,33 +20,10 @@ constexpr int Q     = L1_ACTIVATION == ActivationFunction::CReLU
                       ? (Q1 * Q2)
                       : (Q1 * Q1 * Q2);
 
-template <Color C>
-static size_t feature_index(Square square, Piece piece) {
-    Color color     = piece.color();
-    size_t type_idx = piece.type() - 1;
-
-    if constexpr (C == CL_BLACK) {
-        square = mirror_vertical(square);
-        color  = opposite_color(color);
-    }
-
-    size_t index = 0;
-    index = index * CL_COUNT + color;
-    index = index * (PT_COUNT - 1) + type_idx;
-    index = index * SQ_COUNT + square;
-    return index;
-}
-
 void NNUE::clear() {
     // Copy all biases.
-    m_accum_stack.clear();
-
-    m_accum_stack.resize(1);
-    m_accum_stack.reserve(32);
-    Accumulator& accum = accumulator();
-
-    std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), accum.white.begin());
-    std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), accum.black.begin());
+    std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), m_accum.white.begin());
+    std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), m_accum.black.begin());
 }
 
 int NNUE::forward(Color color) const {
@@ -54,10 +31,8 @@ int NNUE::forward(Color color) const {
     constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
     __m256i sum = _mm256_setzero_si256();
 
-    const Accumulator& accum = accumulator();
-
-    const auto& our_accum   = color == CL_WHITE ? accum.white : accum.black;
-    const auto& their_accum = color == CL_WHITE ? accum.black : accum.white;
+    auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
+    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
     for (int i = 0; i < L1_SIZE / STRIDE; ++i)
     {
@@ -93,19 +68,17 @@ int NNUE::forward(Color color) const {
 #else
     int sum = 0;
 
-    const Accumulator& accum = accumulator();
-
-    const auto& our_accum = color == CL_WHITE ? accum.white : accum.black;
-    const auto& their_accum = color == CL_WHITE ? accum.black : accum.white;
+    auto& our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
+    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
     for (size_t i = 0; i < L1_SIZE; ++i) {
-        int activated = std::clamp(int(our_accum[i]), 0, Q1);
-        sum += activated * m_net->output_weights[i];
-    }
+        int our_activated = std::clamp(int(our_accum[i]), 0, Q1);
+        our_activated *= our_activated;
+        sum += our_activated * m_net->output_weights[i];
 
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        int activated = std::clamp(int(their_accum[i]), 0, Q1);
-        sum += activated * m_net->output_weights[L1_SIZE + i];
+        int their_activated = std::clamp(int(their_accum[i]), 0, Q1);
+        their_activated *= their_activated;
+        sum += their_activated * m_net->output_weights[L1_SIZE + i];
     }
 
     return (sum + m_net->output_bias) * SCALE / Q;
@@ -113,46 +86,23 @@ int NNUE::forward(Color color) const {
 }
 
 void NNUE::enable_feature(Square square, Piece piece) {
-    Accumulator& accum = accumulator();
-
-    size_t white_idx = feature_index<CL_WHITE>(square, piece);
-    size_t black_idx = feature_index<CL_BLACK>(square, piece);
-
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        accum.white[i] += m_net->l1_weights[N_INPUTS * i + white_idx];
-        accum.black[i] += m_net->l1_weights[N_INPUTS * i + black_idx];
-    }
+    update_features<1, 0>({square}, {piece}, {}, {});
 }
 
 void NNUE::disable_feature(Square square, Piece piece) {
-    Accumulator& accum = accumulator();
-
-    size_t white_idx = feature_index<CL_WHITE>(square, piece);
-    size_t black_idx = feature_index<CL_BLACK>(square, piece);
-
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        accum.white[i] -= m_net->l1_weights[N_INPUTS * i + white_idx];
-        accum.black[i] -= m_net->l1_weights[N_INPUTS * i + black_idx];
-    }
+    update_features<0, 1>({}, {}, {square}, {piece});
 }
 
 void NNUE::push_accumulator() {
-    m_accum_stack.push_back(accumulator());
+    m_accum_stack.push_back(m_accum);
 }
 
 void NNUE::pop_accumulator() {
-    ILLUMINA_ASSERT(m_accum_idx >= 0);
+    ILLUMINA_ASSERT(!m_accum_stack.empty());
+
+    m_accum = m_accum_stack.back();
     m_accum_stack.pop_back();
 }
-
-Accumulator& NNUE::accumulator() {
-    return m_accum_stack.back();
-}
-
-const Accumulator& NNUE::accumulator() const {
-    return m_accum_stack.back();
-}
-
 
 NNUE::NNUE()
     : m_net(s_default_network) {

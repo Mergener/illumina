@@ -24,8 +24,6 @@ public:
 private:
     NNUE m_nnue;
     Color m_ctm;
-
-    bool m_undoing_move = false;
 };
 
 } // illumina

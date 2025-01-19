@@ -58,6 +58,7 @@ public:
                    Score static_eval,
                    BoundType bound_type);
     int hash_full() const;
+    void prefetch(ui64 zob) const;
 
     explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
     ~TranspositionTable() = default;
@@ -73,6 +74,7 @@ private:
     ui8 m_gen = 0;
 
     TranspositionTableEntry& entry_ref(ui64 key);
+    const TranspositionTableEntry& entry_ref(ui64 key) const;
 };
 
 inline ui64 TranspositionTableEntry::key() const {
@@ -115,6 +117,13 @@ inline size_t TranspositionTable::size() const {
     return m_size_in_bytes;
 }
 
+inline const TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) const {
+    return m_buf[key % m_max_entry_count];
+}
+
+inline void TranspositionTable::prefetch(ui64 zob) const {
+    __builtin_prefetch(&entry_ref(zob));
+}
 
 } // illumina
 
