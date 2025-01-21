@@ -64,7 +64,7 @@ int NNUE::forward(Color color) const {
     sum1 = _mm_shuffle_epi32(sum0, _MM_SHUFFLE(2, 3, 0, 1));
     sum0 = _mm_add_epi32(sum0, sum1);
 
-    return (_mm_cvtsi128_si32(sum0) + m_net->output_bias) * SCALE / Q;
+    return i64((_mm_cvtsi128_si32(sum0) + m_net->output_bias) * SCALE) / Q;
 #else
     int sum = 0;
 
@@ -81,7 +81,7 @@ int NNUE::forward(Color color) const {
         sum += their_activated * m_net->output_weights[L1_SIZE + i];
     }
 
-    return (sum + m_net->output_bias) * SCALE / Q;
+    return i64((sum + m_net->output_bias) * SCALE) / Q;
 #endif
 }
 

@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <iostream>
+#include <algorithm>
 
 #include "debug.h"
 
@@ -91,7 +92,7 @@ constexpr bool bit_is_set(ui64 val, ui8 bit) {
  * Example: lrot(0b00110010, 4) = 0b00100011
  */
 constexpr ui8 lrot(ui8 val, ui8 rot) {
-    return (val << rot) | (val >> ((sizeof(val) * 8) - rot));
+    return (val << std::clamp(rot, ui8(0), ui8(8))) | (val >> std::clamp((8 - rot), 0, 8));
 }
 
 /**
