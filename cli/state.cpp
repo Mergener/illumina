@@ -169,7 +169,7 @@ void State::evaluate() const {
     Evaluation eval;
     Board repl = m_board;
     eval.on_new_board(repl);
-    Score score = normalize_eval(eval.get(), repl);
+    Score score = normalize_score_if_desired(eval.get(), repl);
 
     std::cout << "      ";
 
@@ -193,7 +193,7 @@ void State::evaluate() const {
             else {
                 repl.set_piece_at(s, PIECE_NULL);
                 eval.on_new_board(repl);
-                Score score_without_piece = normalize_eval(eval.get(), repl);
+                Score score_without_piece = normalize_score_if_desired(eval.get(), repl);
                 repl.set_piece_at(s, p);
 
                 std::cout << std::setw(6)
@@ -288,7 +288,7 @@ void State::setup_searcher() {
                   << multipv_string(opt_multi_pv.value() > 1, res.pv_idx)
                   << " depth "    << res.depth
                   << " seldepth " << res.sel_depth
-                  << " score "    << score_string(normalize_eval(res.score, m_board))
+                  << " score "    << score_string(normalize_score_if_desired(res.score, m_board))
                   << bound_type_string(res.bound_type);
         if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
         std::cout << " pv "       << pv_to_string(res.line, m_board, m_frc);
@@ -373,6 +373,13 @@ void State::search(SearchSettings settings, bool trace) {
     });
 }
 
+Score State::normalize_score_if_desired(Score score, const Board& board) const {
+    if (!m_options.option<UCIOptionCheck>("NormalizeScores").value()) {
+        return score;
+    }
+    return normalize_score(score, board);
+}
+
 void State::stop_search() {
     m_searcher.stop();
 }
@@ -441,6 +448,7 @@ void State::register_options() {
         });
     m_options.register_option<UCIOptionSpin>("EvalRandomMargin", 0, 0, 1024);
     m_options.register_option<UCIOptionSpin>("OverrideNodesLimit", 0, 0, INT32_MAX);
+    m_options.register_option<UCIOptionCheck>("NormalizeScores", true);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \

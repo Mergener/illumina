@@ -113,7 +113,7 @@ static std::pair<double, double> wdl_params(Score score, const Board& board) {
     return { p_a, p_b };
 }
 
-Score normalize_eval(Score score, const Board& board) {
+Score normalize_score(Score score, const Board& board) {
     if (score == 0 || std::abs(score) >= KNOWN_WIN) {
         return score;
     }

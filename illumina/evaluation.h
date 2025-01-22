@@ -26,7 +26,7 @@ private:
     Color m_ctm;
 };
 
-Score normalize_eval(Score eval, const Board& board);
+Score normalize_score(Score score, const Board& board);
 
 } // illumina
 
