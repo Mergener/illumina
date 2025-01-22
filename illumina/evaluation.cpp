@@ -107,8 +107,8 @@ static std::pair<double, double> wdl_params(Score score, const Board& board) {
 
     double x = std::clamp(material, 17, 78) / 58.0;
 
-    double p_a = ((AS[0] * x / 58 + AS[1]) * x / 58 + AS[2]) * x / 58 + AS[3];
-    double p_b = ((BS[0] * x / 58 + BS[1]) * x / 58 + BS[2]) * x / 58 + BS[3];
+    double p_a = ((AS[0] * x + AS[1]) * x + AS[2]) * x + AS[3];
+    double p_b = ((BS[0] * x + BS[1]) * x + BS[2]) * x + BS[3];
 
     return { p_a, p_b };
 }
