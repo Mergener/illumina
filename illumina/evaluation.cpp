@@ -122,4 +122,21 @@ Score normalize_score(Score score, const Board& board) {
     return Score(std::round(100.0 * double(score) / a));
 }
 
+WDL wdl_from_score(Score score, const Board& board) {
+    if (score >= KNOWN_WIN) {
+        return { 1000, 0, 0 };
+    }
+    if (score <= -KNOWN_WIN) {
+        return { 0, 0, 1000 };
+    }
+
+    auto [a, b] = wdl_params(score, board);
+
+    int w = std::round(1000.0 / (1.0 + std::exp((a - double(score)) / b)));
+    int l = std::round(1000.0 / (1.0 + std::exp((a + double(score)) / b)));
+    int d = 1000 - w - l;
+
+    return { w, d, l };
+}
+
 } // illumina

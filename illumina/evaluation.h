@@ -28,6 +28,14 @@ private:
 
 Score normalize_score(Score score, const Board& board);
 
+struct WDL {
+    int w;
+    int d;
+    int l;
+};
+
+WDL wdl_from_score(Score score, const Board& board);
+
 } // illumina
 
 #endif // ILLUMINA_EVALUATION_H
