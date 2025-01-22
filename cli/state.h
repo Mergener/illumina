@@ -52,6 +52,7 @@ private:
 
     void setup_searcher();
     void register_options();
+    Score normalize_score_if_desired(Score score, const Board& board) const;
 };
 
 void initialize_global_state();
