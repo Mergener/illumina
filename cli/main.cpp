@@ -31,13 +31,11 @@ int main(int argc, char* argv[]) {
         // Initialize program state.
         initialize_global_state();
 
-        // If command line arguments were specified, execute them.
-        if (argc > 1) {
-            for (int i = 1; i < argc; ++i) {
-                server.handle(argv[i]);
-                while (global_state().searching());
-            }
+        // Bench if specified.
+        if (has_cli_arg(argc, argv, "bench")) {
+            server.handle("bench");
             server.handle("quit");
+            return 0;
         }
 
         // Finally, run.
@@ -58,6 +56,15 @@ int main(int argc, char* argv[]) {
         std::cerr << "Fatal:\n" << e.what() << std::endl;
         return EXIT_FAILURE;
     }
+}
+
+static bool has_cli_arg(int argc, char* argv[], std::string_view arg) {
+    for (int i = 0; i < argc; ++i) {
+        if (std::string(argv[i]) == arg) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void display_hello_text() {
