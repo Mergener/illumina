@@ -169,7 +169,7 @@ void State::evaluate() const {
     Evaluation eval;
     Board repl = m_board;
     eval.on_new_board(repl);
-    Score score = eval.get();
+    Score score = normalize_eval(eval.get(), repl);
 
     std::cout << "      ";
 
@@ -193,7 +193,7 @@ void State::evaluate() const {
             else {
                 repl.set_piece_at(s, PIECE_NULL);
                 eval.on_new_board(repl);
-                Score score_without_piece = eval.get();
+                Score score_without_piece = normalize_eval(eval.get(), repl);
                 repl.set_piece_at(s, p);
 
                 std::cout << std::setw(6)
@@ -288,7 +288,7 @@ void State::setup_searcher() {
                   << multipv_string(opt_multi_pv.value() > 1, res.pv_idx)
                   << " depth "    << res.depth
                   << " seldepth " << res.sel_depth
-                  << " score "    << score_string(res.score)
+                  << " score "    << score_string(normalize_eval(res.score, m_board))
                   << bound_type_string(res.bound_type);
         if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
         std::cout << " pv "       << pv_to_string(res.line, m_board, m_frc);
