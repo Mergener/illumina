@@ -81,14 +81,21 @@ if (PROFILING)
     add_definitions(-DPROFILING)
 endif()
 
-# For GCC-derived compilers, we need to specify some flags in order
-# to have <thread> and <filesystem> properly working.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # GCC requires some flags in order for threads and <filesystem> to work.
-    set(CMAKE_CXX_FLAGS "-pthread -static-libstdc++ -static-libgcc --static")
+    # We need to link against pthread.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+
+    # Windows machines often don't include C/C++ runtimes by default.
+    # In this platform, linking against C/C++ runtimes statically might
+    # be preferred.
+    if (WIN32)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc --static")
+    endif()
 # We don't want Clang to dynamically link the standard library.
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc ${CMAKE_EXE_LINKER_FLAGS}")
+    if (WIN32)
+        set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc ${CMAKE_EXE_LINKER_FLAGS}")
+    endif()
 endif()
 
 # Define our supported architectures here.
