@@ -27,45 +27,45 @@ void NNUE::clear() {
 }
 
 int NNUE::forward(Color color) const {
-#ifdef HAS_AVX2
-    constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
-    __m256i sum = _mm256_setzero_si256();
-
-    auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
-    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
-
-    for (int i = 0; i < L1_SIZE / STRIDE; ++i)
-    {
-        __m256i accum_val;
-        __m256i clamped;
-        __m256i squared;
-
-        accum_val = _mm256_load_si256(reinterpret_cast<const __m256i*>(&our_accum[i * STRIDE]));
-        clamped   = _mm256_max_epi16(_mm256_min_epi16(accum_val, _mm256_set1_epi16(Q1)), _mm256_setzero_si256());
-        squared   = _mm256_mullo_epi16(clamped, _mm256_load_si256(reinterpret_cast<const __m256i *>(&m_net->output_weights[i * STRIDE])));
-        squared   = _mm256_madd_epi16(clamped, squared);
-        sum       = _mm256_add_epi32(sum, squared);
-
-        accum_val = _mm256_load_si256(reinterpret_cast<const __m256i*>(&their_accum[i * STRIDE]));
-        clamped   = _mm256_max_epi16(_mm256_min_epi16(accum_val, _mm256_set1_epi16(Q1)), _mm256_setzero_si256());
-        squared   = _mm256_mullo_epi16(clamped, _mm256_load_si256(reinterpret_cast<const __m256i *>(&m_net->output_weights[L1_SIZE + i * STRIDE])));
-        squared   = _mm256_madd_epi16(clamped, squared);
-        sum       = _mm256_add_epi32(sum, squared);
-    }
-
-    __m128i sum0;
-    __m128i sum1;
-
-    sum0 = _mm256_castsi256_si128(sum);
-    sum1 = _mm256_extracti128_si256(sum, 1);
-    sum0 = _mm_add_epi32(sum0, sum1);
-    sum1 = _mm_unpackhi_epi64(sum0, sum0);
-    sum0 = _mm_add_epi32(sum0, sum1);
-    sum1 = _mm_shuffle_epi32(sum0, _MM_SHUFFLE(2, 3, 0, 1));
-    sum0 = _mm_add_epi32(sum0, sum1);
-
-    return (_mm_cvtsi128_si32(sum0) + m_net->output_bias) * SCALE / Q;
-#else
+//#ifdef HAS_AVX2
+//    constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
+//    __m256i sum = _mm256_setzero_si256();
+//
+//    auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
+//    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+//
+//    for (int i = 0; i < L1_SIZE / STRIDE; ++i)
+//    {
+//        __m256i accum_val;
+//        __m256i clamped;
+//        __m256i squared;
+//
+//        accum_val = _mm256_load_si256(reinterpret_cast<const __m256i*>(&our_accum[i * STRIDE]));
+//        clamped   = _mm256_max_epi16(_mm256_min_epi16(accum_val, _mm256_set1_epi16(Q1)), _mm256_setzero_si256());
+//        squared   = _mm256_mullo_epi16(clamped, _mm256_load_si256(reinterpret_cast<const __m256i *>(&m_net->output_weights[i * STRIDE])));
+//        squared   = _mm256_madd_epi16(clamped, squared);
+//        sum       = _mm256_add_epi32(sum, squared);
+//
+//        accum_val = _mm256_load_si256(reinterpret_cast<const __m256i*>(&their_accum[i * STRIDE]));
+//        clamped   = _mm256_max_epi16(_mm256_min_epi16(accum_val, _mm256_set1_epi16(Q1)), _mm256_setzero_si256());
+//        squared   = _mm256_mullo_epi16(clamped, _mm256_load_si256(reinterpret_cast<const __m256i *>(&m_net->output_weights[L1_SIZE + i * STRIDE])));
+//        squared   = _mm256_madd_epi16(clamped, squared);
+//        sum       = _mm256_add_epi32(sum, squared);
+//    }
+//
+//    __m128i sum0;
+//    __m128i sum1;
+//
+//    sum0 = _mm256_castsi256_si128(sum);
+//    sum1 = _mm256_extracti128_si256(sum, 1);
+//    sum0 = _mm_add_epi32(sum0, sum1);
+//    sum1 = _mm_unpackhi_epi64(sum0, sum0);
+//    sum0 = _mm_add_epi32(sum0, sum1);
+//    sum1 = _mm_shuffle_epi32(sum0, _MM_SHUFFLE(2, 3, 0, 1));
+//    sum0 = _mm_add_epi32(sum0, sum1);
+//
+//    return (_mm_cvtsi128_si32(sum0) + m_net->output_bias) * SCALE / Q;
+//#else
     int sum = 0;
 
     auto& our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
@@ -82,7 +82,7 @@ int NNUE::forward(Color color) const {
     }
 
     return (sum + m_net->output_bias) * SCALE / Q;
-#endif
+//#endif
 }
 
 void NNUE::enable_feature(Square square, Piece piece) {
