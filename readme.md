@@ -3,7 +3,7 @@ Illumina is a chess engine that supports the [UCI protocol](https://en.wikipedia
 ## Building Prerequisites
 
 - C++17 compliant compiler
-- CMake 3.20 or higher (build system generator)
+- CMake 3.15 or higher (build system generator)
 
 ## Building
 
