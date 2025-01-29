@@ -91,6 +91,7 @@ constexpr bool bit_is_set(ui64 val, ui8 bit) {
  * Example: lrot(0b00110010, 4) = 0b00100011
  */
 constexpr ui8 lrot(ui8 val, ui8 rot) {
+    rot %= 8;
     return (val << rot) | (val >> ((sizeof(val) * 8) - rot));
 }
 
