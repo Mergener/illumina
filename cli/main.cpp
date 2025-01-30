@@ -17,10 +17,10 @@ int main(int argc, char* argv[]) {
         illumina::init();
 
         // Perform UCI setup.
-        CLIApplication server;
-        register_commands(server);
+        CLIApplication app;
+        register_commands(app);
 
-        server.set_error_handler([](CLIApplication& server, const std::exception& err) {
+        app.set_error_handler([](CLIApplication& server, const std::exception& err) {
             std::cerr << "Error:\n" << err.what() << std::endl;
         });
 
@@ -30,10 +30,10 @@ int main(int argc, char* argv[]) {
         // If command line arguments were specified, execute them.
         if (argc > 1) {
             for (int i = 1; i < argc; ++i) {
-                server.handle(argv[i]);
+                app.handle(argv[i]);
                 while (global_state().searching());
             }
-            server.handle("quit");
+            app.handle("quit");
         }
 
         // Finally, run.
@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Assertions are enabled for this build." << std::endl;
 #endif
 
-        server.listen();
+        app.listen();
 
         return EXIT_SUCCESS;
     }
