@@ -343,11 +343,11 @@ void State::search(SearchSettings settings, bool trace) {
     }
 
     // Prevent invoking two simultaneous searches.
-    if (m_searching) {
+    if (m_searching.load(std::memory_order_acquire)) {
         std::cerr << "Already searching." << std::endl;
         return;
     }
-    m_searching = true;
+    m_searching.store(true, std::memory_order_seq_cst);
     if (m_search_thread != nullptr) {
         m_search_thread->join();
         delete m_search_thread;
@@ -369,7 +369,7 @@ void State::search(SearchSettings settings, bool trace) {
 
             std::cout << std::endl;
 
-            m_searching = false;
+            m_searching.store(false, std::memory_order_seq_cst);
         }
         catch (const std::exception& e) {
             std::cerr << "Unhandled exception during search: " << std::endl
