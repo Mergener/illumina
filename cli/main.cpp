@@ -13,10 +13,6 @@ static void display_hello_text();
 
 int main(int argc, char* argv[]) {
     try {
-        // Setup some C++ stuff.
-        std::ios::sync_with_stdio(false);
-        std::cin.tie();
-
         // Initialize illumina.
         illumina::init();
 
