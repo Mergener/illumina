@@ -320,8 +320,8 @@ SearchResults Searcher::search(const Board& board,
     // Fire secondary threads.
     secondary_workers.clear();
     std::vector<std::thread> helper_threads;
+    secondary_workers.resize(n_helper_threads);
     for (int i = 0; i < n_helper_threads; ++i) {
-        secondary_workers.push_back(nullptr);
         helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
             secondary_workers[i] = std::make_unique<SearchWorker>(false, board, &context, &settings);
             secondary_workers[i]->iterative_deepening();
@@ -1228,12 +1228,8 @@ SearchWorker::SearchWorker(bool main,
       m_board(board),
       m_context(context),
       m_settings(settings),
-      m_eval_random_margin(m_main
-                           ? settings->eval_random_margin
-                           : std::max(SMP_EVAL_RANDOM_MARGIN, settings->eval_random_margin)),
-      m_eval_random_seed(m_main
-                         ? settings->eval_rand_seed
-                         : random(ui64(1), UINT64_MAX)) {
+      m_eval_random_margin(settings->eval_random_margin),
+      m_eval_random_seed(settings->eval_rand_seed) {
     m_eval.on_new_board(m_board);
 
     // Dispatch board callbacks to Worker's methods.
