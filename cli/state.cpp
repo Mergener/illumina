@@ -343,7 +343,7 @@ void State::search(SearchSettings settings, bool trace) {
     }
 
     // Prevent invoking two simultaneous searches.
-    if (m_searching.load(std::memory_order_acquire)) {
+    if (m_searching.load(std::memory_order_relaxed)) {
         std::cerr << "Already searching." << std::endl;
         return;
     }
