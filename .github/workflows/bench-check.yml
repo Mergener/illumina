@@ -17,13 +17,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Check Commit Message
+      - name: Check Commit Message for Bench
+        id: check_commit
         run: |
           commit_message=$(git log -1 --pretty=%B)
           echo "Latest commit message: $commit_message"
-          if echo "$commit_message" | grep -iE '^bench[[:space:]]+[0-9]+$|^bench:[[:space:]]*[0-9]+$'; then
-            echo "Bench already included in last commit. Skipping job."
-            exit 0
+          
+          # Extract bench value if present (case-insensitive)
+          if echo "$commit_message" | grep -iEo '\bbench[: ]+[0-9]+\b' >/dev/null; then
+            bench_commit=$(echo "$commit_message" | grep -iEo '[0-9]+')
+            echo "Found bench value in commit: $bench_commit"
+            echo "bench_found=true" >> $GITHUB_ENV
+            echo "bench_commit=$bench_commit" >> $GITHUB_ENV
+          else
+            echo "No bench found in commit."
+            echo "bench_found=false" >> $GITHUB_ENV
           fi
 
       - name: Set up C++ compiler and CMake
@@ -37,9 +45,22 @@ jobs:
           make EXE=illumina
           output=$(./illumina bench)
           bench_nodes=$(echo "$output" | grep -o '^[0-9]*' | head -n 1)
-          echo "$bench_nodes" > bench.txt
+          echo "$bench_nodes" > openbench/bench.txt
+          echo "Obtained bench: $bench_nodes"
+          echo "bench_nodes=$bench_nodes" >> $GITHUB_ENV
 
-      - name: Verify Bench File and Commit Changes
+      - name: Compare Bench Results
+        if: env.bench_found == 'true'
+        run: |
+          if [ "$bench_nodes" -eq "$bench_commit" ]; then
+            echo "Bench matches commit. No commit needed."
+          else
+            echo "Bench mismatch! Expected: $bench_commit, Got: $bench_nodes"
+            exit 1
+          fi
+
+      - name: Commit New Bench Result
+        if: env.bench_found == 'false' || failure()
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
