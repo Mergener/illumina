@@ -8,7 +8,6 @@
 
 using namespace illumina;
 
-static bool has_cli_arg(int argc, char* argv[], std::string_view arg);
 static void display_hello_text();
 
 int main(int argc, char* argv[]) {

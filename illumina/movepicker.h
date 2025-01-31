@@ -271,11 +271,12 @@ inline MovePicker<QUIESCE>::MovePicker(const Board& board,
                                        Depth ply,
                                        const MoveHistory& move_hist,
                                        Move hash_move)
-    : m_board(&board), m_ply(ply),
-      m_hash_move(hash_move), m_mv_hist(&move_hist),
+    : m_curr_move_range({ &m_moves[0], &m_moves[0] }),
+      m_moves_it(&m_moves[0]),
+      m_moves_end(&m_moves[0]),
+      m_board(&board), m_mv_hist(&move_hist),
       m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
-      m_curr_move_range({ &m_moves[0], &m_moves[0] }), m_moves_end(&m_moves[0]),
-      m_moves_it(&m_moves[0]) {
+      m_hash_move(hash_move), m_ply(ply) {
 }
 
 template<bool QUIESCE>

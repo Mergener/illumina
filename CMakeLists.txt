@@ -93,7 +93,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     endif()
 # We don't want Clang to dynamically link the standard library.
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall")
     if (WIN32)
         set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc ${CMAKE_EXE_LINKER_FLAGS}")
     endif()

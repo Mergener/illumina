@@ -1,6 +1,6 @@
 #include "attacks.h"
 
-#ifdef HAS_PEXT
+#ifndef HAS_PEXT
 
 namespace illumina {
 

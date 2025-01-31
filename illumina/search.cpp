@@ -98,12 +98,14 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              const RootInfo* root_info,
                              const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
                              TimeManager* time_manager)
-    : m_stop(should_stop),
-      m_tt(tt), m_listeners(listeners),
-      m_time_manager(time_manager),
+    : m_tt(tt),
+      m_listeners(listeners),
       m_root_info(root_info),
-      m_helper_workers(helper_workers),
-      m_search_start(now()) { }
+      m_stop(should_stop),
+      m_time_manager(time_manager),
+      m_search_start(now()),
+      m_helper_workers(helper_workers)
+      { }
 
 void SearchContext::stop_search() const {
     m_stop->store(true, std::memory_order_relaxed);
@@ -146,13 +148,13 @@ public:
                  const Board& board,
                  SearchContext* context,
                  const SearchSettings* settings);
-    Board       m_board;
 
 private:
     const SearchSettings* m_settings;
     const SearchContext*  m_context;
     WorkerResults         m_results;
 
+    Board       m_board;
     MoveHistory m_hist;
     Evaluation  m_eval {};
     bool        m_main;
@@ -1224,10 +1226,10 @@ SearchWorker::SearchWorker(bool main,
                            const Board& board,
                            SearchContext* context,
                            const SearchSettings* settings)
-    : m_main(main),
-      m_board(board),
+    : m_settings(settings),
       m_context(context),
-      m_settings(settings),
+      m_board(board),
+      m_main(main),
       m_eval_random_margin(settings->eval_random_margin),
       m_eval_random_seed(settings->eval_rand_seed) {
     m_eval.on_new_board(m_board);
