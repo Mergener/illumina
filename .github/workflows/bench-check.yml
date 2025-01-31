@@ -1,8 +1,8 @@
 name: Bench Validation
 
 permissions:
-  contents: write 
-  
+  contents: write
+
 on:
   push:
     branches:
@@ -16,6 +16,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Check Commit Message
+        run: |
+          commit_message=$(git log -1 --pretty=%B)
+          echo "Latest commit message: $commit_message"
+          if echo "$commit_message" | grep -iE '^bench[[:space:]]+[0-9]+$|^bench:[[:space:]]*[0-9]+$'; then
+            echo "Bench already included in last commit. Skipping job."
+            exit 0
+          fi
 
       - name: Set up C++ compiler and CMake
         run: |
