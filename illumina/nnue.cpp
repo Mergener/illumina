@@ -34,7 +34,7 @@ int NNUE::forward(Color color) const {
     auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
     auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
-    for (int i = 0; i < L1_SIZE / STRIDE; ++i)
+    for (size_t i = 0; i < L1_SIZE / STRIDE; ++i)
     {
         __m256i accum_val;
         __m256i clamped;
