@@ -344,12 +344,7 @@ void State::search(SearchSettings settings, bool trace) {
 
     // Prevent invoking two simultaneous searches.
     if (m_searching.exchange(true, std::memory_order_acquire)) {
-        std::cerr << "Already searching." << std::endl;
-        return;
-    }
-    if (m_search_thread != nullptr) {
-        m_search_thread->join();
-        delete m_search_thread;
+        stop_search();
     }
 
     // Finally, fire the search thread.
@@ -387,6 +382,10 @@ Score State::normalize_score_if_desired(Score score, const Board& board) const {
 
 void State::stop_search() {
     m_searcher.stop();
+    if (m_search_thread != nullptr) {
+        m_search_thread->join();
+        delete m_search_thread;
+    }
 }
 
 void State::quit() {
