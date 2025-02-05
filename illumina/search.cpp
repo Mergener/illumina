@@ -714,7 +714,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     SearchMove move {};
     Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
-    Score best_score = -MATE_SCORE;
+    Score best_score = -MAX_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
         if (move == node->skip_move) {
@@ -999,7 +999,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
-    return alpha;
+    return best_score;
 }
 
 template <bool TRACE, bool PV>
