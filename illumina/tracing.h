@@ -48,7 +48,7 @@ public:
     virtual void set(Traceable which, TracedValue value) = 0;
     virtual void pop_node(bool discard = false) = 0;
 
-    virtual ~ISearchTracer() = 0;
+    virtual ~ISearchTracer() = default;
 };
 
 } // illumina
