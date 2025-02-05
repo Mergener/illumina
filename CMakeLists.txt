@@ -81,21 +81,20 @@ if (PROFILING)
     add_definitions(-DPROFILING)
 endif()
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # We need to link against pthread.
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+if (   CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+    OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter")
 
-    # Windows machines often don't include C/C++ runtimes by default.
-    # In this platform, linking against C/C++ runtimes statically might
-    # be preferred.
     if (WIN32)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc --static")
-    endif()
-# We don't want Clang to dynamically link the standard library.
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall")
-    if (WIN32)
-        set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc ${CMAKE_EXE_LINKER_FLAGS}")
+        # Windows machines often don't include C/C++ runtimes by default.
+        # In this platform, linking against C/C++ runtimes statically might
+        # be preferred.
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --static")
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc")
+        endif()
+    else()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
     endif()
 endif()
 
