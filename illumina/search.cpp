@@ -714,7 +714,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     SearchMove move {};
     Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
-    Score best_score = -MATE_SCORE;
+    Score best_score = -MAX_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
         if (move == node->skip_move) {
@@ -960,12 +960,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         return alpha;
     }
 
+    best_score = n_searched_moves > 0 ? best_score : alpha;
+
     // Store in transposition table.
     // Don't store in singular searches.
     if (node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_LOWERBOUND);
+            tt.try_store(board_key,
+                         ply, best_move,
+                         best_score,
+                         depth, raw_eval,
+                         BT_LOWERBOUND);
 
             // Update corrhist.
             if (   !in_check
@@ -977,8 +983,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Couldn't raise alpha, score is an upperbound.
             tt.try_store(board_key,
                          ply, best_move,
-                         n_searched_moves > 0 ? best_score : alpha,
-                         depth, raw_eval, BT_UPPERBOUND);
+                         best_score,
+                         depth, raw_eval,
+                         BT_UPPERBOUND);
 
             // Update corrhist.
             if (   !in_check
@@ -988,7 +995,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             }
         } else {
             // We have an exact score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_EXACT);
+            tt.try_store(board_key,
+                         ply, best_move,
+                         best_score,
+                         depth, raw_eval,
+                         BT_EXACT);
 
             // Update corrhist.
             if (   !in_check
@@ -999,7 +1010,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
-    return alpha;
+    return best_score;
 }
 
 template <bool TRACE, bool PV>
