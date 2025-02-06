@@ -667,26 +667,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
-    // Null move pruning.
-    if (   !PV
-        && !SKIP_NULL
-        && !in_check
-        && non_pawn_bb(m_board) != 0
-        && popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES
-        && static_eval >= beta
-        && depth >= NMP_MIN_DEPTH
-        && node->skip_move == MOVE_NULL) {
-        Depth reduction = std::min(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
-
-        m_board.make_null_move();
-        Score score = -pvs<TRACE, false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
-        m_board.undo_null_move();
-
-        if (score >= beta) {
-            return score;
-        }
-    }
-
     // Internal iterative reductions.
     if (   depth >= IIR_MIN_DEPTH
         && !found_in_tt
