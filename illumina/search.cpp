@@ -676,7 +676,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         && static_eval >= beta
         && depth >= NMP_MIN_DEPTH
         && node->skip_move == MOVE_NULL) {
-        Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
+        Depth reduction = std::min(depth,
+                                   NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR);
 
         m_board.make_null_move();
         Score score = -pvs<TRACE, false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
