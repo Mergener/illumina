@@ -1035,7 +1035,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
     if (stand_pat >= beta) {
         TRACE_SET(Traceable::SCORE, beta);
-        return beta;
+        return stand_pat;
     }
     if (stand_pat > alpha) {
         alpha = stand_pat;
@@ -1052,6 +1052,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     MovePicker<true> move_picker(m_board, ply, m_hist);
     SearchMove move;
     SearchMove best_move;
+    Score best_score = stand_pat;
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
@@ -1063,6 +1064,10 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
         Score score = -quiescence_search<TRACE, PV>(ply + 1, -beta, -alpha);
         m_board.undo_move();
+
+        if (score > best_score) {
+            best_score = score;
+        }
 
         if (score >= beta) {
             best_move = move;
@@ -1081,7 +1086,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
     }
 
-    return alpha;
+    return best_score;
 }
 
 Score SearchWorker::evaluate() const {
