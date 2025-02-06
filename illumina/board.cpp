@@ -526,6 +526,7 @@ void Board::make_null_move() {
 
     m_prev_states.push_back(m_state);
 
+    m_state.last_move = MOVE_NULL;
     set_color_to_move(opposite_color(color_to_move()));
     set_ep_square(SQ_NULL);
 
