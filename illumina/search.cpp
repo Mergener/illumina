@@ -680,7 +680,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                                    NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR);
 
         m_board.make_null_move();
-        Score score = -pvs<TRACE, false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
+        Score score = -pvs<TRACE, false, true>(depth - reduction, -beta, -beta + 1, node + 1);
         m_board.undo_null_move();
 
         if (score >= beta) {
