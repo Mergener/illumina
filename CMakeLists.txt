@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.15)
 project(illumina)
 set(CMAKE_CXX_STANDARD 17)
 
-# Set illumina version.
-set(ILLUMINA_VERSION_MAJOR 2)
+# Set illumina version. Only applies to Production builds.
+set(ILLUMINA_VERSION_MAJOR 3)
 set(ILLUMINA_VERSION_MINOR 0)
 
 # Setup important paths.
