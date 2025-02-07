@@ -7,6 +7,9 @@
 *.a
 *.obj
 
+# Binary name on Linux
+illumina*
+
 # IDE generated directories/files
 *.vs
 *.idea
