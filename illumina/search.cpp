@@ -606,6 +606,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         hash_move = tt_entry.move();
 
         TRACE_SET(Traceable::FOUND_IN_TT, true);
+        TRACE_SET(Traceable::TT_MOVE, hash_move);
+        TRACE_SET(Traceable::TT_BOUND, tt_entry.bound_type());
+        TRACE_SET(Traceable::TT_DEPTH, tt_entry.depth());
+        TRACE_SET(Traceable::TT_SCORE, tt_entry.score());
 
         // TT Cutoff.
         if (   !PV
