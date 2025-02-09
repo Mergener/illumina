@@ -814,6 +814,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             if (score < se_beta) {
                 extensions++;
+                if (score < se_beta - SE_DOUBLE_EXT_MARGIN) {
+                    extensions++;
+                }
             }
             // Multi-cut pruning.
             else if (score >= beta) {
