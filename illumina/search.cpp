@@ -606,6 +606,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         hash_move = tt_entry.move();
 
         TRACE_SET(Traceable::FOUND_IN_TT, true);
+        TRACE_SET(Traceable::TT_MOVE, hash_move);
+        TRACE_SET(Traceable::TT_BOUND, tt_entry.bound_type());
+        TRACE_SET(Traceable::TT_DEPTH, tt_entry.depth());
+        TRACE_SET(Traceable::TT_SCORE, tt_entry.score());
 
         // TT Cutoff.
         if (   !PV
@@ -676,10 +680,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         && static_eval >= beta
         && depth >= NMP_MIN_DEPTH
         && node->skip_move == MOVE_NULL) {
-        Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
+        Depth reduction = depth / 3 + 4;
 
         m_board.make_null_move();
-        Score score = -pvs<TRACE, false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
+        Score score = -pvs<TRACE, false, true>(depth  - reduction, -beta, -beta + 1, node + 1);
         m_board.undo_null_move();
 
         if (score >= beta) {
@@ -810,6 +814,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             if (score < se_beta) {
                 extensions++;
+                if (  !PV
+                    && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
+                    extensions++;
+                }
             }
             // Multi-cut pruning.
             else if (score >= beta) {
