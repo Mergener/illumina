@@ -684,12 +684,21 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Depth reduction = depth / 3 + 4;
 
         m_board.make_null_move();
-        Score score = -pvs<TRACE, false, true>(depth  - reduction, -beta, -beta + 1, node + 1);
+        Score score = -pvs<TRACE, false, true>(depth - reduction, -beta, -beta + 1, node + 1);
         TRACE_SET(Traceable::SCORE, -score);
         m_board.undo_null_move();
 
         if (score >= beta) {
-            return score;
+            if (depth <= 14) {
+                return score;
+            }
+            TRACE_PUSH_SIBLING();
+            score = pvs<TRACE, false, true>(depth - reduction, -beta, -beta + 1, node + 1);
+            TRACE_SET(Traceable::SCORE, score);
+            TRACE_POP();
+            if (score >= beta) {
+                return score;
+            }
         }
     }
 
