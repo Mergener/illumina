@@ -2,6 +2,7 @@
 #define ILLUMINA_STATE_H
 
 #include <thread>
+#include <atomic>
 
 #include "illumina.h"
 
@@ -45,13 +46,14 @@ private:
     UCIOptionManager m_options;
     Searcher         m_searcher;
     std::thread*     m_search_thread = nullptr;
-    bool             m_searching = false;
+    std::atomic_bool m_searching = false;
     TimePoint        m_search_start;
     bool             m_frc = false;
     ui64             m_eval_random_seed = 0;
 
     void setup_searcher();
     void register_options();
+    Score normalize_score_if_desired(Score score, const Board& board) const;
 };
 
 void initialize_global_state();

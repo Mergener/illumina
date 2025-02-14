@@ -98,12 +98,14 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              const RootInfo* root_info,
                              const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
                              TimeManager* time_manager)
-    : m_stop(should_stop),
-      m_tt(tt), m_listeners(listeners),
-      m_time_manager(time_manager),
+    : m_tt(tt),
+      m_listeners(listeners),
       m_root_info(root_info),
-      m_helper_workers(helper_workers),
-      m_search_start(now()) { }
+      m_stop(should_stop),
+      m_time_manager(time_manager),
+      m_search_start(now()),
+      m_helper_workers(helper_workers)
+      { }
 
 void SearchContext::stop_search() const {
     m_stop->store(true, std::memory_order_relaxed);
@@ -146,13 +148,13 @@ public:
                  const Board& board,
                  SearchContext* context,
                  const SearchSettings* settings);
-    Board       m_board;
 
 private:
     const SearchSettings* m_settings;
     const SearchContext*  m_context;
     WorkerResults         m_results;
 
+    Board       m_board;
     MoveHistory m_hist;
     Evaluation  m_eval {};
     bool        m_main;
@@ -320,8 +322,8 @@ SearchResults Searcher::search(const Board& board,
     // Fire secondary threads.
     secondary_workers.clear();
     std::vector<std::thread> helper_threads;
+    secondary_workers.resize(n_helper_threads);
     for (int i = 0; i < n_helper_threads; ++i) {
-        secondary_workers.push_back(nullptr);
         helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
             secondary_workers[i] = std::make_unique<SearchWorker>(false, board, &context, &settings);
             secondary_workers[i]->iterative_deepening();
@@ -463,7 +465,7 @@ void SearchWorker::aspiration_windows() {
     // Prepare the search stack.
     constexpr size_t STACK_SIZE = MAX_DEPTH + 64;
     SearchNode search_stack[STACK_SIZE];
-    for (Depth ply = 0; ply < STACK_SIZE; ++ply) {
+    for (Depth ply = 0; ply < Depth(STACK_SIZE); ++ply) {
         SearchNode& node = search_stack[ply];
         node.ply = ply;
     }
@@ -494,6 +496,7 @@ void SearchWorker::aspiration_windows() {
                              m_curr_pv_idx + 1,
                              alpha, beta);
             score = pvs<true, true, false, true>(depth, alpha, beta, &search_stack[0]);
+            tracer->set(Traceable::SCORE, score);
             tracer->finish_tree();
         }
         else {
@@ -604,6 +607,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         hash_move = tt_entry.move();
 
         TRACE_SET(Traceable::FOUND_IN_TT, true);
+        TRACE_SET(Traceable::TT_MOVE, hash_move);
+        TRACE_SET(Traceable::TT_BOUND, tt_entry.bound_type());
+        TRACE_SET(Traceable::TT_DEPTH, tt_entry.depth());
+        TRACE_SET(Traceable::TT_SCORE, tt_entry.score());
 
         // TT Cutoff.
         if (   !PV
@@ -674,10 +681,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         && static_eval >= beta
         && depth >= NMP_MIN_DEPTH
         && node->skip_move == MOVE_NULL) {
-        Depth reduction = std::max(depth, std::min(NMP_BASE_DEPTH_RED, NMP_BASE_DEPTH_RED + (static_eval - beta) / NMP_EVAL_DELTA_DIVISOR));
+        Depth reduction = depth / 3 + 4;
 
         m_board.make_null_move();
-        Score score = -pvs<TRACE, false, true>(depth - 1 - reduction, -beta, -beta + 1, node + 1);
+        Score score = -pvs<TRACE, false, true>(depth  - reduction, -beta, -beta + 1, node + 1);
+        TRACE_SET(Traceable::SCORE, -score);
         m_board.undo_null_move();
 
         if (score >= beta) {
@@ -694,7 +702,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
-        return quiescence_search<TRACE, PV>(ply, alpha, beta);
+        Score score = quiescence_search<TRACE, PV>(ply, alpha, beta);
+        TRACE_SET(Traceable::SCORE, score);
+        return score;
     }
 
     // Kickstart our curr move counter for later reporting.
@@ -712,7 +722,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     SearchMove move {};
     Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
-    Score best_score = -MATE_SCORE;
+    Score best_score = -MAX_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
         if (move == node->skip_move) {
@@ -801,6 +811,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             TRACE_SET(Traceable::SKIP_MOVE, node->skip_move);
 
             Score score = pvs<TRACE, false>(depth / 2, se_beta - 1, se_beta, node);
+            TRACE_SET(Traceable::SCORE, score);
 
             TRACE_POP();
 
@@ -808,6 +819,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             if (score < se_beta) {
                 extensions++;
+                if (  !PV
+                    && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
+                    extensions++;
+                }
             }
             // Multi-cut pruning.
             else if (score >= beta) {
@@ -849,22 +864,26 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
             score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
+            TRACE_SET(Traceable::SCORE, -score);
         }
         else {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
             score = -pvs<TRACE, false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
+            TRACE_SET(Traceable::SCORE, -score);
 
             if (score > alpha && reductions > 1) {
                 TRACE_PUSH_SIBLING();
                 score = -pvs<TRACE, false>(depth - 1 + extensions, -alpha - 1, -alpha, node + 1);
+                TRACE_SET(Traceable::SCORE, -score);
                 TRACE_POP();
             }
 
             if (score > alpha && score < beta) {
                 TRACE_PUSH_SIBLING();
                 score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
+                TRACE_SET(Traceable::SCORE, -score);
                 TRACE_POP();
             }
         }
@@ -879,7 +898,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         if (score >= best_score) {
             best_score = score;
-            TRACE_SET(Traceable::SCORE, best_score);
         }
 
         if (score >= beta) {
@@ -950,7 +968,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
 
         Score score = m_board.in_check() ? (-MATE_SCORE + ply) : 0;
-        TRACE_SET(Traceable::SCORE, score);
         return score;
     }
 
@@ -958,12 +975,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         return alpha;
     }
 
+    best_score = n_searched_moves > 0 ? best_score : alpha;
+
     // Store in transposition table.
     // Don't store in singular searches.
     if (node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_LOWERBOUND);
+            tt.try_store(board_key,
+                         ply, best_move,
+                         best_score,
+                         depth, raw_eval,
+                         BT_LOWERBOUND);
 
             // Update corrhist.
             if (   !in_check
@@ -975,8 +998,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Couldn't raise alpha, score is an upperbound.
             tt.try_store(board_key,
                          ply, best_move,
-                         n_searched_moves > 0 ? best_score : alpha,
-                         depth, raw_eval, BT_UPPERBOUND);
+                         best_score,
+                         depth, raw_eval,
+                         BT_UPPERBOUND);
 
             // Update corrhist.
             if (   !in_check
@@ -986,7 +1010,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             }
         } else {
             // We have an exact score.
-            tt.try_store(board_key, ply, best_move, alpha, depth, raw_eval, BT_EXACT);
+            tt.try_store(board_key,
+                         ply, best_move,
+                         best_score,
+                         depth, raw_eval,
+                         BT_EXACT);
 
             // Update corrhist.
             if (   !in_check
@@ -997,7 +1025,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
-    return alpha;
+    return best_score;
 }
 
 template <bool TRACE, bool PV>
@@ -1021,14 +1049,11 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
     if (stand_pat >= beta) {
-        TRACE_SET(Traceable::SCORE, beta);
-        return beta;
+        return stand_pat;
     }
     if (stand_pat > alpha) {
         alpha = stand_pat;
     }
-
-    TRACE_SET(Traceable::SCORE, alpha);
 
     check_limits();
     if (should_stop()) {
@@ -1039,6 +1064,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     MovePicker<true> move_picker(m_board, ply, m_hist);
     SearchMove move;
     SearchMove best_move;
+    Score best_score = stand_pat;
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
@@ -1049,13 +1075,17 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
         Score score = -quiescence_search<TRACE, PV>(ply + 1, -beta, -alpha);
+        TRACE_SET(Traceable::SCORE, -score);
         m_board.undo_move();
+
+        if (score > best_score) {
+            best_score = score;
+        }
 
         if (score >= beta) {
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
-            TRACE_SET(Traceable::SCORE, alpha);
             alpha = score;
             break;
         }
@@ -1063,12 +1093,11 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
-            TRACE_SET(Traceable::SCORE, alpha);
             alpha = score;
         }
     }
 
-    return alpha;
+    return best_score;
 }
 
 Score SearchWorker::evaluate() const {
@@ -1224,16 +1253,12 @@ SearchWorker::SearchWorker(bool main,
                            const Board& board,
                            SearchContext* context,
                            const SearchSettings* settings)
-    : m_main(main),
-      m_board(board),
+    : m_settings(settings),
       m_context(context),
-      m_settings(settings),
-      m_eval_random_margin(m_main
-                           ? settings->eval_random_margin
-                           : std::max(SMP_EVAL_RANDOM_MARGIN, settings->eval_random_margin)),
-      m_eval_random_seed(m_main
-                         ? settings->eval_rand_seed
-                         : random(ui64(1), UINT64_MAX)) {
+      m_board(board),
+      m_main(main),
+      m_eval_random_margin(settings->eval_random_margin),
+      m_eval_random_seed(settings->eval_rand_seed) {
     m_eval.on_new_board(m_board);
 
     // Dispatch board callbacks to Worker's methods.

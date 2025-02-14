@@ -169,10 +169,13 @@ inline bool supportsColor() noexcept
 inline bool isMsysPty(int fd) noexcept
 {
     // Dynamic load for binary compability with old Windows
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type-mismatch"
     const auto ptrGetFileInformationByHandleEx
         = reinterpret_cast<decltype(&GetFileInformationByHandleEx)>(
             GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")),
                            "GetFileInformationByHandleEx"));
+#pragma GCC diagnostic pop
     if (!ptrGetFileInformationByHandleEx) {
         return false;
     }

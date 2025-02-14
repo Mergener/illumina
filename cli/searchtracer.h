@@ -45,6 +45,8 @@ public:
     explicit SearchTracer(const std::string& db_path,
                           size_t batch_size_mib = DEFAULT_TRACER_BATCH_SIZE);
 
+    ~SearchTracer() override = default;
+
 private:
     SQLite::Database m_db;
     size_t m_target_node_count;

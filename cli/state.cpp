@@ -36,7 +36,7 @@ void initialize_global_state() {
 }
 
 bool State::searching() const {
-    return m_searching;
+    return m_searching.load(std::memory_order_relaxed);
 }
 
 State& global_state() {
@@ -54,6 +54,10 @@ static std::string score_string(Score score) {
     }
     int n_moves = moves_to_mate(score);
     return "mate " + std::to_string(score > 0 ? n_moves : -n_moves);
+}
+
+static std::string wdl_string(const WDL& wdl) {
+    return std::to_string(wdl.w) + " " + std::to_string(wdl.d) + " " + std::to_string(wdl.l);
 }
 
 void State::new_game() {
@@ -169,7 +173,7 @@ void State::evaluate() const {
     Evaluation eval;
     Board repl = m_board;
     eval.on_new_board(repl);
-    Score score = eval.get();
+    Score score = normalize_score_if_desired(eval.get(), repl);
 
     std::cout << "      ";
 
@@ -193,7 +197,7 @@ void State::evaluate() const {
             else {
                 repl.set_piece_at(s, PIECE_NULL);
                 eval.on_new_board(repl);
-                Score score_without_piece = eval.get();
+                Score score_without_piece = normalize_score_if_desired(eval.get(), repl);
                 repl.set_piece_at(s, p);
 
                 std::cout << std::setw(6)
@@ -283,16 +287,18 @@ void State::setup_searcher() {
     m_searcher.set_pv_finish_listener([this](const PVResults& res) {
         // Check if we need to log multipv.
         UCIOptionSpin& opt_multi_pv = m_options.option<UCIOptionSpin>("MultiPV");
+        bool show_wdl = m_options.option<UCIOptionCheck>("UCI_ShowWDL").value();
+        bool has_pv_line = res.line.size() >= 1 && res.line[0] != MOVE_NULL;
 
         std::cout << "info"
                   << multipv_string(opt_multi_pv.value() > 1, res.pv_idx)
                   << " depth "    << res.depth
                   << " seldepth " << res.sel_depth
-                  << " score "    << score_string(res.score)
-                  << bound_type_string(res.bound_type);
-        if (res.line.size() >= 1 && res.line[0] != MOVE_NULL)
-        std::cout << " pv "       << pv_to_string(res.line, m_board, m_frc);
-        std::cout << " hashfull " << m_searcher.tt().hash_full()
+                  << " score "    << score_string(normalize_score_if_desired(res.score, m_board))
+                  << (show_wdl ? " wdl " + wdl_string(wdl_from_score(res.score, m_board)) : "")
+                  << bound_type_string(res.bound_type)
+                  << " pv "       << (has_pv_line ? pv_to_string(res.line, m_board, m_frc) : "")
+                  << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
                   << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
                   << " time "     << res.time
@@ -337,14 +343,8 @@ void State::search(SearchSettings settings, bool trace) {
     }
 
     // Prevent invoking two simultaneous searches.
-    if (m_searching) {
-        std::cerr << "Already searching." << std::endl;
-        return;
-    }
-    m_searching = true;
-    if (m_search_thread != nullptr) {
-        m_search_thread->join();
-        delete m_search_thread;
+    if (m_searching.exchange(true, std::memory_order_acquire)) {
+        stop_search();
     }
 
     // Finally, fire the search thread.
@@ -363,7 +363,7 @@ void State::search(SearchSettings settings, bool trace) {
 
             std::cout << std::endl;
 
-            m_searching = false;
+            m_searching.store(false, std::memory_order_release);
         }
         catch (const std::exception& e) {
             std::cerr << "Unhandled exception during search: " << std::endl
@@ -373,8 +373,19 @@ void State::search(SearchSettings settings, bool trace) {
     });
 }
 
+Score State::normalize_score_if_desired(Score score, const Board& board) const {
+    if (!m_options.option<UCIOptionCheck>("NormalizeScores").value()) {
+        return score;
+    }
+    return normalize_score(score, board);
+}
+
 void State::stop_search() {
     m_searcher.stop();
+    if (m_search_thread != nullptr) {
+        m_search_thread->join();
+        delete m_search_thread;
+    }
 }
 
 void State::quit() {
@@ -441,6 +452,8 @@ void State::register_options() {
         });
     m_options.register_option<UCIOptionSpin>("EvalRandomMargin", 0, 0, 1024);
     m_options.register_option<UCIOptionSpin>("OverrideNodesLimit", 0, 0, INT32_MAX);
+    m_options.register_option<UCIOptionCheck>("NormalizeScores", true);
+    m_options.register_option<UCIOptionCheck>("UCI_ShowWDL", false);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
