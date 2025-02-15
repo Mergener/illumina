@@ -803,7 +803,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             && tt_entry.depth() >= (depth - 3)
             && std::abs(tt_entry.score()) < MATE_THRESHOLD
             && !m_board.gives_check(move)) {
-            Score se_beta = tt_entry.score() - depth * 3;
+            Score se_beta = std::max(-MATE_SCORE, tt_entry.score() - depth);
 
             node->skip_move = move;
 
