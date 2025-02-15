@@ -681,10 +681,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         && static_eval >= beta
         && depth >= NMP_MIN_DEPTH
         && node->skip_move == MOVE_NULL) {
-        Depth reduction = depth / 3 + 4;
+        Depth reduction = depth / 3 + 4 + improving;
 
         m_board.make_null_move();
-        Score score = -pvs<TRACE, false, true>(depth  - reduction, -beta, -beta + 1, node + 1);
+        Score score = -pvs<TRACE, false, true>(depth - reduction, -beta, -beta + 1, node + 1);
         TRACE_SET(Traceable::SCORE, -score);
         m_board.undo_null_move();
 
