@@ -828,6 +828,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             else if (score >= beta) {
                 return score;
             }
+            else if (tt_entry.score() >= beta) {
+                extensions = -2;
+            }
         }
 
         m_board.make_move(move);
