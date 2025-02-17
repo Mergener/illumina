@@ -829,7 +829,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 return score;
             }
             else if (tt_entry.score() >= beta) {
-                extensions = -2;
+                extensions = -1;
             }
         }
 
