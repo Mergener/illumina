@@ -715,6 +715,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Store played quiet moves in this list.
     // Useful for history updates later on.
     StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
+    StaticList<Move, MAX_GENERATED_MOVES> captures_played;
 
     int move_idx = -1;
 
@@ -893,6 +894,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
         }
+        else if (move.is_capture()) {
+            captures_played.push_back(move);
+        }
 
         n_searched_moves++;
 
@@ -908,6 +912,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             TRACE_SET(Traceable::BEST_MOVE_RAW, best_move.raw());
 
             // Update our history scores and refutation moves.
+            for (Move capture: captures_played) {
+                m_hist.update_capture_history(capture, depth, capture == best_move);
+            }
             if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);
 
