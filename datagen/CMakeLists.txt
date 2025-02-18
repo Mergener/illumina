@@ -1,5 +1,6 @@
 set(datagen_src main.cpp)
 
+
 foreach (ARCH ${ARCHS})
     set(TARGET illumina_datagen_${ARCH})
     add_executable(${TARGET} ${datagen_src})

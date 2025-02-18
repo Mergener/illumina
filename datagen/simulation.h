@@ -11,6 +11,8 @@ public:
     virtual void on_pv(const PVResults& results) = 0;
     virtual void on_move(Move move, Score score) = 0;
     virtual void on_game_finished(BoardResult r) = 0;
+
+    virtual ~SimulationListener() = default;
 };
 
 struct SimulationOptions {
