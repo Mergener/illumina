@@ -75,7 +75,7 @@ private:
         ButterflyArray<int> main_history {};
         PieceToArray<PieceToArray<int>> counter_move_history {};
         PieceToArray<int> check_history {};
-        PieceToArray<int> capture_history {};
+        std::array<PieceToArray<int>, PT_COUNT> capture_history {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
@@ -163,11 +163,11 @@ inline void MoveHistory::update_quiet_history(Move move,
 }
 
 inline int MoveHistory::capture_history(Move move) const {
-    return m_data->capture_history.get(move);
+    return m_data->capture_history[move.captured_piece().type()].get(move);
 }
 
 inline void MoveHistory::update_capture_history(Move move, Depth depth, bool good) {
-    update_history_by_depth(m_data->capture_history.get(move), depth, good);
+    update_history_by_depth(m_data->capture_history[move.captured_piece().type()].get(move), depth, good);
 }
 
 inline void MoveHistory::update_corrhist_entry(CorrhistTable& table,
