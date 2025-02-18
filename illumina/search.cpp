@@ -829,7 +829,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 return score;
             }
             else if (tt_entry.score() >= beta) {
-                extensions = -1;
+                extensions = PV - 1;
             }
         }
 
@@ -1090,6 +1090,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             TRACE_SET(Traceable::BEST_MOVE, move);
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
             alpha = score;
+
             break;
         }
         if (score > alpha) {
