@@ -337,6 +337,9 @@ SearchResults Searcher::search(const Board& board,
 
     main_worker.iterative_deepening();
 
+    // Force search to be stopped.
+    context.stop_search();
+
     // Finish tracing search.
     if (settings.tracer != nullptr) {
         settings.tracer->finish_search();
@@ -347,45 +350,12 @@ SearchResults Searcher::search(const Board& board,
         thread.join();
     }
 
-    // Save obtained results in vector and vote for the best afterwards.
-    std::vector<WorkerResults> all_results;
-    all_results.push_back(main_worker.results());
-    for (std::unique_ptr<SearchWorker>& worker: secondary_workers) {
-        if (worker == nullptr) {
-            continue;
-        }
-
-        all_results.push_back(worker->results());
-    }
-
-    // Vote for the best results. Prioritize results
-    // with higher scores that reached higher depths.
-    WorkerResults* selected_results;
-    i64 best_result_score = INT_MIN;
-    for (WorkerResults& worker_results: all_results) {
-        results.total_nodes += worker_results.nodes;
-        if (worker_results.pv_results[0].best_move == MOVE_NULL) {
-            // Ignore threads that couldn't complete the search to a point
-            // where they have a valid move.
-            continue;
-        }
-
-        i64 result_score = i64(worker_results.searched_depth * 500) +
-                           i64(worker_results.pv_results[0].score)  +
-                           i64((worker_results.pv_results[0].bound_type == BT_EXACT)) * 400;
-
-        if (result_score > best_result_score) {
-            selected_results  = &worker_results;
-            best_result_score = result_score;
-        }
-    }
-
     // Fill in the search results object to be returned.
     // We assume that the best move is the one at MultiPV 1.
     // Although this is not necessarily true, we don't want
     // to focus our efforts in improving MultiPV mode since
     // it is already not the one used for playing.
-    const auto& main_line_results = selected_results->pv_results[0];
+    const auto& main_line_results = main_worker.results().pv_results[0];
     results.score = main_line_results.score;
 
     // Only accept non-null best moves.
