@@ -357,6 +357,7 @@ SearchResults Searcher::search(const Board& board,
     // it is already not the one used for playing.
     const auto& main_line_results = main_worker.results().pv_results[0];
     results.score = main_line_results.score;
+    results.total_nodes = main_worker.results().nodes; // TODO: include nodes from helper threads.
 
     // Only accept non-null best moves.
     if (main_line_results.best_move != MOVE_NULL) {
