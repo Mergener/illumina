@@ -924,7 +924,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             // Due to aspiration windows, our search may have failed high in the root.
             // Make sure we always have a best_move and a best_score.
-            if (ROOT && (!should_stop() || depth <= 2)) {
+            if constexpr (ROOT) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
                 m_results.pv_results[m_curr_pv_idx].score     = alpha;
             }
@@ -941,8 +941,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             TRACE_SET(Traceable::BEST_MOVE, move);
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
 
-            // Make sure we update our best_move in the root ASAP.
-            if (ROOT && (!should_stop() || depth <= 2)) {
+            // Make sure we update our best_move in the root.
+            if constexpr (ROOT) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
                 m_results.pv_results[m_curr_pv_idx].score     = alpha;
             }
@@ -971,10 +971,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         Score score = m_board.in_check() ? (-MATE_SCORE + ply) : 0;
         return score;
-    }
-
-    if (should_stop()) {
-        return alpha;
     }
 
     best_score = n_searched_moves > 0 ? best_score : alpha;
