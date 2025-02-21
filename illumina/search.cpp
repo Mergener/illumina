@@ -181,7 +181,7 @@ private:
 
     void aspiration_windows();
 
-    void report_pv_results(const SearchNode* search_stack);
+    void update_pv_results(const SearchNode* search_stack, bool notify_tm);
 
     Score evaluate() const;
     Score draw_score() const;
@@ -507,7 +507,7 @@ void SearchWorker::aspiration_windows() {
             // We found an exact score within our bounds, finish
             // the current depth search.
             m_results.pv_results[m_curr_pv_idx].bound_type = BT_EXACT;
-            report_pv_results(search_stack);
+            update_pv_results(search_stack, true);
             break;
         }
 
@@ -518,6 +518,8 @@ void SearchWorker::aspiration_windows() {
 
             m_results.pv_results[m_curr_pv_idx].score     = prev_score;
             m_results.pv_results[m_curr_pv_idx].best_move = best_move;
+            m_results.pv_results[m_curr_pv_idx].bound_type = BT_UPPERBOUND;
+            update_pv_results(search_stack, false);
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
@@ -525,7 +527,7 @@ void SearchWorker::aspiration_windows() {
             prev_score = score;
             best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
             m_results.pv_results[m_curr_pv_idx].bound_type = BT_LOWERBOUND;
-            report_pv_results(search_stack);
+            update_pv_results(search_stack, true);
         }
 
         check_limits();
@@ -1122,8 +1124,9 @@ Score SearchWorker::evaluate() const {
     return score;
 }
 
-void SearchWorker::report_pv_results(const SearchNode* search_stack) {
-    // We only want the main thread to report results, the others
+void SearchWorker::update_pv_results(const SearchNode* search_stack,
+                                     bool notify_tm) {
+    // We only want the main thread to update results, the others
     // should just assist on the search.
     if (!m_main) {
         return;
