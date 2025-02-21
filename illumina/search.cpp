@@ -1173,7 +1173,7 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
     }
 
     // Notify the time manager that we finished a pv iteration.
-    if (m_main) {
+    if (m_main && notify_tm) {
         m_context->time_manager().on_new_pv(pv_results.depth,
                                             pv_results.best_move,
                                             pv_results.score);
