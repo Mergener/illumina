@@ -835,7 +835,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Late move reductions.
         Depth reductions = 0;
-        if (   n_searched_moves >= LMR_MIN_MOVE_IDX
+        if (   n_searched_moves >= LMR_MIN_MOVE_IDX + ROOT
             && depth >= LMR_MIN_DEPTH
             && !in_check
             && !m_board.in_check()) {
