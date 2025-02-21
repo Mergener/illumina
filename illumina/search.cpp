@@ -627,6 +627,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
+    bool ttpv = PV || (found_in_tt && tt_entry.ttpv());
+
     // Check extensions.
     // Extend positions in check.
     depth += in_check;
@@ -986,7 +988,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                          ply, best_move,
                          best_score,
                          depth, raw_eval,
-                         BT_LOWERBOUND);
+                         BT_LOWERBOUND,
+                         ttpv);
 
             // Update corrhist.
             if (   !in_check
@@ -1000,7 +1003,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                          ply, best_move,
                          best_score,
                          depth, raw_eval,
-                         BT_UPPERBOUND);
+                         BT_UPPERBOUND,
+                         ttpv);
 
             // Update corrhist.
             if (   !in_check
@@ -1014,7 +1018,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                          ply, best_move,
                          best_score,
                          depth, raw_eval,
-                         BT_EXACT);
+                         BT_EXACT,
+                         ttpv);
 
             // Update corrhist.
             if (   !in_check

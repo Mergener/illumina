@@ -31,7 +31,8 @@ void TranspositionTableEntry::replace(ui64 key,
                                       Depth depth,
                                       i16 static_eval,
                                       BoundType bound_type,
-                                      ui8 generation) {
+                                      ui8 generation,
+                                      bool ttpv) {
     m_key_low = key & 0xFFFFFFFF;
     m_key_hi  = key >> 32;
     m_move  = move;
@@ -42,6 +43,7 @@ void TranspositionTableEntry::replace(ui64 key,
     m_info |= (bound_type & BITMASK(2)) << 1;
     m_info |= (generation & BITMASK(8)) << 3;
     m_info |= (depth      & BITMASK(8)) << 11;
+    m_info |= (ttpv       & BITMASK(1)) << 19;
 }
 
 void TranspositionTable::new_search() {
