@@ -850,6 +850,9 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 reductions += m_hist.quiet_history(move,
                                                    m_board.last_move(),
                                                    m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
+
+                // Don't reduce nodes that have been on the PV as much.
+                reductions -= ttpv;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
