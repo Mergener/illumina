@@ -656,7 +656,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
     Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
-    if (   !PV
+    if (   !ttpv
         && !in_check
         && node->skip_move == MOVE_NULL
         && depth <= RFP_MAX_DEPTH
