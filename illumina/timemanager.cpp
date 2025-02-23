@@ -66,7 +66,7 @@ bool TimeManager::time_up_soft() const {
     double base_soft = double(m_soft);
 
     double soft = base_soft;
-    soft -= base_soft * (TM_BM_STABILITY_FACTOR * std::min(8, m_best_move_stability));
+    soft -= base_soft * (TM_BM_STABILITY_FACTOR * m_best_move_stability);
 
     return elapsed >= i64(soft);
 }
