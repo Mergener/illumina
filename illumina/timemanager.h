@@ -26,6 +26,7 @@ public:
 
 private:
     TimePoint m_time_start {};
+
     enum {
         NORMAL,
         MOVETIME,
