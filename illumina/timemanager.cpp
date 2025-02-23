@@ -17,6 +17,8 @@ void TimeManager::start_normal(i64 our_time_ms, i64 our_inc_ms, i64 their_time_m
 
     m_hard = std::max(i64(1), i64(hard) - LAG_MARGIN);
     m_soft = std::max(i64(1), i64(soft));
+
+    m_best_move_stability = 0;
 }
 
 void TimeManager::start_movetime(i64 movetime_ms) {
@@ -41,6 +43,14 @@ bool TimeManager::time_up_hard() const {
 }
 
 void TimeManager::on_pv_results(const PVResults& pv_results) {
+    if (pv_results.depth >= 6) {
+        if (m_last_best_move == pv_results.best_move) {
+            m_best_move_stability++;
+        } else {
+            m_best_move_stability = 0;
+        }
+    }
+    m_last_best_move = pv_results.best_move;
 }
 
 bool TimeManager::time_up_soft() const {
@@ -48,13 +58,17 @@ bool TimeManager::time_up_soft() const {
         return false;
     }
 
+    i64 elapsed = delta_ms(Clock::now(), m_time_start);
     if (m_mode == MOVETIME) {
-        return    m_force_finish_soft
-               || (delta_ms(Clock::now(), m_time_start) >= m_soft);
+        return elapsed >= m_soft;
     }
 
-    return    m_force_finish_soft
-           || (delta_ms(Clock::now(), m_time_start) >= m_soft);
+    double base_soft = double(m_soft);
+
+    double soft = base_soft;
+    soft -= base_soft * (TM_BM_STABILITY_FACTOR * std::min(8, m_best_move_stability));
+
+    return elapsed >= i64(soft);
 }
 
 } // illumina
