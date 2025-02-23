@@ -20,7 +20,7 @@
 //
 
 // Aspiration windows
-TUNABLE_VALUE(ASP_WIN_WINDOW, int, 42, 0);
+TUNABLE_VALUE(ASP_WIN_WINDOW, int, 30, 0);
 TUNABLE_VALUE(ASP_WIN_MIN_DEPTH, int, 6);
 
 // Reverse futility pruning
