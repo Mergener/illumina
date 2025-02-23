@@ -43,30 +43,23 @@ bool TimeManager::time_up_hard() const {
 }
 
 void TimeManager::on_pv_results(const PVResults& pv_results) {
-    if (pv_results.depth >= 6) {
-        if (m_last_best_move == pv_results.best_move) {
-            m_best_move_stability++;
-        } else {
-            m_best_move_stability = 0;
-        }
+    if (m_last_best_move == pv_results.best_move) {
+        m_best_move_stability = std::min(m_best_move_stability + 1, 12);
+    } else {
+        m_best_move_stability = 0;
     }
     m_last_best_move = pv_results.best_move;
 }
 
 bool TimeManager::time_up_soft() const {
-    if (m_mode == INFINITE) {
+    if (m_mode != NORMAL) {
         return false;
     }
 
     i64 elapsed = delta_ms(Clock::now(), m_time_start);
-    if (m_mode == MOVETIME) {
-        return elapsed >= m_soft;
-    }
 
-    double base_soft = double(m_soft);
-
-    double soft = base_soft;
-    soft -= base_soft * (TM_BM_STABILITY_FACTOR * m_best_move_stability);
+    double bm_stability = TM_BM_STABILITY_BASE - TM_BM_STABILITY_SLOPE * m_best_move_stability;
+    double soft = double(m_soft) * bm_stability;
 
     return elapsed >= i64(soft);
 }

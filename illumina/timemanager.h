@@ -28,12 +28,12 @@ private:
     TimePoint m_time_start {};
 
     enum {
+        INFINITE,
         NORMAL,
-        MOVETIME,
-        INFINITE
-    } m_mode;
-    i64 m_hard;
-    i64 m_soft;
+        MOVETIME
+    } m_mode = INFINITE;
+    i64 m_hard = 0;
+    i64 m_soft = 0;
 
     Move m_last_best_move = MOVE_NULL;
     int  m_best_move_stability = 0;
