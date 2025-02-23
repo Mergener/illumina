@@ -1,5 +1,7 @@
 #include "timemanager.h"
 
+#include "search.h"
+
 namespace illumina {
 
 static constexpr i64 LAG_MARGIN = 10;
@@ -38,15 +40,21 @@ bool TimeManager::time_up_hard() const {
     return delta_ms(Clock::now(), m_time_start) >= m_hard;
 }
 
+void TimeManager::on_pv_results(const PVResults& pv_results) {
+}
+
 bool TimeManager::time_up_soft() const {
     if (m_mode == INFINITE) {
         return false;
     }
 
-    return m_force_finish_soft || (delta_ms(Clock::now(), m_time_start) >= m_soft);
-}
+    if (m_mode == MOVETIME) {
+        return    m_force_finish_soft
+               || (delta_ms(Clock::now(), m_time_start) >= m_soft);
+    }
 
-void TimeManager::pv_finished(const illumina::PVResults &pv_results) {
+    return    m_force_finish_soft
+           || (delta_ms(Clock::now(), m_time_start) >= m_soft);
 }
 
 } // illumina

@@ -31,10 +31,22 @@ struct SearchSettings {
     ISearchTracer* tracer = nullptr;
 };
 
-struct SearchResults {
+struct PVResults {
+    Depth depth;
+    int pv_idx;
+    Depth sel_depth;
     Move  best_move;
-    Move  ponder_move;
     Score score;
+    ui64  nodes;
+    ui64  time;
+    BoundType bound_type;
+    std::vector<Move> line;
+};
+
+struct SearchResults {
+    Move  best_move = MOVE_NULL;
+    Move  ponder_move = MOVE_NULL;
+    Score score = 0;
     ui64 total_nodes = 0;
 };
 

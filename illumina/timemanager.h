@@ -8,6 +8,8 @@
 
 namespace illumina {
 
+struct PVResults;
+
 class TimeManager {
 public:
     void start_movetime(i64 movetime_ms);
@@ -19,8 +21,7 @@ public:
     void start_infinite();
     bool time_up_hard() const;
     bool time_up_soft() const;
-    void pv_finished(const PVResults& pv_results);
-
+    void on_pv_results(const PVResults& pv_results);
     TimeManager() = default;
 
 private:

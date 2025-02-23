@@ -107,22 +107,6 @@ inline void SearchMove::reduce_value(i32 val) {
     m_val -= val;
 }
 
-//
-// PV Results
-//
-
-struct PVResults {
-    Depth depth;
-    int pv_idx;
-    Depth sel_depth;
-    Move  best_move;
-    Score score;
-    ui64  nodes;
-    ui64  time;
-    BoundType bound_type;
-    std::vector<Move> line;
-};
-
 }
 
 #endif // ILLUMINA_SEARCHTYPES_H
