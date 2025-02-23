@@ -181,7 +181,7 @@ private:
 
     void aspiration_windows();
 
-    void report_pv_results(const SearchNode* search_stack);
+    void update_pv_results(const SearchNode* search_stack, bool notify_tm);
 
     Score evaluate() const;
     Score draw_score() const;
@@ -507,7 +507,7 @@ void SearchWorker::aspiration_windows() {
             // We found an exact score within our bounds, finish
             // the current depth search.
             m_results.pv_results[m_curr_pv_idx].bound_type = BT_EXACT;
-            report_pv_results(search_stack);
+            update_pv_results(search_stack, true);
             break;
         }
 
@@ -518,6 +518,8 @@ void SearchWorker::aspiration_windows() {
 
             m_results.pv_results[m_curr_pv_idx].score     = prev_score;
             m_results.pv_results[m_curr_pv_idx].best_move = best_move;
+            m_results.pv_results[m_curr_pv_idx].bound_type = BT_UPPERBOUND;
+            update_pv_results(search_stack, false);
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
@@ -525,7 +527,7 @@ void SearchWorker::aspiration_windows() {
             prev_score = score;
             best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
             m_results.pv_results[m_curr_pv_idx].bound_type = BT_LOWERBOUND;
-            report_pv_results(search_stack);
+            update_pv_results(search_stack, true);
         }
 
         check_limits();
@@ -944,7 +946,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             TRACE_SET(Traceable::BEST_MOVE, move);
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
 
-            // Make sure we update our best_move in the root ASAP.
+            // Make sure we update our best_move in the root.
             if (ROOT && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
                 m_results.pv_results[m_curr_pv_idx].score     = alpha;
@@ -974,10 +976,6 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         Score score = m_board.in_check() ? (-MATE_SCORE + ply) : 0;
         return score;
-    }
-
-    if (should_stop()) {
-        return alpha;
     }
 
     best_score = n_searched_moves > 0 ? best_score : alpha;
@@ -1130,8 +1128,9 @@ Score SearchWorker::evaluate() const {
     return score;
 }
 
-void SearchWorker::report_pv_results(const SearchNode* search_stack) {
-    // We only want the main thread to report results, the others
+void SearchWorker::update_pv_results(const SearchNode* search_stack,
+                                     bool notify_tm) {
+    // We only want the main thread to update results, the others
     // should just assist on the search.
     if (!m_main) {
         return;
@@ -1178,7 +1177,7 @@ void SearchWorker::report_pv_results(const SearchNode* search_stack) {
     }
 
     // Notify the time manager that we finished a pv iteration.
-    if (m_main) {
+    if (m_main && notify_tm) {
         m_context->time_manager().on_new_pv(pv_results.depth,
                                             pv_results.best_move,
                                             pv_results.score);
