@@ -49,12 +49,10 @@ bool TimeManager::time_up_soft() const {
     }
 
     if (m_mode == MOVETIME) {
-        return    m_force_finish_soft
-               || (delta_ms(Clock::now(), m_time_start) >= m_soft);
+        return delta_ms(Clock::now(), m_time_start) >= m_soft;
     }
 
-    return    m_force_finish_soft
-           || (delta_ms(Clock::now(), m_time_start) >= m_soft);
+    return delta_ms(Clock::now(), m_time_start) >= m_soft;
 }
 
 } // illumina

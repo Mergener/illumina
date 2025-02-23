@@ -33,7 +33,6 @@ private:
     } m_mode;
     i64 m_hard;
     i64 m_soft;
-    bool m_force_finish_soft;
 };
 
 } // illumina
