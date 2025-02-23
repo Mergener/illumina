@@ -297,7 +297,7 @@ SearchResults Searcher::search(const Board& board,
     SearchWorker main_worker(true, board, &context, &settings);
 
     // Kickstart our time manager.
-    ui64 our_time = UINT64_MAX;
+    i64 our_time = UINT64_MAX;
     if (settings.move_time.has_value()) {
         // 'movetime'
         our_time = settings.move_time.value();
@@ -306,14 +306,13 @@ SearchResults Searcher::search(const Board& board,
     else if (settings.white_time.has_value() || settings.black_time.has_value()) {
         // 'wtime/winc/btime/binc'
         our_time = board.color_to_move() == CL_WHITE
-                 ? settings.white_time.value_or(UINT64_MAX)
-                 : settings.black_time.value_or(UINT64_MAX);
+                 ? settings.white_time.value_or(INT64_MAX)
+                 : settings.black_time.value_or(INT64_MAX);
 
-        m_tm.start_tourney_time(our_time, 0, 0, 0);
+        m_tm.start_normal(our_time, 0, 0, 0);
     }
     else {
-        // 'infinite'
-        m_tm.stop();
+        m_tm.start_infinite();
     }
 
     // Determine the number of helper threads to be used.
@@ -406,7 +405,7 @@ void SearchWorker::iterative_deepening() {
         // If we finished soft, we don't want to start a new iteration.
         if (   m_main
             && m_root_depth > 2
-            && m_context->time_manager().finished_soft()) {
+            && m_context->time_manager().time_up_soft()) {
             m_context->stop_search();
         }
 
@@ -440,7 +439,7 @@ void SearchWorker::iterative_deepening() {
             // If we finished soft, we don't want to start a new iteration.
             if (   m_main
                 && m_root_depth > 2
-                && m_context->time_manager().finished_soft()) {
+                && m_context->time_manager().time_up_soft()) {
                 m_context->stop_search();
             }
 
@@ -1178,9 +1177,7 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
 
     // Notify the time manager that we finished a pv iteration.
     if (m_main && notify_tm) {
-        m_context->time_manager().on_new_pv(pv_results.depth,
-                                            pv_results.best_move,
-                                            pv_results.score);
+        m_context->time_manager().pv_finished(pv_results);
     }
 
     // Notify whoever else needs to know about it.
@@ -1201,7 +1198,7 @@ void SearchWorker::check_limits() {
         return;
     }
 
-    if (m_context->time_manager().finished_hard()) {
+    if (m_context->time_manager().time_up_hard()) {
         m_context->stop_search();
     }
 }

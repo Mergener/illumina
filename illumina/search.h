@@ -14,18 +14,6 @@
 
 namespace illumina {
 
-struct PVResults {
-    Depth depth;
-    int pv_idx;
-    Depth sel_depth;
-    Move  best_move;
-    Score score;
-    ui64  nodes;
-    ui64  time;
-    BoundType bound_type;
-    std::vector<Move> line;
-};
-
 struct SearchSettings {
     Score contempt = 0;
     int n_pvs = 1;
