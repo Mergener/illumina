@@ -55,7 +55,10 @@ void TimeManager::on_pv_results(const PVResults& pv_results) {
 
 bool TimeManager::time_up_soft() const {
     if (m_mode != NORMAL) {
-        return false;
+        return time_up_hard();
+    }
+    if (m_depth <= 6) {
+        return time_up_hard();
     }
 
     i64 elapsed = delta_ms(Clock::now(), m_time_start);
