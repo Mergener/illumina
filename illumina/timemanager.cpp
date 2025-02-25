@@ -48,8 +48,8 @@ void TimeManager::on_pv_results(const PVResults& pv_results) {
     } else {
         m_best_move_stability = 0;
     }
+    m_depth = pv_results.depth;
     m_last_best_move = pv_results.best_move;
-
     m_best_move_node_pct = double(pv_results.best_move_nodes) / double(pv_results.nodes);
 }
 
