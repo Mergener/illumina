@@ -17,6 +17,8 @@ void TimeManager::start_normal(i64 our_time_ms, i64 our_inc_ms, i64 their_time_m
 
     m_hard = std::max(i64(1), i64(hard) - LAG_MARGIN);
     m_soft = std::max(i64(1), i64(soft));
+
+    m_best_move_stability = 0;
 }
 
 void TimeManager::start_movetime(i64 movetime_ms) {
@@ -41,18 +43,25 @@ bool TimeManager::time_up_hard() const {
 }
 
 void TimeManager::on_pv_results(const PVResults& pv_results) {
+    if (m_last_best_move == pv_results.best_move) {
+        m_best_move_stability = std::min(m_best_move_stability + 1, 12);
+    } else {
+        m_best_move_stability = 0;
+    }
+    m_last_best_move = pv_results.best_move;
 }
 
 bool TimeManager::time_up_soft() const {
-    if (m_mode == INFINITE) {
+    if (m_mode != NORMAL) {
         return false;
     }
 
-    if (m_mode == MOVETIME) {
-        return delta_ms(Clock::now(), m_time_start) >= m_soft;
-    }
+    i64 elapsed = delta_ms(Clock::now(), m_time_start);
 
-    return delta_ms(Clock::now(), m_time_start) >= m_soft;
+    double bm_stability = TM_BM_STABILITY_BASE - TM_BM_STABILITY_SLOPE * m_best_move_stability;
+    double soft = double(m_soft) * bm_stability;
+
+    return elapsed >= i64(soft);
 }
 
 } // illumina
