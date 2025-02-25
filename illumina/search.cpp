@@ -133,6 +133,7 @@ struct WorkerResults {
     Depth sel_depth   = 0;
     ui64  nodes       = 0;
     Depth searched_depth = 0;
+    std::unordered_map<Move, ui64> root_moves_nodes;
 };
 
 class SearchWorker {
@@ -839,6 +840,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             reductions = std::clamp(reductions, 0, depth);
         }
 
+        // Record how many nodes were previously searched so that we
+        // can compare how many nodes are spent for this move.
+        ui64 nodes_before = m_results.nodes;
+
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
@@ -877,6 +882,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         if (score >= best_score) {
             best_score = score;
+        }
+
+        if constexpr (ROOT) {
+            m_results.root_moves_nodes[m_curr_move] += m_results.nodes - nodes_before;
         }
 
         if (score >= beta) {
@@ -1133,6 +1142,7 @@ PVResults SearchWorker::generate_pv_results(const illumina::SearchNode *search_s
     // would be the best move of the entire search.
     if (!pv_results.line.empty()) {
         pv_results.best_move = pv_results.line[0];
+        pv_results.best_move_nodes = m_results.root_moves_nodes.at(pv_results.best_move);
     }
 
     return pv_results;
