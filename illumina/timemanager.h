@@ -37,6 +37,7 @@ private:
 
     Move m_last_best_move = MOVE_NULL;
     int  m_best_move_stability = 0;
+    double m_best_move_node_pct = 0;
 };
 
 } // illumina

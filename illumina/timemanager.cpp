@@ -49,6 +49,8 @@ void TimeManager::on_pv_results(const PVResults& pv_results) {
         m_best_move_stability = 0;
     }
     m_last_best_move = pv_results.best_move;
+
+    m_best_move_node_pct = double(pv_results.best_move_nodes) / double(pv_results.nodes);
 }
 
 bool TimeManager::time_up_soft() const {
@@ -59,7 +61,8 @@ bool TimeManager::time_up_soft() const {
     i64 elapsed = delta_ms(Clock::now(), m_time_start);
 
     double bm_stability = TM_BM_STABILITY_BASE - TM_BM_STABILITY_SLOPE * m_best_move_stability;
-    double soft = double(m_soft) * bm_stability;
+    double nodes = std::max(TM_NODES_BASE, (1.0 - m_best_move_node_pct) * TM_NODES_SLOPE + TM_NODES_BIAS);
+    double soft = double(m_soft) * bm_stability * (m_last_best_move != MOVE_NULL ? nodes : 1.0);
 
     return elapsed >= i64(soft);
 }

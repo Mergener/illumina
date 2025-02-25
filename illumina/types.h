@@ -943,6 +943,16 @@ inline std::ostream& operator<<(std::ostream& stream, Move move) {
     return stream;
 }
 
+
 } // illumina
+
+namespace std {
+template<>
+struct hash<illumina::Move> {
+    std::size_t operator()(const illumina::Move &m) const {
+        return std::hash<illumina::ui32>()(m.raw());
+    }
+};
+} // std
 
 #endif // ILLUMINA_TYPES_H
