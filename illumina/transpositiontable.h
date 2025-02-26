@@ -18,6 +18,7 @@ public:
     Score     score() const;
     Depth     depth() const;
     Score     static_eval() const;
+    bool      ttpv() const;
 
 private:
     ui32 m_key_low;
@@ -29,6 +30,7 @@ private:
     //  1-2:   bound_type
     //  3-10:  generation
     //  11-18: depth
+    //  19:    ttpv
     ui32 m_info;
 
     i16 m_score;
@@ -38,7 +40,8 @@ private:
                  Score score, Depth depth,
                  i16 static_eval,
                  BoundType bound_type,
-                 ui8 generation);
+                 ui8 generation,
+                 bool ttpv);
 };
 
 constexpr size_t TT_DEFAULT_SIZE_MB = 32;
@@ -56,7 +59,8 @@ public:
                    Score score,
                    Depth depth,
                    Score static_eval,
-                   BoundType bound_type);
+                   BoundType bound_type,
+                   bool ttpv);
     int hash_full() const;
     void prefetch(ui64 zob) const;
 
@@ -99,6 +103,10 @@ inline ui8 TranspositionTableEntry::generation() const {
 
 inline Depth TranspositionTableEntry::depth() const {
     return (m_info >> 11) & BITMASK(8);
+}
+
+inline bool TranspositionTableEntry::ttpv() const {
+    return (m_info >> 19) & BITMASK(1);
 }
 
 inline Score TranspositionTableEntry::score() const {
