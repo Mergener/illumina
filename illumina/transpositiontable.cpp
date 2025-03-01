@@ -136,14 +136,15 @@ void TranspositionTable::resize(size_t new_size) {
 }
 
 int TranspositionTable::hash_full() const {
+    constexpr size_t SAMPLE_SIZE = 1000;
     int filled = 0;
-    for (size_t i = 0; i < 1024; ++i) {
+    for (size_t i = 0; i < SAMPLE_SIZE; ++i) {
         TranspositionTableEntry& entry = m_buf[i];
         if (entry.valid()) {
             filled += 1000;
         }
     }
-    return filled / 1024;
+    return filled / SAMPLE_SIZE;
 }
 
 TranspositionTable::TranspositionTable(size_t size)
