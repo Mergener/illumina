@@ -33,8 +33,8 @@ struct RootInfo {
 struct SearchNode {
     Depth ply = 0;
     Score static_eval = 0;
-    Move  pv[MAX_DEPTH];
     Move  skip_move = MOVE_NULL;
+    Move  pv[MAX_DEPTH];
 };
 
 class SearchWorker;
@@ -60,7 +60,7 @@ public:
     bool should_stop() const;
 
     SearchContext(TranspositionTable* tt,
-                  std::atomic_bool* should_stop,
+                  std::atomic<bool>* should_stop,
                   const Searcher::Listeners* listeners,
                   const RootInfo* root_info,
                   const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
@@ -70,7 +70,7 @@ private:
     TranspositionTable*        m_tt;
     const Searcher::Listeners* m_listeners;
     const RootInfo*            m_root_info;
-    std::atomic_bool*          m_stop;
+    std::atomic<bool>*         m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
     const std::vector<std::unique_ptr<SearchWorker>>* m_helper_workers;
@@ -93,7 +93,7 @@ const Searcher::Listeners& SearchContext::listeners() const {
 }
 
 SearchContext::SearchContext(TranspositionTable* tt,
-                             std::atomic_bool* should_stop,
+                             std::atomic<bool>* should_stop,
                              const Searcher::Listeners* listeners,
                              const RootInfo* root_info,
                              const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
@@ -123,26 +123,15 @@ const std::vector<std::unique_ptr<SearchWorker>>& SearchContext::helper_workers(
     return *m_helper_workers;
 }
 
-struct WorkerResults {
-    struct {
-        Move best_move = MOVE_NULL;
-        Move ponder_move = MOVE_NULL;
-        Score score = 0;
-        BoundType bound_type = BT_EXACT;
-    } pv_results[MAX_PVS];
-    Depth sel_depth   = 0;
-    ui64  nodes       = 0;
-    Depth searched_depth = 0;
-};
-
 class SearchWorker {
 public:
     void iterative_deepening();
     bool should_stop() const;
-    bool tracing() const;
-    void check_limits();
 
-    const WorkerResults& results() const;
+    ui64  nodes() const;
+    Score score() const;
+    Move  best_move() const;
+    Move  ponder_move() const;
 
     SearchWorker(bool main,
                  const Board& board,
@@ -152,20 +141,24 @@ public:
 private:
     const SearchSettings* m_settings;
     const SearchContext*  m_context;
-    WorkerResults         m_results;
+    const bool m_main;
+    int m_eval_random_margin = 0;
+    int m_eval_random_seed = 0;
+    std::vector<Move> m_search_moves;
 
     Board       m_board;
     MoveHistory m_hist;
     Evaluation  m_eval {};
-    bool        m_main;
     Depth       m_root_depth = 1;
     Move        m_curr_move  = MOVE_NULL;
     int         m_curr_move_number = 0;
     int         m_curr_pv_idx = 0;
-    int         m_eval_random_margin = 0;
-    int         m_eval_random_seed = 0;
+    Depth       m_sel_depth = 0;
 
-    std::vector<Move> m_search_moves;
+    std::atomic<Score> m_score = 0;
+    std::atomic<ui64>  m_nodes = 0;
+    std::atomic<Move>  m_best_move = MOVE_NULL;
+    std::atomic<Move>  m_ponder_move = MOVE_NULL;
 
     template <bool TRACE, bool PV>
     Score quiescence_search(Depth ply, Score alpha, Score beta);
@@ -181,7 +174,9 @@ private:
 
     void aspiration_windows();
 
-    void update_pv_results(const SearchNode* search_stack, bool notify_tm);
+    void update_pv_results(const SearchNode* search_stack,
+                           Score alpha, Score beta,
+                           bool notify_tm);
 
     Score evaluate() const;
     Score draw_score() const;
@@ -204,6 +199,8 @@ private:
     template <bool TRACE>
     void on_piece_removed(const Board& board, Piece p, Square s);
 
+    void check_limits();
+    bool tracing() const;
 };
 
 void Searcher::stop() {
@@ -355,17 +352,18 @@ SearchResults Searcher::search(const Board& board,
     // Although this is not necessarily true, we don't want
     // to focus our efforts in improving MultiPV mode since
     // it is already not the one used for playing.
-    const auto& main_line_results = main_worker.results().pv_results[0];
-    results.score = main_line_results.score;
-    results.total_nodes = main_worker.results().nodes; // TODO: include nodes from helper threads.
+    results.score = main_worker.score();
+    results.total_nodes = main_worker.nodes();
 
     // Only accept non-null best moves.
-    if (main_line_results.best_move != MOVE_NULL) {
-        results.best_move = main_line_results.best_move;
+    Move best_move = main_worker.best_move();
+    if (best_move != MOVE_NULL) {
+        results.best_move = best_move;
     }
     // Only accept non-null ponder moves.
-    if (main_line_results.best_move != MOVE_NULL) {
-        results.ponder_move = main_line_results.ponder_move;
+    Move ponder_move = main_worker.ponder_move();
+    if (ponder_move != MOVE_NULL) {
+        results.ponder_move = ponder_move;
     }
 
     return results;
@@ -399,13 +397,12 @@ void SearchWorker::iterative_deepening() {
 
             // Make sure we set a valid move as the best move so that
             // we can return it if our search is interrupted early.
-            if (m_results.pv_results[m_curr_pv_idx].best_move == MOVE_NULL) {
-                m_results.pv_results[m_curr_pv_idx].best_move = m_search_moves[0];
+            if (m_best_move.load(std::memory_order_relaxed) == MOVE_NULL) {
+                m_best_move.store(m_search_moves[0], std::memory_order_relaxed);
             }
 
             check_limits();
             aspiration_windows();
-            m_results.searched_depth = m_root_depth;
             check_limits();
 
             // If we finished soft, we don't want to start a new iteration.
@@ -422,7 +419,7 @@ void SearchWorker::iterative_deepening() {
 
             // When using MultiPV, erase the best searched move and look for a new
             // pv without it.
-            Move pv_move = m_results.pv_results[m_curr_pv_idx].best_move;
+            Move pv_move = best_move();
             auto best_move_it = std::find(m_search_moves.begin(), m_search_moves.end(), pv_move);
             if (best_move_it != m_search_moves.end()) {
                 m_search_moves.erase(best_move_it);
@@ -442,7 +439,7 @@ void SearchWorker::aspiration_windows() {
     }
 
     // Prepare aspiration windows.
-    Score prev_score = m_results.pv_results[m_curr_pv_idx].score;
+    Score prev_score = score();
     Score alpha      = -MAX_SCORE;
     Score beta       = MAX_SCORE;
     Score window     = ASP_WIN_WINDOW;
@@ -456,7 +453,7 @@ void SearchWorker::aspiration_windows() {
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
 
-    Move best_move = m_results.pv_results[m_curr_pv_idx].best_move;
+    Move best_move = m_best_move.load(std::memory_order_relaxed);
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
@@ -474,11 +471,17 @@ void SearchWorker::aspiration_windows() {
             score = pvs<false, true, false, true>(depth, alpha, beta, &search_stack[0]);
         }
 
+        // Update ponder move if and only if we have both
+        // a best move and a ponder move.
+        if (   search_stack->pv[0] != MOVE_NULL
+            && search_stack->pv[1] != MOVE_NULL) {
+            m_ponder_move.store(search_stack->pv[1], std::memory_order_relaxed);
+        }
+
         if (score > alpha && score < beta) {
             // We found an exact score within our bounds, finish
             // the current depth search.
-            m_results.pv_results[m_curr_pv_idx].bound_type = BT_EXACT;
-            update_pv_results(search_stack, true);
+            update_pv_results(search_stack, alpha, beta, true);
             break;
         }
 
@@ -487,18 +490,16 @@ void SearchWorker::aspiration_windows() {
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_root_depth;
 
-            m_results.pv_results[m_curr_pv_idx].score     = prev_score;
-            m_results.pv_results[m_curr_pv_idx].best_move = best_move;
-            m_results.pv_results[m_curr_pv_idx].bound_type = BT_UPPERBOUND;
-            update_pv_results(search_stack, false);
+            m_score.store(prev_score, std::memory_order_relaxed);
+            m_best_move.store(best_move, std::memory_order_relaxed);
+            update_pv_results(search_stack, alpha, beta, false);
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
 
             prev_score = score;
-            best_move  = m_results.pv_results[m_curr_pv_idx].best_move;
-            m_results.pv_results[m_curr_pv_idx].bound_type = BT_LOWERBOUND;
-            update_pv_results(search_stack, true);
+            best_move  = m_best_move.load(std::memory_order_relaxed);
+            update_pv_results(search_stack, alpha, beta, true);
         }
 
         check_limits();
@@ -537,11 +538,11 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Keep track on some stats to report or use later.
-    m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
+    m_sel_depth = std::max(node->ply, m_sel_depth);
 
     // Make sure we count the root node.
     if constexpr (ROOT) {
-        m_results.nodes++;
+        m_nodes.fetch_add(1, std::memory_order_relaxed);
     }
 
     // Check if we must stop our search.
@@ -901,8 +902,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Due to aspiration windows, our search may have failed high in the root.
             // Make sure we always have a best_move and a best_score.
             if (ROOT && (!should_stop() || depth <= 2)) {
-                m_results.pv_results[m_curr_pv_idx].best_move = move;
-                m_results.pv_results[m_curr_pv_idx].score     = alpha;
+                m_best_move.store(move, std::memory_order_relaxed);
+                m_score.store(alpha, std::memory_order_relaxed);
             }
 
             if constexpr (PV && !ROOT) {
@@ -919,8 +920,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
             // Make sure we update our best_move in the root.
             if (ROOT && (!should_stop() || depth <= 2)) {
-                m_results.pv_results[m_curr_pv_idx].best_move = move;
-                m_results.pv_results[m_curr_pv_idx].score     = alpha;
+                m_best_move.store(move, std::memory_order_relaxed);
+                m_score.store(alpha, std::memory_order_relaxed);
             }
 
             // Update the PV table.
@@ -1016,8 +1017,9 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::ZOB_KEY, i64(m_board.hash_key()));
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
-    
-    m_results.sel_depth = std::max(m_results.sel_depth, ply);
+
+    // Keep track on seldepth.
+    m_sel_depth = std::max(ply, m_sel_depth);
 
     Score stand_pat = evaluate();
     if (!m_board.in_check()) {
@@ -1100,6 +1102,7 @@ Score SearchWorker::evaluate() const {
 }
 
 void SearchWorker::update_pv_results(const SearchNode* search_stack,
+                                     Score alpha, Score beta,
                                      bool notify_tm) {
     // We only want the main thread to update results, the others
     // should just assist on the search.
@@ -1107,21 +1110,28 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
         return;
     }
 
+    Score score  = this->score();
+    BoundType bt = score >= beta
+                 ? BT_LOWERBOUND
+                 : score <= alpha
+                 ? BT_UPPERBOUND
+                 : BT_EXACT;
+
     PVResults pv_results;
     pv_results.pv_idx     = m_curr_pv_idx;
     pv_results.depth      = m_root_depth;
-    pv_results.sel_depth  = m_results.sel_depth;
-    pv_results.score      = m_results.pv_results[m_curr_pv_idx].score;
+    pv_results.sel_depth  = m_sel_depth;
+    pv_results.score      = score;
     pv_results.time       = m_context->elapsed();
-    pv_results.bound_type = m_results.pv_results[m_curr_pv_idx].bound_type;
+    pv_results.bound_type = bt;
 
-    ui64 total_nodes = m_results.nodes;
+    ui64 total_nodes = nodes();
     for (const std::unique_ptr<SearchWorker>& worker: m_context->helper_workers()) {
         if (worker == nullptr) {
             continue;
         }
 
-        total_nodes += worker->results().nodes;
+        total_nodes += worker->nodes();
     }
     pv_results.nodes = total_nodes;
 
@@ -1141,12 +1151,6 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
         pv_results.best_move = pv_results.line[0];
     }
 
-    // Ponder move is the move we would consider pondering about if we could.
-    // We assume the best response from our opponent to be that move.
-    if (pv_results.line.size() >= 2) {
-        m_results.pv_results[m_curr_pv_idx].ponder_move = pv_results.line[1];
-    }
-
     // Notify the time manager that we finished a pv iteration.
     if (m_main && notify_tm) {
         m_context->time_manager().on_new_pv(pv_results.depth,
@@ -1163,12 +1167,13 @@ void SearchWorker::check_limits() {
         return;
     }
 
-    if (m_results.nodes >= m_settings->max_nodes) {
+    ui64 nodes = this->nodes();
+    if (nodes >= m_settings->max_nodes) {
         m_context->stop_search();
         return;
     }
 
-    if (m_results.nodes % 1024 != 0) {
+    if (nodes % 1024 != 0) {
         return;
     }
 
@@ -1186,7 +1191,7 @@ Score SearchWorker::draw_score() const {
 template <bool TRACE>
 void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
     TRACE_PUSH();
-    m_results.nodes++;
+    m_nodes.fetch_add(1, std::memory_order_relaxed);
     m_context->tt().prefetch(board.estimate_hash_key_after(move));
     m_eval.on_make_move(board, move);
 }
@@ -1200,7 +1205,7 @@ void SearchWorker::on_undo_move(const illumina::Board& board, illumina::Move mov
 template <bool TRACE>
 void SearchWorker::on_make_null_move(const illumina::Board& board) {
     TRACE_PUSH();
-    m_results.nodes++;
+    m_nodes.fetch_add(1, std::memory_order_relaxed);
     m_eval.on_make_null_move(board);
 
     TRACE_SET(Traceable::LAST_MOVE, MOVE_NULL);
@@ -1227,16 +1232,32 @@ bool SearchWorker::should_stop() const {
     return m_context->should_stop();
 }
 
+Score SearchWorker::score() const {
+    return m_score.load(std::memory_order_relaxed);
+}
+
+ui64 SearchWorker::nodes() const {
+    return m_nodes.load(std::memory_order_relaxed);
+}
+
+Move SearchWorker::best_move() const {
+    return m_best_move.load(std::memory_order_relaxed);
+}
+
+Move SearchWorker::ponder_move() const {
+    return m_ponder_move.load(std::memory_order_relaxed);
+}
+
 SearchWorker::SearchWorker(bool main,
                            const Board& board,
                            SearchContext* context,
                            const SearchSettings* settings)
     : m_settings(settings),
       m_context(context),
-      m_board(board),
       m_main(main),
       m_eval_random_margin(settings->eval_random_margin),
-      m_eval_random_seed(settings->eval_rand_seed) {
+      m_eval_random_seed(settings->eval_rand_seed),
+      m_board(board) {
     m_eval.on_new_board(m_board);
 
     // Dispatch board callbacks to Worker's methods.
@@ -1262,10 +1283,6 @@ SearchWorker::SearchWorker(bool main,
 
 bool SearchWorker::tracing() const {
     return m_main && m_settings->tracer != nullptr;
-}
-
-const WorkerResults& SearchWorker::results() const {
-    return m_results;
 }
 
 static void init_search_constants() {
