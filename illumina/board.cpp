@@ -939,17 +939,17 @@ bool Board::detect_frc() const {
 bool Board::is_repetition_draw(int max_appearances) const {
     int appearances = 1;
 
-    for (auto it = m_prev_states.crbegin(); it != m_prev_states.crend(); ++it) {
-        const auto& state = *it;
+    for (int i = int(m_prev_states.size()) - 2; i >= 0; i -= 2) {
+        const auto& state = m_prev_states[i];
 
-        if (state.last_move.makes_progress()) {
-            break;
-        }
         if (state.hash_key == m_state.hash_key) {
             appearances++;
             if (appearances == max_appearances) {
                 return true;
             }
+        }
+        if (state.last_move.makes_progress()) {
+            break;
         }
     }
 
