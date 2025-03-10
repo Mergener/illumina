@@ -350,8 +350,8 @@ void SearchTracer::save_search(const SearchInfo& search) {
 
 SearchTracer::SearchTracer(const std::string& db_path,
                            size_t batch_size_mib)
-    : m_target_node_count((batch_size_mib * 1024 * 1024) / sizeof(NodeInfo)),
-      m_db(db_path, SQLite::OPEN_CREATE | SQLite::OPEN_READWRITE) {
+    : m_db(db_path, SQLite::OPEN_CREATE | SQLite::OPEN_READWRITE),
+      m_target_node_count((batch_size_mib * 1024 * 1024) / sizeof(NodeInfo)){
     m_node_batch.reserve(m_target_node_count + 3);
     m_node_stack.reserve(MAX_DEPTH);
 

@@ -30,7 +30,7 @@ using TracedValue = std::variant<std::monostate, i64, bool, Move, double>;
                                                 "Unsupported traceable type.");
 #include "traceables.def"
 
-class SearchSettings;
+struct SearchSettings;
 
 class ISearchTracer {
 public:
@@ -47,6 +47,8 @@ public:
     virtual void push_sibling_node() = 0;
     virtual void set(Traceable which, TracedValue value) = 0;
     virtual void pop_node(bool discard = false) = 0;
+
+    virtual ~ISearchTracer() = default;
 };
 
 } // illumina

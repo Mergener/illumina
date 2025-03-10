@@ -31,7 +31,8 @@ void TranspositionTableEntry::replace(ui64 key,
                                       Depth depth,
                                       i16 static_eval,
                                       BoundType bound_type,
-                                      ui8 generation) {
+                                      ui8 generation,
+                                      bool ttpv) {
     m_key_low = key & 0xFFFFFFFF;
     m_key_hi  = key >> 32;
     m_move  = move;
@@ -42,6 +43,7 @@ void TranspositionTableEntry::replace(ui64 key,
     m_info |= (bound_type & BITMASK(2)) << 1;
     m_info |= (generation & BITMASK(8)) << 3;
     m_info |= (depth      & BITMASK(8)) << 11;
+    m_info |= (ttpv       & BITMASK(1)) << 19;
 }
 
 void TranspositionTable::new_search() {
@@ -67,12 +69,13 @@ void TranspositionTable::try_store(ui64 key,
                                    Score score,
                                    Depth depth,
                                    Score static_eval,
-                                   BoundType bound_type) {
+                                   BoundType bound_type,
+                                   bool ttpv) {
     TranspositionTableEntry& entry = entry_ref(key);
 
     // Always add when no existing entry is found.
     if (!entry.valid()) {
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen);
+        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen, ttpv);
 
         // Since we're adding a completely new entry, update the counter.
         m_entry_count++;
@@ -81,7 +84,7 @@ void TranspositionTable::try_store(ui64 key,
 
     // Always replace when current entry has no stored move.
     if (entry.move() == MOVE_NULL && move != MOVE_NULL) {
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen);
+        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen, ttpv);
         return;
     }
 
@@ -92,21 +95,21 @@ void TranspositionTable::try_store(ui64 key,
 
     // Always replace older generations.
     if (entry.generation() != m_gen) {
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen);
+        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen, ttpv);
         return;
     }
 
     // Always replace when we get a higher depth (with a move assigned).
     if (depth > entry.depth()) {
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen);
+        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen, ttpv);
         return;
     }
 
     // Replace when we're getting a more accurate score on the same depth.
     if (depth == entry.depth()
         && ((bound_type == BT_EXACT      && entry.bound_type() != BT_EXACT)
-        ||   bound_type != BT_UPPERBOUND && entry.bound_type() == BT_UPPERBOUND)) {
-        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen);
+        ||  (bound_type != BT_UPPERBOUND && entry.bound_type() == BT_UPPERBOUND))) {
+        entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen, ttpv);
         return;
     }
 }

@@ -64,8 +64,8 @@ TUNABLE_VALUE(SEE_PRUNING_THRESHOLD, int, -1);
 // QSEE pruning
 TUNABLE_VALUE(QSEE_PRUNING_THRESHOLD, int, -1);
 
-// Lazy SMP
-TUNABLE_VALUE(SMP_EVAL_RANDOM_MARGIN, int, 0);
+// Singular Extensions
+TUNABLE_VALUE(SE_DOUBLE_EXT_MARGIN, int, 15);
 
 //
 // Time manager constants
