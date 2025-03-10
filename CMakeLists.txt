@@ -19,6 +19,7 @@ endif()
 message(STATUS "NNUE_PATH is set to: ${NNUE_PATH}")
 
 # Add some compilation options.
+
 option(TUNING "Tunable values become runtime variables that can be changed via UCI options." OFF)
 if (TUNING)
     add_definitions(-DTUNING_BUILD)
@@ -79,6 +80,27 @@ if (PROFILING)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -pg -fno-omit-frame-pointer")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g -pg")
     add_definitions(-DPROFILING)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(LTO_DEFAULT_ON ON)
+else()
+    set(LTO_DEFAULT_ON OFF)
+endif()
+option(ENABLE_LTO
+       "Enables link time optimization, which may produce much faster binaries.
+        This might cause linker errors if the system does not support it or is
+        missing the proper linker."
+       ${LTO_DEFAULT_ON})
+if (ENABLE_LTO)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
+
+    # In order to allow link time optimization on Windows, we need
+    # to enable the following flag.
+    if (WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        message("Clang+Win32+LTO detected. Compilation might fail if lld is not found. If you're using MSYS, you might want to run pacman -S mingw-w64-x86_64-lld to install it.")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=lld")
+    endif()
 endif()
 
 if (   CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
