@@ -7,7 +7,7 @@ namespace illumina {
 
 class MarlinflowDataWriter : public DataWriter {
 public:
-    void write_data(ThreadContext& ctx,
+    ui64 write_data(ThreadContext& ctx,
                     std::ostream& stream,
                     const Game& game,
                     const std::vector<ExtractedData>& extracted_data) override;

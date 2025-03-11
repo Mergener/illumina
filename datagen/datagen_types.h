@@ -10,11 +10,12 @@
 
 namespace illumina {
 
-struct ThreadContext {
-    TimePoint time_start = Clock::now();
-    std::mt19937 rng = std::mt19937 { std::random_device()() };
-    size_t bytes_written = 0;
-    size_t positions_written = 0;
+struct DatagenOptions {
+    ui64 thread_buffer_size = 8192;
+    
+};
+
+class ThreadContext {
 };
 
 /**
@@ -41,7 +42,7 @@ public:
  */
 class DataWriter {
 public:
-    virtual void write_data(ThreadContext& ctx,
+    virtual ui64 write_data(ThreadContext& ctx,
                             std::ostream& stream,
                             const Game& game,
                             const std::vector<ExtractedData>& extracted_data) = 0;

@@ -9,6 +9,9 @@ BaseExtractor::BaseExtractor(int min_positions_per_game,
 
 std::vector<ExtractedData> BaseExtractor::extract_data(ThreadContext& ctx,
                                                        const Game& game) {
+    std::random_device rnd;
+    std::mt19937 rng(rnd());
+
     // We'll recreate the positions from the game and filter out
     // some of them before we output them.
     std::vector<ExtractedData> extracted_data;
@@ -33,7 +36,7 @@ std::vector<ExtractedData> BaseExtractor::extract_data(ThreadContext& ctx,
 
     // Since the tuples will be sliced, shuffling them allows us
     // to not only save data from the beginning of the game.
-    std::shuffle(extracted_data.begin(), extracted_data.end(), ctx.rng);
+    std::shuffle(extracted_data.begin(), extracted_data.end(), rng);
 
     size_t n_pos = std::min(size_t(m_min_positions_per_game) + ply_data_vec.size() / 30,
                             size_t(m_max_positions_per_game));
