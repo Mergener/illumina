@@ -1,6 +1,6 @@
 foreach (ARCH ${ARCHS})
     set(TARGET datagen_${ARCH})
-    add_executable(${TARGET} main.cpp)
+    add_executable(${TARGET} main.cpp simulation.cpp simulation.h writers/marlinflow.cpp writers/marlinflow.h extractors/base_extractor.cpp extractors/base_extractor.h datagen_types.h)
     apply_arch_options(${TARGET} ${ARCH})
     set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME datagen_${ARCH})
     target_link_libraries(${TARGET} PRIVATE illumina_lib_${ARCH})
