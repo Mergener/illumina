@@ -11,11 +11,12 @@
 namespace illumina {
 
 struct DatagenOptions {
-    ui64 thread_buffer_size = 8192;
-    
+    int threads = 1;
+    std::string out_file_name;
 };
 
-class ThreadContext {
+struct ThreadContext {
+    int thread_index;
 };
 
 /**

@@ -1994,7 +1994,7 @@ public:
 
         if (!parser.m_optional_arguments.empty()) {
             stream << (!has_visible_positional_args ? "" : "\n")
-                   << "Optional arguments:\n";
+                   << "Explicit arguments:\n";
         }
 
         for (const auto &argument : parser.m_optional_arguments) {

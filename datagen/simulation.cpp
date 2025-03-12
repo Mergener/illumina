@@ -2,12 +2,17 @@
 
 namespace illumina {
 
-Game simulate(const GameOptions& options) {
+Game simulate(Searcher& white_searcher,
+              Searcher& black_searcher,
+              const GameOptions& options) {
     Game game;
 
     struct {
-        Searcher searcher;
-    } players[CL_COUNT];
+        Searcher* searcher;
+    } players[CL_COUNT] = {
+        { &white_searcher },
+        { &black_searcher }
+    };
 
     SearchSettings search_settings;
     search_settings.max_nodes = options.search_node_limit;
@@ -49,7 +54,7 @@ Game simulate(const GameOptions& options) {
         validation_search_settings.max_nodes = UINT64_MAX;
         validation_search_settings.max_depth = 2;
 
-        SearchResults search_results = player.searcher.search(board, validation_search_settings);
+        SearchResults search_results = player.searcher->search(board, validation_search_settings);
 
         if (std::abs(search_results.score) >= 200) {
             // Position is excessively imbalanced.
@@ -72,7 +77,7 @@ Game simulate(const GameOptions& options) {
         auto& player = players[board.color_to_move()];
 
         // Perform a shallow search to simulate a move.
-        SearchResults search_results = player.searcher.search(board, search_settings);
+        SearchResults search_results = player.searcher->search(board, search_settings);
         Move best_move = search_results.best_move;
 
         // Save position data.

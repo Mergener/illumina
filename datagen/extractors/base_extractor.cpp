@@ -38,11 +38,12 @@ std::vector<ExtractedData> BaseExtractor::extract_data(ThreadContext& ctx,
     // to not only save data from the beginning of the game.
     std::shuffle(extracted_data.begin(), extracted_data.end(), rng);
 
-    size_t n_pos = std::min(size_t(m_min_positions_per_game) + ply_data_vec.size() / 30,
-                            size_t(m_max_positions_per_game));
-    n_pos = std::min(n_pos, extracted_data.size());
+    // We want longer games to skew towards the upper bound of extracted data points.
+    size_t n_data_points = std::min(size_t(m_min_positions_per_game) + ply_data_vec.size() / 32,
+                                    size_t(m_max_positions_per_game));
+    n_data_points = std::min(n_data_points, extracted_data.size());
 
-    extracted_data.erase(extracted_data.begin(), extracted_data.begin() + n_pos);
+    extracted_data.erase(extracted_data.begin() + n_data_points, extracted_data.end());
 
     return extracted_data;
 }

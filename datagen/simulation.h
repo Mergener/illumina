@@ -15,7 +15,7 @@ struct GamePlyData {
 
 struct GameOptions {
     Board base_start_pos = Board::standard_startpos();
-    ui64 search_node_limit = 16;
+    ui64 search_node_limit = 6000;
     int  min_random_plies = 8;
     int  max_random_plies = 16;
     int  win_adjudication_score = 1000;
@@ -28,7 +28,9 @@ struct Game {
     std::vector<GamePlyData> ply_data;
 };
 
-Game simulate(const GameOptions& options = {});
+Game simulate(Searcher& white_searcher,
+              Searcher& black_searcher,
+              const GameOptions& options = {});
 
 } // illumina
 

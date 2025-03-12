@@ -9,44 +9,188 @@
 
 #include <illumina.h>
 
-#include "datagen_types.h"
+#include <argparse/argparse.hpp>
 
+#include "datagen_types.h"
+#include "logger.h"
 #include "extractors/base_extractor.h"
 #include "writers/marlinflow.h"
 
 namespace illumina {
 
-[[noreturn]] void thread_main(std::string out_file) {
+static DatagenOptions parse_args(int argc, char* argv[]) {
+    DatagenOptions options {};
+
+    argparse::ArgumentParser args(argv[0], ILLUMINA_VERSION_NAME);
+
+    args.add_argument("-t", "--threads")
+        .default_value(options.threads)
+        .store_into(options.threads)
+        .help("number of threads.");
+
+    args.add_argument("-f", "--filename")
+        .required()
+        .store_into(options.out_file_name)
+        .help("name of the output file. Extension will be '.txt'.");
+
+    try {
+        args.parse_args(argc, argv);
+    }
+    catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        std::cerr << args;
+        std::exit(EXIT_FAILURE);
+    }
+
+    return options;
+}
+
+[[noreturn]] static void thread_main(int thread_index,
+                              const DatagenOptions& datagen_options) {
     ThreadContext ctx {};
+    ctx.thread_index = thread_index;
+
     BaseExtractor extractor {};
     MarlinflowDataWriter writer {};
 
-    std::cout << "Thread "
-              << std::this_thread::get_id()
-              << " saving to file "
-              << out_file << std::endl;
+    // Each thread will write to its own output file.
+    // We want the main thread to match the file name
+    // specified by the user.
+    std::string out_file = datagen_options.out_file_name;
+    if (thread_index != 0) {
+        out_file += "_" + std::to_string(thread_index);
+    }
+    out_file += ".txt";
+    sync_cout(ctx) << "Starting and saving data to " << out_file << "." << sync_endl;
+    std::ofstream fstream(out_file, std::ios_base::app);
 
+    // Record/prepare our data generation state before we
+    // jump into the processing state.
     TimePoint start = Clock::now();
-    ui64 total_data_points = 0;
+    ui64 total_data_points    = 0;
     ui64 unlogged_data_points = 0;
+    ui64 total_bytes          = 0;
+    ui64 total_games          = 0;
 
-    std::ofstream fstream(out_file);
+    Searcher white_searcher;
+    Searcher black_searcher;
 
     while (true) {
-        Game game = simulate();
+        white_searcher.tt().new_search();
+        black_searcher.tt().new_search();
+
+        Game game = simulate(white_searcher,
+                             black_searcher);
+
         std::vector<ExtractedData> data = extractor.extract_data(ctx, game);
 
+        // We write the data to a string stream before we
+        // output it so that we can keep track of the amount
+        // of bytes we're sending.
         std::stringstream sstream;
         ui64 data_points = writer.write_data(ctx, sstream, game, data);
-        total_data_points += data_points;
+        std::string data_str = sstream.str();
+        fstream << data_str << std::flush;
+
+        // Keep track of datagen statistics.
+        total_games++;
+        total_bytes          += data_str.size();
+        total_data_points    += data_points;
         unlogged_data_points += data_points;
 
+        // Log how much data we have already collected
+        // without spamming stdout too much.
         if (unlogged_data_points >= 1000) {
             unlogged_data_points = 0;
 
-            
+            static auto bytes_str = [](ui64 bytes) {
+                constexpr ui64 KiB =       1024ull;
+                constexpr ui64 MiB = KiB * 1024ull;
+                constexpr ui64 GiB = MiB * 1024ull;
+                constexpr ui64 TiB = GiB * 1024ull;
+
+                if (bytes < KiB) {
+                    return std::to_string(bytes) + " B";
+                }
+
+                std::string unit;
+                ui64 divisor;
+
+                if (bytes < MiB) {
+                    divisor = KiB;
+                    unit = " KiB";
+                }
+                else if (bytes < GiB) {
+                    divisor = MiB;
+                    unit = " MiB";
+                }
+                else if (bytes < TiB) {
+                    divisor = GiB;
+                    unit = " GiB";
+                }
+                else {
+                    divisor = TiB;
+                    unit = " TiB";
+                }
+
+                return std::to_string(bytes / divisor)
+                     + "."
+                     + std::to_string(int(double(bytes % divisor) / divisor * 10))
+                     + unit;
+            };
+
+            static auto time_str = [](ui64 elapsed_ms) {
+                constexpr ui64 ONE_MINUTE = 60;
+                constexpr ui64 ONE_HOUR   = ONE_MINUTE * 60;
+
+                ui64 elapsed_seconds = elapsed_ms / 1000;
+
+                if (elapsed_seconds < ONE_MINUTE) {
+                    return std::to_string(elapsed_seconds) + "s";
+                }
+                if (elapsed_seconds < ONE_HOUR) {
+                    return std::to_string(elapsed_seconds / ONE_MINUTE) + "m"
+                         + std::to_string(elapsed_seconds % ONE_MINUTE) + "s";
+                }
+                return std::to_string(elapsed_seconds / ONE_HOUR) + "h"
+                     + std::to_string((elapsed_seconds % ONE_HOUR) / ONE_MINUTE) + "m"
+                     + std::to_string(elapsed_seconds % ONE_MINUTE);
+            };
+
+            ui64 elapsed_ms    = delta_ms(Clock::now(), start);
+            double bytes_per_data = double(total_bytes) / double(total_data_points);
+            double data_per_sec   = double(total_data_points) / (elapsed_ms / 1000.0);
+            double games_per_sec  = double(total_games) / (elapsed_ms / 1000.0);
+
+            sync_cout(ctx) << std::setprecision(2)
+                           << total_data_points << " data points generated in "
+                           << time_str(elapsed_ms) << " ("
+                           << bytes_str(total_bytes) << ", "
+                           << bytes_per_data << " bytes/data, "
+                           << data_per_sec << " data/sec, "
+                           << total_games << " games, "
+                           << games_per_sec << " games/sec"
+                           << ")." << sync_endl;
         }
     }
+}
+
+static int datagen_main(int argc, char* argv[]) {
+    // Parse command line args.
+    DatagenOptions options = parse_args(argc, argv);
+
+    std::cout << "Starting data generation with " << options.threads << " threads." << std::endl;
+
+    // Fire helper threads.
+    std::vector<std::thread> helper_threads;
+    for (int i = 0; i < options.threads - 1; ++i) {
+        helper_threads.emplace_back([=]() {
+            thread_main(i + 1, options);
+        });
+    }
+
+    // Run main thread.
+    thread_main(0, options);
 }
 
 }
@@ -54,20 +198,13 @@ namespace illumina {
 int main(int argc, char* argv[]) {
     std::ios_base::sync_with_stdio(false);
 
-    std::string out_file_name;
+    try {
+        illumina::init();
 
-    if (argc < 2) {
-        std::cout << "Enter an output file name: " << std::endl;
-        std::getline(std::cin, out_file_name);
-
-        out_file_name.erase(std::remove(out_file_name.begin(), out_file_name.end(), '"'), out_file_name.end());
-        out_file_name.erase(std::remove(out_file_name.begin(), out_file_name.end(), '\n'), out_file_name.end());
+        return illumina::datagen_main(argc, argv);
     }
-    else {
-        out_file_name = argv[1];
+    catch (const std::exception& e) {
+        std::cerr << "Fatal:\n" << e.what() << std::endl;
+        return EXIT_FAILURE;
     }
-
-    illumina::init();
-
-    illumina::thread_main(out_file_name + ".txt");
 }

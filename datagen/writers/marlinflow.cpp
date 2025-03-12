@@ -1,9 +1,10 @@
 #include "marlinflow.h"
 
-#include <illumina.h>
 #include <string>
 #include <unordered_map>
 #include <sstream>
+
+#include <illumina.h>
 
 namespace illumina {
 
@@ -20,18 +21,17 @@ ui64 MarlinflowDataWriter::write_data(ThreadContext& ctx,
                                       std::ostream& stream,
                                       const Game& game,
                                       const std::vector<ExtractedData>& extracted_data) {
-    ui64 data_points = 0;
     for (const ExtractedData& data: extracted_data) {
         std::stringstream ss;
         stream << data.fen                      << " | "
                << data.ply_data.white_pov_score << " | "
-               << s_wdl_map.at(game.result.outcome)[game.result.winner.value_or(CL_WHITE)];
+               << s_wdl_map.at(game.result.outcome)[game.result.winner.value_or(CL_WHITE)]
+               << std::endl;
 
         std::string s = ss.str();
         stream << s;
-        data_points++;
     }
-    return data_points;
+    return extracted_data.size();
 }
 
 MarlinflowDataWriter::~MarlinflowDataWriter() noexcept { }
