@@ -1,20 +1,20 @@
-#include "base_extractor.h"
+#include "base_selector.h"
 
 namespace illumina {
 
-BaseExtractor::BaseExtractor(int min_positions_per_game,
-              int max_positions_per_game)
+BaseSelector::BaseSelector(int min_positions_per_game,
+                           int max_positions_per_game)
     : m_min_positions_per_game(min_positions_per_game),
       m_max_positions_per_game(max_positions_per_game) { }
 
-std::vector<ExtractedData> BaseExtractor::extract_data(ThreadContext& ctx,
-                                                       const Game& game) {
+std::vector<DataPoint> BaseSelector::select(ThreadContext& ctx,
+                                            const Game& game) {
     std::random_device rnd;
     std::mt19937 rng(rnd());
 
     // We'll recreate the positions from the game and filter out
     // some of them before we output them.
-    std::vector<ExtractedData> extracted_data;
+    std::vector<DataPoint> extracted_data;
     Board board = game.start_pos;
     const std::vector<GamePlyData>& ply_data_vec = game.ply_data;
 
@@ -48,7 +48,7 @@ std::vector<ExtractedData> BaseExtractor::extract_data(ThreadContext& ctx,
     return extracted_data;
 }
 
-BaseExtractor::~BaseExtractor() noexcept {
+BaseSelector::~BaseSelector() noexcept {
 }
 
 } // illumina

@@ -13,8 +13,8 @@
 
 #include "datagen_types.h"
 #include "logger.h"
-#include "extractors/base_extractor.h"
-#include "writers/marlinflow.h"
+#include "selectors/base_selector.h"
+#include "formatters/marlinflow.h"
 
 namespace illumina {
 
@@ -46,12 +46,12 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
 }
 
 [[noreturn]] static void thread_main(int thread_index,
-                              const DatagenOptions& datagen_options) {
+                                     const DatagenOptions& datagen_options) {
     ThreadContext ctx {};
     ctx.thread_index = thread_index;
 
-    BaseExtractor extractor {};
-    MarlinflowDataWriter writer {};
+    BaseSelector extractor {};
+    MarlinflowFormatter writer {};
 
     // Each thread will write to its own output file.
     // We want the main thread to match the file name
@@ -82,7 +82,7 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
         Game game = simulate(white_searcher,
                              black_searcher);
 
-        std::vector<ExtractedData> data = extractor.extract_data(ctx, game);
+        std::vector<DataPoint> data = extractor.select(ctx, game);
 
         // We write the data to a string stream before we
         // output it so that we can keep track of the amount
@@ -157,19 +157,19 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
                      + std::to_string(elapsed_seconds % ONE_MINUTE);
             };
 
-            ui64 elapsed_ms    = delta_ms(Clock::now(), start);
+            ui64 elapsed_ms       = delta_ms(Clock::now(), start);
             double bytes_per_data = double(total_bytes) / double(total_data_points);
             double data_per_sec   = double(total_data_points) / (elapsed_ms / 1000.0);
             double games_per_sec  = double(total_games) / (elapsed_ms / 1000.0);
 
             sync_cout(ctx) << std::setprecision(2)
-                           << total_data_points << " data points generated in "
-                           << time_str(elapsed_ms) << " ("
+                           << total_data_points      << " data points generated in "
+                           << time_str(elapsed_ms)   << " ("
                            << bytes_str(total_bytes) << ", "
-                           << bytes_per_data << " bytes/data, "
-                           << data_per_sec << " data/sec, "
-                           << total_games << " games, "
-                           << games_per_sec << " games/sec"
+                           << bytes_per_data         << " bytes/data, "
+                           << data_per_sec           << " data/sec, "
+                           << total_games            << " games, "
+                           << games_per_sec          << " games/sec"
                            << ")." << sync_endl;
         }
     }

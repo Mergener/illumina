@@ -22,7 +22,7 @@ struct ThreadContext {
 /**
  * Data extracted from a DataExtractor.
  */
-struct ExtractedData {
+struct DataPoint {
     std::string fen;
     GamePlyData ply_data;
 };
@@ -30,25 +30,25 @@ struct ExtractedData {
 /**
  * Nitpicks data from a simulation.
  */
-class DataExtractor {
+class DataSelector {
 public:
-    virtual std::vector<ExtractedData> extract_data(ThreadContext& ctx,
-                                                    const Game& game) = 0;
+    virtual std::vector<DataPoint> select(ThreadContext& ctx,
+                                          const Game& game) = 0;
 
-    virtual ~DataExtractor() = default;
+    virtual ~DataSelector() = default;
 };
 
 /**
  * Writes data to an output stream.
  */
-class DataWriter {
+class DataFormatter {
 public:
     virtual ui64 write_data(ThreadContext& ctx,
                             std::ostream& stream,
                             const Game& game,
-                            const std::vector<ExtractedData>& extracted_data) = 0;
+                            const std::vector<DataPoint>& extracted_data) = 0;
 
-    virtual ~DataWriter() = default;
+    virtual ~DataFormatter() = default;
 };
 
 } // illumina

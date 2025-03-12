@@ -5,14 +5,14 @@
 
 namespace illumina {
 
-class MarlinflowDataWriter : public DataWriter {
+class MarlinflowFormatter : public DataFormatter {
 public:
     ui64 write_data(ThreadContext& ctx,
                     std::ostream& stream,
                     const Game& game,
-                    const std::vector<ExtractedData>& extracted_data) override;
+                    const std::vector<DataPoint>& extracted_data) override;
 
-    ~MarlinflowDataWriter() noexcept override;
+    ~MarlinflowFormatter() noexcept override;
 };
 
 } // illumina
