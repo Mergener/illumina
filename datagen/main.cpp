@@ -33,6 +33,11 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
         .store_into(options.out_file_name)
         .help("name of the output file. Extension will be '.txt'.");
 
+    args.add_argument("--pipeline")
+        .default_value("")
+        .store_into(options.pipeline_file_path)
+        .help("path to a datagen pipeline file.");
+
     try {
         args.parse_args(argc, argv);
     }
@@ -49,9 +54,6 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
                                      const DatagenOptions& datagen_options) {
     ThreadContext ctx {};
     ctx.thread_index = thread_index;
-
-    BaseSelector extractor {};
-    MarlinflowFormatter writer {};
 
     // Each thread will write to its own output file.
     // We want the main thread to match the file name
@@ -72,25 +74,55 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
     ui64 total_bytes          = 0;
     ui64 total_games          = 0;
 
-    Searcher white_searcher;
-    Searcher black_searcher;
+    // Load our pipeline. If the user has specified no pipeline, we
+    // will automatically use the default one.
+    std::string pipeline_json {};
+    const std::string& pipeline_path = datagen_options.pipeline_file_path;
+    if (!pipeline_path.empty()) {
+        std::ifstream pipeline_stream(pipeline_path);
+
+        if (!pipeline_stream.fail()) {
+            // We found a pipeline file. Load it entirely.
+            sync_cout() << "Found pipeline definition, loading it." << sync_endl;
+            pipeline_json = std::string(std::istreambuf_iterator<char>(pipeline_stream),
+                                        std::istreambuf_iterator<char>());
+        }
+        else if (ctx.is_main_thread()) {
+            sync_cout() << "Couldn't find pipeline definition at " << pipeline_path << sync_endl;
+            sync_cout() << "Using default pipeline definition."    << sync_endl;
+        }
+    }
+    Pipeline pipeline(pipeline_json);
+
+    Searcher white_searcher {};
+    Searcher black_searcher {};
 
     while (true) {
+        // Make sure every new game has a fresh TT.
         white_searcher.tt().new_search();
         black_searcher.tt().new_search();
 
+        // Step 1. Simulate the game.
         Game game = simulate(white_searcher,
                              black_searcher);
 
-        std::vector<DataPoint> data = extractor.select(ctx, game);
+        // Step 2. Filter out undesired data extracted from the game.
+        std::vector<DataPoint> data = pipeline.pick_selector()
+                                              .select(ctx, game);
 
+        // Step 3. Format the data.
         // We write the data to a string stream before we
         // output it so that we can keep track of the amount
         // of bytes we're sending.
         std::stringstream sstream;
-        ui64 data_points = writer.write_data(ctx, sstream, game, data);
+        ui64 data_points = pipeline.get_formatter().write(ctx, sstream, game, data);
+
+        // Step 4. Write the data on disk.
         std::string data_str = sstream.str();
         fstream << data_str << std::flush;
+
+        // The following part is solely related to reporting our results
+        // to the user.
 
         // Keep track of datagen statistics.
         total_games++;
@@ -98,8 +130,8 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
         total_data_points    += data_points;
         unlogged_data_points += data_points;
 
-        // Log how much data we have already collected
-        // without spamming stdout too much.
+        // We don't want to spam stdout too much, so only log information
+        // after reasonable intervals.
         if (unlogged_data_points >= 1000) {
             unlogged_data_points = 0;
 

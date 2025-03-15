@@ -1,9 +1,10 @@
 #ifndef ILLUMINA_BASE_EXTRACTOR_H
 #define ILLUMINA_BASE_EXTRACTOR_H
 
-#include "../datagen_types.h"
+#include "../pipeline.h"
 
 namespace illumina {
+
 
 class BaseSelector : public DataSelector {
 public:
@@ -11,8 +12,6 @@ public:
                                   const Game& game) override;
 
     BaseSelector() = default;
-    BaseSelector(int min_positions_per_game,
-                 int max_positions_per_game);
     ~BaseSelector() noexcept override;
 
 private:

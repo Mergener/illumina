@@ -13,15 +13,16 @@ namespace illumina {
 //
 
 enum class IOSync {
-    IO_LOCK,
-    IO_UNLOCK
+    LOCK,
+    UNLOCK
 };
 std::ostream& operator<<(std::ostream&, IOSync);
 
+std::ostream& sync_cout();
 std::ostream& sync_cout(const ThreadContext& thread_context);
 
-#define sync_endl  std::endl << illumina::IOSync::IO_UNLOCK
-#define sync_flush std::flush << illumina::IOSync::IO_UNLOCK
+#define sync_endl  std::endl << illumina::IOSync::UNLOCK
+#define sync_flush std::flush << illumina::IOSync::UNLOCK
 
 } // illumina
 

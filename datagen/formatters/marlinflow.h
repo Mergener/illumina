@@ -1,16 +1,16 @@
 #ifndef ILLUMINA_MARLINFLOW_H
 #define ILLUMINA_MARLINFLOW_H
 
-#include "../datagen_types.h"
+#include "../pipeline.h"
 
 namespace illumina {
 
 class MarlinflowFormatter : public DataFormatter {
 public:
-    ui64 write_data(ThreadContext& ctx,
-                    std::ostream& stream,
-                    const Game& game,
-                    const std::vector<DataPoint>& extracted_data) override;
+    ui64 write(ThreadContext& ctx,
+               std::ostream& stream,
+               const Game& game,
+               const std::vector<DataPoint>& extracted_data) override;
 
     ~MarlinflowFormatter() noexcept override;
 };

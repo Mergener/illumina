@@ -12,12 +12,19 @@ namespace illumina {
 
 struct DatagenOptions {
     int threads = 1;
-    std::string out_file_name;
+    std::string out_file_name {};
+    std::string pipeline_file_path {};
 };
 
 struct ThreadContext {
     int thread_index;
+
+    bool is_main_thread() const;
 };
+
+inline bool ThreadContext::is_main_thread() const {
+    return thread_index == 0;
+}
 
 /**
  * Data extracted from a DataExtractor.
@@ -25,30 +32,6 @@ struct ThreadContext {
 struct DataPoint {
     std::string fen;
     GamePlyData ply_data;
-};
-
-/**
- * Nitpicks data from a simulation.
- */
-class DataSelector {
-public:
-    virtual std::vector<DataPoint> select(ThreadContext& ctx,
-                                          const Game& game) = 0;
-
-    virtual ~DataSelector() = default;
-};
-
-/**
- * Writes data to an output stream.
- */
-class DataFormatter {
-public:
-    virtual ui64 write_data(ThreadContext& ctx,
-                            std::ostream& stream,
-                            const Game& game,
-                            const std::vector<DataPoint>& extracted_data) = 0;
-
-    virtual ~DataFormatter() = default;
 };
 
 } // illumina

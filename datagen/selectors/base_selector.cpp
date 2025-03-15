@@ -2,11 +2,6 @@
 
 namespace illumina {
 
-BaseSelector::BaseSelector(int min_positions_per_game,
-                           int max_positions_per_game)
-    : m_min_positions_per_game(min_positions_per_game),
-      m_max_positions_per_game(max_positions_per_game) { }
-
 std::vector<DataPoint> BaseSelector::select(ThreadContext& ctx,
                                             const Game& game) {
     std::random_device rnd;
@@ -42,7 +37,6 @@ std::vector<DataPoint> BaseSelector::select(ThreadContext& ctx,
     size_t n_data_points = std::min(size_t(m_min_positions_per_game) + ply_data_vec.size() / 32,
                                     size_t(m_max_positions_per_game));
     n_data_points = std::min(n_data_points, extracted_data.size());
-
     extracted_data.erase(extracted_data.begin() + n_data_points, extracted_data.end());
 
     return extracted_data;

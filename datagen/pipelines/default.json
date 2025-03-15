@@ -1,0 +1,11 @@
+{
+  "selectors": [
+    {
+      "type": "base",
+      "weight": 1000
+    }
+  ],
+  "formatter": {
+    "type": "marlinflow"
+  }
+}

@@ -17,10 +17,10 @@ static std::unordered_map<BoardOutcome, std::array<std::string, CL_COUNT>> s_wdl
     { BoardOutcome::DRAW_BY_INSUFFICIENT_MATERIAL, { "0.5", "0.5" } },
 };
 
-ui64 MarlinflowFormatter::write_data(ThreadContext& ctx,
-                                     std::ostream& stream,
-                                     const Game& game,
-                                     const std::vector<DataPoint>& extracted_data) {
+ui64 MarlinflowFormatter::write(ThreadContext& ctx,
+                                std::ostream& stream,
+                                const Game& game,
+                                const std::vector<DataPoint>& extracted_data) {
     for (const DataPoint& data: extracted_data) {
         std::stringstream ss;
         stream << data.fen                      << " | "
