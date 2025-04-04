@@ -13,26 +13,8 @@ namespace illumina {
 
 INCTXT(_default_pipeline, PIPELINE_PATH);
 
-void Pipeline::compute_selector_weight_sum() {
-    int sum = 0;
-    for (const auto& selector: m_selectors) {
-        sum += selector.weight;
-    }
-    m_selector_weight_sum = sum;
-}
-
 DataSelector& Pipeline::pick_selector() const {
-    std::uniform_int_distribution<int> dist(1, m_selector_weight_sum);
-    int random = dist(*m_rng);
-
-    auto it = m_selectors.begin();
-    while (random > 0) {
-        random -= it->weight;
-        it++;
-    }
-    it--;
-
-    return *it->value;
+    return *m_selectors.pick_weighted_random();
 }
 
 DataFormatter& Pipeline::get_formatter() const {
@@ -50,6 +32,10 @@ void from_json(const nlohmann::json& j, SelectorDefinition& d) {
 
     if (j.contains("options")) {
         d.options = j.at("options");
+    }
+
+    if (j.contains("weight")) {
+        d.weight = j.at("weight");
     }
 }
 
@@ -110,12 +96,10 @@ Pipeline::Pipeline(const std::string& pipeline_json) {
             m_selectors.push_back({ it->second(), selector_def.weight });
 
             if (selector_def.options.has_value()) {
-                DataSelector& selector = *(m_selectors.back().value);
+                DataSelector& selector = *(m_selectors.back().first);
                 selector.load_settings(*selector_def.options);
             }
         }
-        // Make sure selector weight sum is properly computed.
-        compute_selector_weight_sum();
 
         const auto& formatter_def = pipeline_defs.formatter;
         auto it = s_formatter_builders.find(pipeline_defs.formatter.type);

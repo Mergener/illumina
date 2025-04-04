@@ -6,8 +6,17 @@
 #include <nlohmann/json/json.hpp>
 
 #include "datagen_types.h"
+#include "weighted_vector.h"
 
 namespace illumina {
+
+class Generator {
+public:
+    virtual void load_settings(const nlohmann::json& j);
+    virtual void Board(Board& board);
+
+    virtual ~Generator() = default;
+};
 
 /**
  * Nitpicks data from a simulation.
@@ -59,17 +68,9 @@ public:
     DataFormatter& get_formatter() const;
 
 private:
-    template <typename T>
-    struct WeightValuePair {
-        T value;
-        int weight = 1000;
-    };
-    std::vector<WeightValuePair<std::unique_ptr<DataSelector>>> m_selectors;
+    WeightedVector<std::unique_ptr<DataSelector>> m_selectors;
     std::unique_ptr<DataFormatter> m_formatter;
     std::unique_ptr<std::mt19937> m_rng = std::make_unique<std::mt19937>();
-    int m_selector_weight_sum;
-
-    void compute_selector_weight_sum();
 };
 
 } // illumina
