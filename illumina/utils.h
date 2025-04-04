@@ -99,6 +99,10 @@ std::string lower_case(std::string str);
 
 std::string upper_case(std::string str);
 
+template <typename TInt, TInt MAX = 2048>
+constexpr TInt intmoid(TInt x) {
+    return (MAX * x) / (MAX + std::abs(x));
+}
 
 } // illumina
 

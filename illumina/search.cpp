@@ -628,7 +628,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
-    Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
+    Score rfp_margin = intmoid(RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth);
     if (   !PV
         && !in_check
         && node->skip_move == MOVE_NULL
@@ -760,7 +760,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 && !in_check
                 && move != hash_move
                 && move.is_quiet()
-                && (static_eval + FP_MARGIN) < alpha
+                && (static_eval + intmoid(FP_MARGIN)) < alpha
                 && !m_board.gives_check(move)) {
                 continue;
             }
@@ -778,7 +778,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             && tt_entry.depth() >= (depth - 3)
             && std::abs(tt_entry.score()) < MATE_THRESHOLD
             && !m_board.gives_check(move)) {
-            Score se_beta = tt_entry.score() - depth * 3;
+            Score se_beta = tt_entry.score() - intmoid(depth * 3);
 
             node->skip_move = move;
 
@@ -795,7 +795,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             if (score < se_beta) {
                 extensions++;
                 if (  !PV
-                    && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
+                    && score < (se_beta - intmoid(SE_DOUBLE_EXT_MARGIN))) {
                     extensions++;
                 }
             }
@@ -822,7 +822,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                 // Further reduce moves that have been historically very bad.
                 reductions += m_hist.quiet_history(move,
                                                    m_board.last_move(),
-                                                   m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
+                                                   m_board.gives_check(move)) <= intmoid(LMR_BAD_HISTORY_THRESHOLD);
 
                 // Don't reduce nodes that have been on the PV as much.
                 reductions -= ttpv;
@@ -830,7 +830,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
                 // and probably don't need unsound sacrifices.
-                bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
+                bool stable = alpha >= intmoid(LMR_STABLE_ALPHA_THRESHOLD);
                 reductions -= !stable * (reductions / 2);
             }
 
@@ -1088,7 +1088,7 @@ Score SearchWorker::evaluate() const {
 
     // If we're not in a known endgame, use our regular
     // static evaluation function.
-    Score score = m_eval.get();
+    Score score = intmoid(m_eval.get());
     if (m_eval_random_margin != 0) {
         // User has requested evaluation randomness, apply the noise.
         i32 seed   = Score((m_eval_random_seed * m_board.hash_key()) & BITMASK(15));
