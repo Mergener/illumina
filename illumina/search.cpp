@@ -611,7 +611,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Compute the static eval. Useful for many heuristics.
     Score raw_eval;
-    if (!in_check) {
+    bool do_eval = !in_check;
+    if (do_eval) {
         raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
         static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
         TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
@@ -631,6 +632,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
     if (   !PV
         && !in_check
+        && (!found_in_tt || !tt_entry.move().is_capture())
         && node->skip_move == MOVE_NULL
         && depth <= RFP_MAX_DEPTH
         && alpha < MATE_THRESHOLD
