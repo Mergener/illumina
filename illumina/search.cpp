@@ -183,7 +183,7 @@ private:
 
     void update_pv_results(const SearchNode* search_stack, bool notify_tm);
 
-    Score evaluate() const;
+    Score evaluate();
     Score draw_score() const;
 
     template <bool TRACE>
@@ -1077,7 +1077,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     return best_score;
 }
 
-Score SearchWorker::evaluate() const {
+Score SearchWorker::evaluate() {
     // Check if we're in a known endgame.
     Endgame eg = identify_endgame(m_board);
 
@@ -1088,7 +1088,7 @@ Score SearchWorker::evaluate() const {
 
     // If we're not in a known endgame, use our regular
     // static evaluation function.
-    Score score = m_eval.get();
+    Score score = m_eval.compute();
     if (m_eval_random_margin != 0) {
         // User has requested evaluation randomness, apply the noise.
         i32 seed   = Score((m_eval_random_seed * m_board.hash_key()) & BITMASK(15));

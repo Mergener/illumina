@@ -6,8 +6,13 @@
 
 namespace illumina {
 
+Evaluation::Evaluation() {
+    m_lazy_updates.reserve(MAX_DEPTH);
+}
+
 void Evaluation::on_new_board(const Board& board) {
     m_nnue.clear();
+    m_lazy_updates.clear();
     m_ctm = board.color_to_move();
 
     // Activate every feature individually.
@@ -19,7 +24,45 @@ void Evaluation::on_new_board(const Board& board) {
     }
 }
 
+void Evaluation::apply_lazy_updates() {
+    for (Move move: m_lazy_updates) {
+        if (move != MOVE_NULL) {
+            apply_make_move(move);
+        }
+        else {
+            apply_make_null_move();
+        }
+    }
+    m_lazy_updates.clear();
+}
+
 void Evaluation::on_make_move(const Board& board, Move move) {
+    m_lazy_updates.push_back(move);
+}
+
+void Evaluation::on_undo_move(const Board& board, Move move) {
+    if (m_lazy_updates.empty()) {
+        apply_undo_move(move);
+    }
+    else {
+        m_lazy_updates.pop_back();
+    }
+}
+
+void Evaluation::on_make_null_move(const Board& board) {
+    m_lazy_updates.push_back(MOVE_NULL);
+}
+
+void Evaluation::on_undo_null_move(const Board& board) {
+    if (m_lazy_updates.empty()) {
+        apply_undo_null_move();
+    }
+    else {
+        m_lazy_updates.pop_back();
+    }
+}
+
+void Evaluation::apply_make_move(Move move) {
     m_nnue.push_accumulator();
     Color moved_color = m_ctm;
     m_ctm = opposite_color(m_ctm);
@@ -70,16 +113,16 @@ void Evaluation::on_make_move(const Board& board, Move move) {
     }
 }
 
-void Evaluation::on_undo_move(const Board& board, Move move) {
+void Evaluation::apply_undo_move(Move move) {
     m_ctm = opposite_color(m_ctm);
     m_nnue.pop_accumulator();
 }
 
-void Evaluation::on_make_null_move(const Board& board) {
+void Evaluation::apply_make_null_move() {
     m_ctm = opposite_color(m_ctm);
 }
 
-void Evaluation::on_undo_null_move(const Board& board) {
+void Evaluation::apply_undo_null_move() {
     m_ctm = opposite_color(m_ctm);
 }
 
@@ -89,7 +132,8 @@ void Evaluation::on_piece_added(const Board &board, Piece p, Square s) {
 void Evaluation::on_piece_removed(const Board &board, Piece p, Square s) {
 }
 
-Score Evaluation::get() const {
+Score Evaluation::compute() {
+    apply_lazy_updates();
     return std::clamp(m_nnue.forward(m_ctm), -KNOWN_WIN + 1, KNOWN_WIN - 1);
 }
 
