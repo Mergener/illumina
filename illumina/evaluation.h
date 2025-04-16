@@ -24,12 +24,11 @@ public:
 
     void apply_lazy_updates();
 
-    Evaluation();
-
 private:
     NNUE m_nnue;
     Color m_ctm;
-    std::vector<Move> m_lazy_updates;
+    std::array<Move, MAX_DEPTH> m_lazy_updates;
+    size_t m_n_lazy_updates = 0;
 
     void apply_make_move(Move move);
     void apply_undo_move(Move move);

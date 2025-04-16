@@ -6,13 +6,9 @@
 
 namespace illumina {
 
-Evaluation::Evaluation() {
-    m_lazy_updates.reserve(MAX_DEPTH);
-}
-
 void Evaluation::on_new_board(const Board& board) {
     m_nnue.clear();
-    m_lazy_updates.clear();
+    m_n_lazy_updates = 0;
     m_ctm = board.color_to_move();
 
     // Activate every feature individually.
@@ -25,7 +21,8 @@ void Evaluation::on_new_board(const Board& board) {
 }
 
 void Evaluation::apply_lazy_updates() {
-    for (Move move: m_lazy_updates) {
+    for (size_t i = 0; i < m_n_lazy_updates; ++i) {
+        Move move = m_lazy_updates[i];
         if (move != MOVE_NULL) {
             apply_make_move(move);
         }
@@ -33,32 +30,32 @@ void Evaluation::apply_lazy_updates() {
             apply_make_null_move();
         }
     }
-    m_lazy_updates.clear();
+    m_n_lazy_updates = 0;
 }
 
 void Evaluation::on_make_move(const Board& board, Move move) {
-    m_lazy_updates.push_back(move);
+    m_lazy_updates[m_n_lazy_updates++] = move;
 }
 
 void Evaluation::on_undo_move(const Board& board, Move move) {
-    if (m_lazy_updates.empty()) {
+    if (m_n_lazy_updates == 0) {
         apply_undo_move(move);
     }
     else {
-        m_lazy_updates.pop_back();
+        m_n_lazy_updates--;
     }
 }
 
 void Evaluation::on_make_null_move(const Board& board) {
-    m_lazy_updates.push_back(MOVE_NULL);
+    m_lazy_updates[m_n_lazy_updates++] = MOVE_NULL;
 }
 
 void Evaluation::on_undo_null_move(const Board& board) {
-    if (m_lazy_updates.empty()) {
+    if (m_n_lazy_updates == 0) {
         apply_undo_null_move();
     }
     else {
-        m_lazy_updates.pop_back();
+        m_n_lazy_updates--;
     }
 }
 
