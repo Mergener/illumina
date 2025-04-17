@@ -1,6 +1,13 @@
 {
   "selector": {
-    "type": "base"
+    "type": "base",
+    "options": {
+      "min_positions_per_game": 12,
+      "max_positions_per_game": 16,
+      "exclude_checks": true,
+      "exclude_mate_scores": true,
+      "exclude_last_move_captures": true
+    }
   },
   "formatter": {
     "type": "marlinflow"

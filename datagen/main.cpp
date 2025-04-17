@@ -1,5 +1,4 @@
 #include <iostream>
-#include <sstream>
 #include <random>
 #include <string_view>
 #include <string>
@@ -13,8 +12,7 @@
 
 #include "datagen_types.h"
 #include "logger.h"
-#include "selectors/base_selector.h"
-#include "formatters/marlinflow.h"
+#include "pipeline.h"
 
 namespace illumina {
 
@@ -63,7 +61,6 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
         out_file += "_" + std::to_string(thread_index);
     }
     out_file += ".txt";
-    sync_cout(ctx) << "Starting and saving data to " << out_file << "." << sync_endl;
     std::ofstream fstream(out_file, std::ios_base::app);
 
     // Record/prepare our data generation state before we
@@ -86,16 +83,23 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
             sync_cout() << "Found pipeline definition, loading it." << sync_endl;
             pipeline_json = std::string(std::istreambuf_iterator<char>(pipeline_stream),
                                         std::istreambuf_iterator<char>());
+            sync_cout() << "Loaded custom pipeline:\n" << pipeline_json << sync_endl;
         }
         else if (ctx.is_main_thread()) {
             sync_cout() << "Couldn't find pipeline definition at " << pipeline_path << sync_endl;
-            sync_cout() << "Using default pipeline definition."    << sync_endl;
         }
     }
+    if (ctx.is_main_thread() && pipeline_json.empty()) {
+        sync_cout() << "Using default pipeline definition:\n"  << sync_endl;
+        sync_cout() << default_pipeline_string() << sync_endl;
+    }
+
     Pipeline pipeline(pipeline_json);
 
     Searcher white_searcher {};
     Searcher black_searcher {};
+
+    sync_cout(ctx) << "Starting and saving data to " << out_file << "." << sync_endl;
 
     while (true) {
         // Make sure every new game has a fresh TT.
@@ -228,9 +232,9 @@ static int datagen_main(int argc, char* argv[]) {
 void run_bench() {
     std::cout << "Running bench..." << std::endl;
     BenchResults res = bench();
-    std::cout << "Finished bench.\n"
-              << "\tNodes: " << res.total_nodes
-              << "\tNPS:   " << res.nps
+    std::cout << "Finished bench."
+              << "\n\tNodes: " << res.total_nodes
+              << "\n\tNPS:   " << res.nps
               << std::endl;
 }
 

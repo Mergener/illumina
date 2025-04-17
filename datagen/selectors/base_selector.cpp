@@ -40,6 +40,22 @@ std::vector<DataPoint> BaseSelector::select(ThreadContext& ctx,
     return extracted_data;
 }
 
+template <typename T>
+static void load_optional_setting(const nlohmann::json& j,
+                                  T& out, const char* setting) {
+    if (j.contains(setting)) {
+        out = j[setting];
+    }
+}
+
+void BaseSelector::load_settings(const nlohmann::json& j) {
+    load_optional_setting(j, m_max_positions_per_game, "max_positions_per_game");
+    load_optional_setting(j, m_min_positions_per_game, "min_positions_per_game");
+    load_optional_setting(j, m_exclude_checks, "exclude_checks");
+    load_optional_setting(j, m_exclude_mate_scores, "exclude_mate_scores");
+    load_optional_setting(j, m_exclude_last_move_captures, "exclude_last_move_captures");
+}
+
 BaseSelector::~BaseSelector() noexcept {
 }
 

@@ -78,7 +78,7 @@ Pipeline::Pipeline(const std::string& pipeline_json) {
         // Load pipeline JSON, either from parameter or the default one.
         std::string_view json = !pipeline_json.empty()
                                 ? pipeline_json
-                                : std::string_view(g_default_pipelineData, g_default_pipelineSize);
+                                : default_pipeline_string();
 
         PipelineDefinition pipeline_defs = nlohmann::json::parse(json);
 
@@ -109,6 +109,10 @@ Pipeline::Pipeline(const std::string& pipeline_json) {
         std::cerr << "Failed to parse pipeline definition." << std::endl;
         throw e;
     }
+}
+
+std::string_view default_pipeline_string() {
+    return std::string_view(g_default_pipelineData, g_default_pipelineSize);
 }
 
 } // illumina

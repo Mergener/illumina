@@ -63,6 +63,8 @@ private:
     std::unique_ptr<DataFormatter> m_formatter;
 };
 
+std::string_view default_pipeline_string();
+
 } // illumina
 
 #endif // ILLUMINA_PIPELINE_H
