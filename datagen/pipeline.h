@@ -9,14 +9,6 @@
 
 namespace illumina {
 
-class Generator {
-public:
-    virtual void load_settings(const nlohmann::json& j);
-    virtual void Board(Board& board);
-
-    virtual ~Generator() = default;
-};
-
 /**
  * Nitpicks data from a simulation.
  */
@@ -69,7 +61,6 @@ public:
 private:
     std::unique_ptr<DataSelector> m_selector;
     std::unique_ptr<DataFormatter> m_formatter;
-    std::unique_ptr<std::mt19937> m_rng = std::make_unique<std::mt19937>();
 };
 
 } // illumina
