@@ -24,9 +24,9 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
     args.add_argument("-t", "--threads")
         .default_value(options.threads)
         .store_into(options.threads)
-        .help("number of threads.");
+        .help("number of threads. Helper threads will write to files postfix by the thread index.");
 
-    args.add_argument("-f", "--filename")
+    args.add_argument("-o", "--output")
         .required()
         .store_into(options.out_file_name)
         .help("name of the output file. Extension will be '.txt'.");
