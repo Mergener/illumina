@@ -46,6 +46,7 @@ public:
                          Depth depth,
                          int diff);
 
+    int pawn_corrhist(Color ctm, ui64 pawn_key) const;
     int pawn_corrhist(const Board& board) const;
     int non_pawn_corrhist(const Board& board) const;
 
@@ -187,12 +188,16 @@ inline void MoveHistory::update_corrhist(const Board& board,
                           diff);
 }
 
+inline int MoveHistory::pawn_corrhist(Color ctm, ui64 pawn_key) const {
+    CorrhistEntry& entry = m_data->pawn_corrhist[ctm]
+                                                [pawn_key % CORRHIST_ENTRIES];
+    return entry.key_low == (pawn_key & BITMASK(16))
+           ? entry.value
+           : 0;
+}
+
 inline int MoveHistory::pawn_corrhist(const Board& board) const {
-    CorrhistEntry& entry = m_data->pawn_corrhist[board.color_to_move()]
-                                                [board.pawn_key() % CORRHIST_ENTRIES];
-    return entry.key_low == (board.pawn_key() & BITMASK(16))
-         ? entry.value
-         : 0;
+    return pawn_corrhist(board.color_to_move(), board.pawn_key());
 }
 
 inline int MoveHistory::non_pawn_corrhist(const Board& board) const {

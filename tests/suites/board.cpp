@@ -406,3 +406,27 @@ TEST_CASE(PawnKeys) {
             .to_be(Board("4k3/2b2p1p/1p1ppn2/r5pb/1PpPP2r/2n2qP1/PKP5/RNBQ1BNR w - - 0 1").pawn_key());
     }
 }
+
+TEST_CASE(PawnKeyAfter) {
+    struct {
+        std::string fen;
+        std::string move_str;
+
+        void run() const {
+            Board board(fen);
+            Move move = Move::parse_uci(board, move_str);
+            ui64 est = board.estimate_pawn_key_after(move);
+            board.make_move(move);
+            EXPECT(est).to_be(board.pawn_key());
+        }
+
+    } tests[] = {
+        { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "d2d4" },
+        { "rnbqkbnr/1pp1pppp/p7/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 1", "e5d6" },
+        { "r1r5/p2nqpbk/P1p1b1pp/Rp2p3/2P1P3/4B2P/1P1N1PP1/2Q1RBK1 b - - 0 21", "b5c4" },
+    };
+
+    for (const auto& test: tests) {
+        test.run();
+    }
+}

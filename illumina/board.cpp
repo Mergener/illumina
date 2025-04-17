@@ -1066,6 +1066,21 @@ ui64 Board::estimate_hash_key_after(Move move) const {
     return key;
 }
 
+ui64 Board::estimate_pawn_key_after(Move move) const {
+    ui64 key = pawn_key();
+
+    Piece src_piece = move.source_piece();
+    Piece dst_piece = move.captured_piece();
+    Square capt_square = move.type() == MT_EN_PASSANT
+                       ? (move.destination() - pawn_push_direction(color_to_move()))
+                       : move.destination();
+    key ^= (src_piece.type() == PT_PAWN) * zob_piece_square_key(src_piece, move.source());
+    key ^= (src_piece.type() == PT_PAWN) * zob_piece_square_key(src_piece, move.destination());
+    key ^= (dst_piece.type() == PT_PAWN) * zob_piece_square_key(dst_piece, capt_square);
+
+    return key;
+}
+
 // Board constructors below.
 // We don't use default copy/assignment constructor implementations since
 // we don't want listeners to be copied from a board object to another.

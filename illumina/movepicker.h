@@ -439,6 +439,10 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         };
 
         move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
+
+        ui64 corrhist = m_mv_hist->pawn_corrhist(m_board->color_to_move(),
+                                                 m_board->estimate_pawn_key_after(move));
+        move.add_value(corrhist / 8);
     }
     else {
         // Adjust score based on move history.

@@ -89,6 +89,7 @@ public:
      * SIMPLE_CAPTURE.
      */
     ui64 estimate_hash_key_after(Move move) const;
+    ui64 estimate_pawn_key_after(Move move) const;
 
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
