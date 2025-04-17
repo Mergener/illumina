@@ -1,10 +1,7 @@
 {
-  "selectors": [
-    {
-      "type": "base",
-      "weight": 1000
-    }
-  ],
+  "selector": {
+    "type": "base"
+  },
   "formatter": {
     "type": "marlinflow"
   }

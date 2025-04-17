@@ -6,7 +6,6 @@
 #include <nlohmann/json/json.hpp>
 
 #include "datagen_types.h"
-#include "weighted_vector.h"
 
 namespace illumina {
 
@@ -64,11 +63,11 @@ public:
      */
     Pipeline(const std::string& pipeline_json = "");
 
-    DataSelector&  pick_selector() const;
+    DataSelector&  get_selector() const;
     DataFormatter& get_formatter() const;
 
 private:
-    WeightedVector<std::unique_ptr<DataSelector>> m_selectors;
+    std::unique_ptr<DataSelector> m_selector;
     std::unique_ptr<DataFormatter> m_formatter;
     std::unique_ptr<std::mt19937> m_rng = std::make_unique<std::mt19937>();
 };

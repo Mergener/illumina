@@ -107,7 +107,7 @@ static DatagenOptions parse_args(int argc, char* argv[]) {
                              black_searcher);
 
         // Step 2. Filter out undesired data extracted from the game.
-        std::vector<DataPoint> data = pipeline.pick_selector()
+        std::vector<DataPoint> data = pipeline.get_selector()
                                               .select(ctx, game);
 
         // Step 3. Format the data.
@@ -225,6 +225,15 @@ static int datagen_main(int argc, char* argv[]) {
     thread_main(0, options);
 }
 
+void run_bench() {
+    std::cout << "Running bench..." << std::endl;
+    BenchResults res = bench();
+    std::cout << "Finished bench.\n"
+              << "\tNodes: " << res.total_nodes
+              << "\tNPS:   " << res.nps
+              << std::endl;
+}
+
 }
 
 int main(int argc, char* argv[]) {
@@ -232,7 +241,7 @@ int main(int argc, char* argv[]) {
 
     try {
         illumina::init();
-
+        illumina::run_bench();
         return illumina::datagen_main(argc, argv);
     }
     catch (const std::exception& e) {

@@ -15,18 +15,16 @@ std::vector<DataPoint> BaseSelector::select(ThreadContext& ctx,
 
     // Gather information from each ply from the simulated game.
     for (const GamePlyData& ply_data: ply_data_vec) {
-        // We want to filter out some positions, so simply play out the moves
-        // but don't add them to the out_tuples.
+        board.make_move(ply_data.best_move);
+
+        // Apply filters.
         if (   board.in_check()                               // Checks shouldn't have a static eval.
                || board.last_move().is_capture()              // Likely right before a recapture.
                || is_mate_score(ply_data.white_pov_score)) {  // Mate scores behave differently than regular eval.
-            board.make_move(ply_data.best_move);
             continue;
         }
 
         extracted_data.push_back({ board.fen(false), ply_data });
-
-        board.make_move(ply_data.best_move);
     }
 
     // Since the tuples will be sliced, shuffling them allows us

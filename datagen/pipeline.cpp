@@ -13,8 +13,8 @@ namespace illumina {
 
 INCTXT(_default_pipeline, PIPELINE_PATH);
 
-DataSelector& Pipeline::pick_selector() const {
-    return *m_selectors.pick_weighted_random();
+DataSelector& Pipeline::get_selector() const {
+    return *m_selector;
 }
 
 DataFormatter& Pipeline::get_formatter() const {
@@ -23,7 +23,6 @@ DataFormatter& Pipeline::get_formatter() const {
 
 struct SelectorDefinition {
     std::string type = "base";
-    int weight = 1000;
     std::optional<nlohmann::json> options = std::nullopt;
 };
 
@@ -32,10 +31,6 @@ void from_json(const nlohmann::json& j, SelectorDefinition& d) {
 
     if (j.contains("options")) {
         d.options = j.at("options");
-    }
-
-    if (j.contains("weight")) {
-        d.weight = j.at("weight");
     }
 }
 
@@ -53,12 +48,12 @@ void from_json(const nlohmann::json& j, FormatterDefinition& d) {
 }
 
 struct PipelineDefinition {
-    std::vector<SelectorDefinition> selectors;
+    SelectorDefinition selector;
     FormatterDefinition formatter;
 };
 
 void from_json(const nlohmann::json& j, PipelineDefinition& d) {
-    d.selectors = j.at("selectors");
+    d.selector = j.at("selector");
     d.formatter = j.at("formatter");
 }
 
@@ -88,26 +83,24 @@ Pipeline::Pipeline(const std::string& pipeline_json) {
         PipelineDefinition pipeline_defs = nlohmann::json::parse(json);
 
         // Once the definitions are loaded, we build our components.
-        for (const auto& selector_def: pipeline_defs.selectors) {
-            auto it = s_selector_builders.find(selector_def.type);
-            if (it == s_selector_builders.end()) {
-                throw std::out_of_range("Unrecognized selector type " + selector_def.type);
-            }
-            m_selectors.push_back({ it->second(), selector_def.weight });
-
-            if (selector_def.options.has_value()) {
-                DataSelector& selector = *(m_selectors.back().first);
-                selector.load_settings(*selector_def.options);
-            }
+        // Load the selector.
+        const auto& selector_def = pipeline_defs.selector;
+        auto selector_it = s_selector_builders.find(selector_def.type);
+        if (selector_it == s_selector_builders.end()) {
+            throw std::out_of_range("Unrecognized selector type " + selector_def.type);
+        }
+        m_selector = selector_it->second();
+        if (selector_def.options.has_value()) {
+            m_selector->load_settings(*selector_def.options);
         }
 
+        // Load the formatter.
         const auto& formatter_def = pipeline_defs.formatter;
-        auto it = s_formatter_builders.find(pipeline_defs.formatter.type);
-        if (it == s_formatter_builders.end()) {
+        auto formatter_it = s_formatter_builders.find(pipeline_defs.formatter.type);
+        if (formatter_it == s_formatter_builders.end()) {
             throw std::out_of_range("Unrecognized formatter type " + pipeline_defs.formatter.type);
         }
-        m_formatter = it->second();
-
+        m_formatter = formatter_it->second();
         if (formatter_def.options.has_value()) {
             m_formatter->load_settings(*formatter_def.options);
         }
