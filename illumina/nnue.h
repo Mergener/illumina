@@ -216,4 +216,3 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
 } // illumina
 
 #endif // ILLUMINA_NNUE_H
-
