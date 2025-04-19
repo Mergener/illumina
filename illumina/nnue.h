@@ -19,7 +19,7 @@ enum class ActivationFunction {
 
 static constexpr size_t N_INPUTS = 768;
 static constexpr ActivationFunction L1_ACTIVATION = ActivationFunction::SCReLU;
-static constexpr size_t L1_SIZE  = 256;
+static constexpr size_t L1_SIZE  = 512;
 
 struct EvalNetwork {
     alignas(32) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
@@ -216,3 +216,4 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
 } // illumina
 
 #endif // ILLUMINA_NNUE_H
+
