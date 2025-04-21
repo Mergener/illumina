@@ -179,6 +179,12 @@ void register_commands(CLIApplication& server) {
         global_state().quit();
     });
 
+
+#ifdef TUNING_BUILD
+    server.register_command("obtuneparams", [](const CommandContext& ctx) {
+        global_state().display_ob_tuning_params();
+    });
+#endif
 }
 
 } // illumina

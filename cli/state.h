@@ -39,6 +39,11 @@ public:
     void quit();
     bool searching() const;
 
+    // Tuning
+#ifdef TUNING_BUILD
+    void display_ob_tuning_params();
+#endif
+
     State();
 
 private:
