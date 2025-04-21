@@ -181,7 +181,7 @@ void register_commands(CLIApplication& server) {
 
 
 #ifdef TUNING_BUILD
-    server.register_command("obtuneparams", [](const CommandContext& ctx) {
+    server.register_command("obtune", [](const CommandContext& ctx) {
         global_state().display_ob_tuning_params();
     });
 #endif
