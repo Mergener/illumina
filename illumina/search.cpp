@@ -838,6 +838,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             reductions = std::clamp(reductions, 0, depth);
         }
 
+
+
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
@@ -848,7 +850,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -pvs<TRACE, false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
+            Depth reduced = depth - reductions + extensions;
+            if (   PV
+                || !found_in_tt
+                || (reduced > tt_entry.depth())) {
+                score = -pvs<TRACE, false>(reduced - 1, -alpha - 1, -alpha, node + 1);
+            }
+            else {
+                score = tt_entry.score();
+            }
             TRACE_SET(Traceable::SCORE, -score);
 
             if (score > alpha && reductions > 1) {
