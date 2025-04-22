@@ -5,6 +5,7 @@
 #include "movegen.h"
 #include "utils.h"
 #include "parsehelper.h"
+#include "movegen.h"
 
 namespace illumina {
 
