@@ -132,15 +132,10 @@ inline void MoveHistory::reset() {
 }
 
 inline int MoveHistory::quiet_history(Move move, Move last_move, bool gives_check) const {
-    int weight_sum = MV_HIST_REGULAR_QHIST_WEIGHT
-                   + MV_HIST_COUNTER_MOVE_WEIGHT
-                   + MV_HIST_CHECK_QHIST_WEIGHT;
-
     return int(
                i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move))
              + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->counter_move_history.get(last_move).get(move))
-             + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? m_data->check_history.get(move) : 0))
-             ) / weight_sum;
+             + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? m_data->check_history.get(move) : 0)));
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
