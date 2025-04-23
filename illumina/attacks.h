@@ -58,16 +58,21 @@ inline Bitboard reverse_pawn_pushes(Square s, Color c, Bitboard occ = 0) {
 }
 
 template <Color C>
+inline Bitboard multiple_pawn_attacks(Bitboard pawn_bb) {
+    if constexpr (C == CL_WHITE) {
+        return shift_bb<DIR_NORTHEAST>(pawn_bb) | shift_bb<DIR_NORTHWEST>(pawn_bb);
+    }
+    else {
+        return shift_bb<DIR_SOUTHEAST>(pawn_bb) | shift_bb<DIR_SOUTHWEST>(pawn_bb);
+    }
+}
+
+template <Color C>
 inline Bitboard pawn_attacks(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
     Bitboard s_bb = BIT(s);
-    if constexpr (C == CL_WHITE) {
-        return shift_bb<DIR_NORTHEAST>(s_bb) | shift_bb<DIR_NORTHWEST>(s_bb);
-    }
-    else {
-        return shift_bb<DIR_SOUTHEAST>(s_bb) | shift_bb<DIR_SOUTHWEST>(s_bb);
-    }
+    return multiple_pawn_attacks<C>(s_bb);
 }
 
 inline Bitboard pawn_attacks(Square s, Color c) {
@@ -84,6 +89,17 @@ inline Bitboard knight_attacks(Square s) {
 
     extern const Bitboard g_knight_attacks[];
     return g_knight_attacks[s];
+}
+
+inline Bitboard multiple_knight_attacks(Bitboard knight_bb) {
+    return (shift_bb<DIR_NORTH>(shift_bb<DIR_NORTH>(shift_bb<DIR_EAST>(knight_bb))))
+         | (shift_bb<DIR_NORTH>(shift_bb<DIR_EAST>(shift_bb<DIR_EAST>(knight_bb))))
+         | (shift_bb<DIR_NORTH>(shift_bb<DIR_NORTH>(shift_bb<DIR_WEST>(knight_bb))))
+         | (shift_bb<DIR_NORTH>(shift_bb<DIR_WEST>(shift_bb<DIR_WEST>(knight_bb))))
+         | (shift_bb<DIR_SOUTH>(shift_bb<DIR_SOUTH>(shift_bb<DIR_EAST>(knight_bb))))
+         | (shift_bb<DIR_SOUTH>(shift_bb<DIR_EAST>(shift_bb<DIR_EAST>(knight_bb))))
+         | (shift_bb<DIR_SOUTH>(shift_bb<DIR_SOUTH>(shift_bb<DIR_WEST>(knight_bb))))
+         | (shift_bb<DIR_SOUTH>(shift_bb<DIR_WEST>(shift_bb<DIR_WEST>(knight_bb))));
 }
 
 inline Bitboard bishop_attacks(Square s, Bitboard occ) {

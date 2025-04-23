@@ -397,7 +397,7 @@ constexpr Bitboard shift_bb(Bitboard bb) {
         case DIR_NORTH * 2: return bb << 16;
         case DIR_SOUTH * 2: return bb >> 16;
         case DIR_EAST:      return (bb & ~file_bb(FL_H)) << 1;
-        case DIR_WEST:      return (bb & ~file_bb(FL_A)) << 1;
+        case DIR_WEST:      return (bb & ~file_bb(FL_A)) >> 1;
         case DIR_NORTHEAST: return (bb & ~file_bb(FL_H)) << 9;
         case DIR_NORTHWEST: return (bb & ~file_bb(FL_A)) << 7;
         case DIR_SOUTHEAST: return (bb & ~file_bb(FL_H)) >> 7;

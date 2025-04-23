@@ -1054,3 +1054,7 @@ TEST_CASE(PawnPushes) {
         test.run();
     }
 }
+
+TEST_CASE(MultipleKnightAttacks) {
+    EXPECT(multiple_knight_attacks(0x20000000040000ULL)).to_be(0x8800885a1100110aULL);
+}
