@@ -51,10 +51,7 @@ cmake -S . -B build # For debug builds
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release # For release builds
 ```
 
-CMake allows you to specify a build system generator. By default, it will use the system default generator. You can specify a different generator by passing `-G <GENERATOR_NAME>` to the CMake invocation. For example, to use Ninja as the generator, you would run:
-```bash
-cmake -S . -B build -G Ninja
-```
+CMake allows you to specify a build system generator. By default, it will use the system default generator. You can specify a different generator by passing `-G <GENERATOR_NAME>` to the CMake invocation.
 
 Once you've generated the build system, you can `cd` into the build directory
 and build it with your build system command. For instance, assuming you use Make as the generator, you would run:
