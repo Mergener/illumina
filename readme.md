@@ -24,6 +24,7 @@ The user can interrupt the search when it finds reasonable. The search might've 
 ## Usage
 
 Illumina is a UCI-compliant chess engine. In order to use it with a GUI, simply load it as a UCI engine in your preferred chess GUI.
+
 If you want to interact with it directly via the command line, refer to a UCI protocol reference, such as [this one](https://backscattering.de/chess/uci/).
 
 ## Building
@@ -71,7 +72,7 @@ Illumina also offers the following CMake options (that can be specified by `-D<O
 - `TUNING`: Specifies that we're creating a tuning build. Tuning build exposes many internal constants as UCI options, such as search and time management constants. `OFF` by default.
 - `DEVELOPMENT`: Specifies that we're creating a development build. This is mainly for displaying the correct version name when the engine starts and/or `uci` is called. `ON` by default.
 - `INCLUDE_TRACING_MODULE`: Includes Illumina's tracing module, that allows `go trace` commands. 
-This option requires the SQLiteCPP submodule to be cloned and may considerably increase executable size.
+This option requires the SQLiteCPP submodule to be cloned and may considerably increase executable size. Note that this is forcibly enabled for non-development builds.
 `OFF` by default.
 - `PROFILING`: Specifies that we're creating a profiling build. Enables some compiler options (namely -g -pg -fno-omit-frame-pointer). `OFF` by default.
 - `OPENBENCH_COMPLIANCE_MODE`: Specifies that we're creating a build that is compliant with the OpenBench testing framework, modifying some outputs and UCI options to properly integrate with clients. Not designed to be used directly -- instead, this should only be used by OpenBench clients itself. `OFF` by default.
