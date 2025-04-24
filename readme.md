@@ -11,11 +11,11 @@
 Illumina is a free and open-source chess engine powered by a neural network trained on hundreds of millions of positions from self-play games.
 
 Illumina consists of a command line application that complies to the [Universal Chess Interface (UCI) protocol](https://en.wikipedia.org/wiki/Universal_Chess_Interface). This means that, by itself, it does not provide a graphical user interface (GUI) to play or analyze chess games. For that, you can
-use any Chess GUI that supports UCI engines (most modern GUIs do) to play against Illumina or analyze games with it, such as CuteChess, SCID or ChessBase. 
+use any Chess GUI that supports UCI engines (most modern GUIs do) to play against Illumina or analyze games with it, such as CuteChess, Arena, SCID or ChessBase. 
 
 ## How it works
 
-The user (or in most cases, a host program such as a GUI) sends a [FEN string](https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation) to Illumina indicating the position to evaluate. Then, another command requests the engine to start searching for a best move in the position.
+The user (or, as in most cases, a host program such as a GUI) sends a command with a [FEN string](https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation) to Illumina indicating the position to evaluate. Then, another command requests the engine to start searching for a best move in the position.
 
 When requested to search a position, Illumina will start searching for the best move using a combination of the [Alpha-Beta pruning algorithm](https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning) to walk through the search tree of possible moves and an [Efficiently Updatable Neural Network (NNUE)](https://en.wikipedia.org/wiki/Efficiently_updatable_neural_network) to perform static evaluation on the positions it finds.
 
