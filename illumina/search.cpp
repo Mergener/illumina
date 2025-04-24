@@ -201,7 +201,11 @@ private:
                   SearchNode* stack_node);
 
     template <TraceMode TRACE_MODE, SearchType SEARCH_TYPE>
-    Score quiescence_search(Depth ply, Score alpha, Score beta);
+    std::pair<Score, Score> acquiesce(Depth ply,
+                                      Score alpha,
+                                      Score beta,
+                                      Score material_alpha = -MATE_SCORE,
+                                      Score material_beta = MATE_SCORE);
 
     void aspiration_windows();
 
@@ -705,9 +709,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
-        Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
-        TRACE_SET(Traceable::SCORE, score);
-        return score;
+        auto [material, eval] = acquiesce<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
+        return eval;
     }
 
     // Kickstart our curr move counter for later reporting.
@@ -1032,8 +1035,26 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     return best_score;
 }
 
+static Score material_evaluation(const Board& board) {
+    Score white_eval = (popcount(board.piece_bb(WHITE_PAWN))) * 1
+                     + (popcount(board.piece_bb(WHITE_KNIGHT))) * 1
+                     + (popcount(board.piece_bb(WHITE_BISHOP))) * 1
+                     + (popcount(board.piece_bb(WHITE_ROOK))) * 1
+                     + (popcount(board.piece_bb(WHITE_QUEEN))) * 1
+                     - (popcount(board.piece_bb(BLACK_PAWN))) * 1
+                     - (popcount(board.piece_bb(BLACK_KNIGHT))) * 1
+                     - (popcount(board.piece_bb(BLACK_BISHOP))) * 1
+                     - (popcount(board.piece_bb(BLACK_ROOK))) * 1
+                     - (popcount(board.piece_bb(BLACK_QUEEN))) * 1;
+    return board.color_to_move() == CL_WHITE ? white_eval : -white_eval;
+}
+
 template <TraceMode TRACE_MODE, SearchType SEARCH_TYPE>
-Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
+std::pair<Score, Score> SearchWorker::acquiesce(Depth ply,
+                                                Score alpha,
+                                                Score beta,
+                                                Score mat_alpha,
+                                                Score mat_beta) {
     constexpr bool PV_NODE = SEARCH_TYPE == PVS;
     constexpr bool TRACING = TRACE_MODE == TRACED;
 
@@ -1047,31 +1068,23 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
     
-    m_results.sel_depth = std::max(m_results.sel_depth, ply);
-
-    Score stand_pat = evaluate();
-    if (!m_board.in_check()) {
-        stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
-    }
+    Score stand_pat = material_evaluation(m_board);
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
-    if (stand_pat >= beta) {
-        return stand_pat;
+    if (stand_pat >= mat_beta) {
+        return { stand_pat, m_eval.get() };
     }
-    if (stand_pat > alpha) {
-        alpha = stand_pat;
+    if (stand_pat > mat_alpha) {
+        mat_alpha = stand_pat;
     }
 
     check_limits();
-    if (should_stop()) {
-        return alpha;
-    }
 
     // Finally, start looping over available noisy moves.
     MovePicker<true> move_picker(m_board, ply, m_hist);
     SearchMove move;
     SearchMove best_move;
-    Score best_score = stand_pat;
+    std::pair<Score, Score> best_result = { stand_pat, alpha };
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
@@ -1081,30 +1094,30 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
-        Score score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -beta, -alpha);
-        TRACE_SET(Traceable::SCORE, -score);
+        auto [material, eval] = -acquiesce<TRACE_MODE, SEARCH_TYPE>(ply + 1, -beta, -alpha, -mat_beta, -mat_alpha);
+        TRACE_SET(Traceable::SCORE, -eval);
         m_board.undo_move();
 
-        if (score > best_score) {
-            best_score = score;
+        if (material > best_result.first) {
+            best_result = { material, eval };
         }
 
-        if (score >= beta) {
+        if (material >= mat_beta) {
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
-            alpha = score;
+            mat_alpha = material;
             break;
         }
-        if (score > alpha) {
+        if (material > mat_alpha) {
             best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, move);
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
-            alpha = score;
+            mat_alpha = material;
         }
     }
 
-    return best_score;
+    return best_result;
 }
 
 Score SearchWorker::evaluate() const {
@@ -1121,9 +1134,9 @@ Score SearchWorker::evaluate() const {
     Score score = m_eval.get();
     if (m_eval_random_margin != 0) {
         // User has requested evaluation randomness, apply the noise.
-        i32 seed   = Score((m_eval_random_seed * m_board.hash_key()) & BITMASK(15));
+        i32 seed = Score((m_eval_random_seed * m_board.hash_key()) & BITMASK(15));
         i32 margin = m_eval_random_margin;
-        i32 noise  = (seed % (margin * 2)) - margin;
+        i32 noise = (seed % (margin * 2)) - margin;
         score += Score(noise);
     }
     return score;
