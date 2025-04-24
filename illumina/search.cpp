@@ -135,6 +135,30 @@ struct WorkerResults {
     Depth searched_depth = 0;
 };
 
+/** Whether we are at the root node or not. */
+enum RootMode {
+    NON_ROOT,
+    ROOT,
+};
+
+/** Whether we're doing Principal Variation Search or a Zero-Window search. */
+enum SearchType {
+    PVS,
+    ZWS
+};
+
+/** Whether a search should be traced or not. */
+enum TraceMode {
+    UNTRACED,
+    TRACED,
+};
+
+/** Whether we should skip Null Move Pruning or not. */
+enum SkipNmpMode {
+    DONT_SKIP_NMP,
+    SKIP_NMP
+};
+
 class SearchWorker {
 public:
     void iterative_deepening();
@@ -167,17 +191,17 @@ private:
 
     std::vector<Move> m_search_moves;
 
-    template <bool TRACE, bool PV>
-    Score quiescence_search(Depth ply, Score alpha, Score beta);
+    template <TraceMode TRACE_MODE,
+        SearchType SEARCH_TYPE,
+        SkipNmpMode SKIP_NULL_MODE = DONT_SKIP_NMP,
+        RootMode ROOT_MODE = NON_ROOT>
+    Score negamax(Depth depth,
+                  Score alpha,
+                  Score beta,
+                  SearchNode* stack_node);
 
-    template <bool TRACE,
-              bool PV,
-              bool SKIP_NULL = false,
-              bool ROOT = false>
-    Score pvs(Depth depth,
-              Score alpha,
-              Score beta,
-              SearchNode* stack_node);
+    template <TraceMode TRACE_MODE, SearchType SEARCH_TYPE>
+    Score quiescence_search(Depth ply, Score alpha, Score beta);
 
     void aspiration_windows();
 
@@ -218,7 +242,7 @@ TranspositionTable& Searcher::tt() {
 
 #define TRACE_PUSH(move)                  \
 do {                                      \
-    if constexpr (TRACE) {                \
+    if constexpr (TRACING) {           \
         auto tracer = m_settings->tracer; \
         tracer->push_node();              \
     }                                     \
@@ -226,7 +250,7 @@ do {                                      \
 
 #define TRACE_PUSH_SIBLING()              \
 do {                                      \
-    if constexpr (TRACE) {                \
+    if constexpr (TRACING) {           \
         auto tracer = m_settings->tracer; \
         tracer->push_sibling_node();      \
     }                                     \
@@ -234,7 +258,7 @@ do {                                      \
 
 #define TRACE_POP()                       \
 do {                                      \
-    if constexpr (TRACE) {                \
+    if constexpr (TRACING) {           \
         auto tracer = m_settings->tracer; \
         tracer->pop_node();               \
     }                                     \
@@ -242,7 +266,7 @@ do {                                      \
 
 #define TRACE_SET(which, val)             \
 do {                                      \
-    if constexpr (TRACE) {                \
+    if constexpr (TRACING) {                \
         auto tracer = m_settings->tracer; \
         tracer->set(which, val);          \
     }                                     \
@@ -448,7 +472,6 @@ void SearchWorker::aspiration_windows() {
     Score window     = ASP_WIN_WINDOW;
     Depth depth      = m_root_depth;
 
-
     // Don't use aspiration windows in lower depths since
     // their results is still too unstable.
     if (depth >= ASP_WIN_MIN_DEPTH) {
@@ -466,12 +489,12 @@ void SearchWorker::aspiration_windows() {
             tracer->new_tree(m_root_depth,
                              m_curr_pv_idx + 1,
                              alpha, beta);
-            score = pvs<true, true, false, true>(depth, alpha, beta, &search_stack[0]);
+            score = negamax<TRACED, PVS, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
             tracer->set(Traceable::SCORE, score);
             tracer->finish_tree();
         }
         else {
-            score = pvs<false, true, false, true>(depth, alpha, beta, &search_stack[0]);
+            score = negamax<UNTRACED, PVS, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
         }
 
         if (score > alpha && score < beta) {
@@ -510,14 +533,19 @@ void SearchWorker::aspiration_windows() {
 static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
-template<bool TRACE,
-         bool PV,
-         bool SKIP_NULL,
-         bool ROOT>
-Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) {
-    ILLUMINA_ASSERT(!TRACE || tracing());
+template<TraceMode TRACE_MODE,
+         SearchType SEARCH_TYPE,
+         SkipNmpMode SKIP_NMP_MODE,
+         RootMode ROOT_MODE>
+Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* stack_node) {
+    constexpr bool PV_NODE      = SEARCH_TYPE   == PVS;
+    constexpr bool ROOT_NODE    = ROOT_MODE     == ROOT;
+    constexpr bool TRACING      = TRACE_MODE    == TRACED;
+    constexpr bool SKIPPING_NMP = SKIP_NMP_MODE == SKIP_NMP;
 
-    TRACE_SET(Traceable::PV, PV);
+    ILLUMINA_ASSERT(!TRACING || tracing());
+
+    TRACE_SET(Traceable::PV, PV_NODE);
     TRACE_SET(Traceable::ALPHA, alpha);
     TRACE_SET(Traceable::BETA, beta);
     TRACE_SET(Traceable::LAST_MOVE, m_board.last_move());
@@ -527,20 +555,20 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
-    if constexpr (PV) {
-        node->pv[0] = MOVE_NULL;
+    if constexpr (PV_NODE) {
+        stack_node->pv[0] = MOVE_NULL;
     }
 
     // Don't search nodes with closed bounds.
-    if (!ROOT && alpha >= beta) {
+    if (!ROOT_NODE && alpha >= beta) {
         return alpha;
     }
 
     // Keep track on some stats to report or use later.
-    m_results.sel_depth = std::max(m_results.sel_depth, node->ply);
+    m_results.sel_depth = std::max(m_results.sel_depth, stack_node->ply);
 
     // Make sure we count the root node.
-    if constexpr (ROOT) {
+    if constexpr (ROOT_NODE) {
         m_results.nodes++;
     }
 
@@ -552,7 +580,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Check for draws and return the draw score, taking contempt into consideration.
-    if (!ROOT && (m_board.is_repetition_draw(2) || (m_board.rule50() >= 100) || m_board.is_insufficient_material_draw())) {
+    if (!ROOT_NODE && (m_board.is_repetition_draw(2) || (m_board.rule50() >= 100) || m_board.is_insufficient_material_draw())) {
         return draw_score();
     }
 
@@ -564,14 +592,14 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Move hash_move         = MOVE_NULL;
     bool in_check          = m_board.in_check();
     Color us               = m_board.color_to_move();
-    Depth ply              = node->ply;
-    Score& static_eval     = node->static_eval;
+    Depth ply              = stack_node->ply;
+    Score& static_eval     = stack_node->static_eval;
 
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry, node->ply)
+    bool found_in_tt = tt.probe(board_key, tt_entry, stack_node->ply)
                     && (   hash_move == MOVE_NULL
                         || (   m_board.is_move_pseudo_legal(hash_move)
                             && m_board.is_move_legal(hash_move)));
@@ -586,8 +614,8 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         TRACE_SET(Traceable::TT_SCORE, tt_entry.score());
 
         // TT Cutoff.
-        if (   !PV
-            && node->skip_move == MOVE_NULL
+        if (!PV_NODE
+            && stack_node->skip_move == MOVE_NULL
             && tt_entry.depth() >= depth) {
             BoundType bt = tt_entry.bound_type();
             Score score  = tt_entry.score();
@@ -600,7 +628,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         }
     }
 
-    bool ttpv = PV || (found_in_tt && tt_entry.ttpv());
+    bool ttpv = PV_NODE || (found_in_tt && tt_entry.ttpv());
 
     // Check extensions.
     // Extend positions in check.
@@ -623,15 +651,15 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
     TRACE_SET(Traceable::STATIC_EVAL, static_eval);
 
-    bool improving = ply > 2 && !in_check && ((node - 2)->static_eval < static_eval);
+    bool improving = ply > 2 && !in_check && ((stack_node - 2)->static_eval < static_eval);
     TRACE_SET(Traceable::IMPROVING, improving);
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
     Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
-    if (   !PV
+    if (!PV_NODE
         && !in_check
-        && node->skip_move == MOVE_NULL
+        && stack_node->skip_move == MOVE_NULL
         && depth <= RFP_MAX_DEPTH
         && alpha < MATE_THRESHOLD
         && static_eval - rfp_margin > beta) {
@@ -648,18 +676,18 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     }
 
     // Null move pruning.
-    if (   !PV
-        && !SKIP_NULL
+    if (!PV_NODE
+        && !SKIPPING_NMP
         && !in_check
         && non_pawn_bb(m_board) != 0
         && popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES
         && static_eval >= beta
         && depth >= NMP_MIN_DEPTH
-        && node->skip_move == MOVE_NULL) {
+        && stack_node->skip_move == MOVE_NULL) {
         Depth reduction = depth / 3 + 4;
 
         m_board.make_null_move();
-        Score score = -pvs<TRACE, false, true>(depth  - reduction, -beta, -beta + 1, node + 1);
+        Score score = -negamax<TRACE_MODE, ZWS, SKIP_NMP>(depth - reduction, -beta, -beta + 1, stack_node + 1);
         TRACE_SET(Traceable::SCORE, -score);
         m_board.undo_null_move();
 
@@ -670,20 +698,20 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Internal iterative reductions.
     if (   depth >= IIR_MIN_DEPTH
-        && !found_in_tt
-        && node->skip_move == MOVE_NULL) {
+           && !found_in_tt
+           && stack_node->skip_move == MOVE_NULL) {
         depth -= IIR_DEPTH_RED;
     }
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
-        Score score = quiescence_search<TRACE, PV>(ply, alpha, beta);
+        Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
         TRACE_SET(Traceable::SCORE, score);
         return score;
     }
 
     // Kickstart our curr move counter for later reporting.
-    if constexpr (ROOT) {
+    if constexpr (ROOT_NODE) {
         m_curr_move_number = 0;
     }
 
@@ -700,20 +728,20 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     Score best_score = -MAX_SCORE;
     while ((move = move_picker.next()) != MOVE_NULL) {
         has_legal_moves = true;
-        if (move == node->skip_move) {
+        if (move == stack_node->skip_move) {
             continue;
         }
 
         move_idx++;
 
         // Skip unrequested moves.
-        if (   ROOT
+        if (ROOT_NODE
             && std::find(m_search_moves.begin(), m_search_moves.end(), move) == m_search_moves.end()) {
             continue;
         }
 
         // Report 'currmove' and 'currmovenumber'.
-        if constexpr (ROOT) {
+        if constexpr (ROOT_NODE) {
             m_curr_move_number++;
             m_curr_move = move;
 
@@ -728,7 +756,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         if (   non_pawn_bb(m_board)
             && alpha > -KNOWN_WIN) {
             // Late move pruning.
-            if (!ROOT
+            if (!ROOT_NODE
                 && alpha > -MATE_THRESHOLD
                 && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
                 && move_idx >= s_lmp_count_table[improving][depth]
@@ -745,7 +773,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                                              | m_board.piece_bb(Piece(them, PT_ROOK));
 
             // SEE pruning.
-            if ((!PV || m_root_depth > SEE_PRUNING_MAX_DEPTH)
+            if ((!PV_NODE || m_root_depth > SEE_PRUNING_MAX_DEPTH)
                 && (discovered_atks & their_valuable_pieces) == 0
                 && depth <= SEE_PRUNING_MAX_DEPTH
                 && !m_board.in_check()
@@ -755,7 +783,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             }
 
             // Futility pruning.
-            if ((!PV || m_root_depth > FP_MAX_DEPTH)
+            if ((!PV_NODE || m_root_depth > FP_MAX_DEPTH)
                 && depth <= FP_MAX_DEPTH
                 && !in_check
                 && move != hash_move
@@ -768,10 +796,10 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
         // Singular extensions.
         Depth extensions = 0;
-        if (   !ROOT
+        if (!ROOT_NODE
             && !in_check
             && hash_move != MOVE_NULL
-            && node->skip_move == MOVE_NULL
+            && stack_node->skip_move == MOVE_NULL
             && tt_entry.bound_type() != BT_UPPERBOUND
             && depth >= 8
             && move == hash_move
@@ -780,21 +808,21 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             && !m_board.gives_check(move)) {
             Score se_beta = tt_entry.score() - depth * 3;
 
-            node->skip_move = move;
+            stack_node->skip_move = move;
 
             TRACE_PUSH_SIBLING();
-            TRACE_SET(Traceable::SKIP_MOVE, node->skip_move);
+            TRACE_SET(Traceable::SKIP_MOVE, stack_node->skip_move);
 
-            Score score = pvs<TRACE, false>(depth / 2, se_beta - 1, se_beta, node);
+            Score score = negamax<TRACE_MODE, ZWS>(depth / 2, se_beta - 1, se_beta, stack_node);
             TRACE_SET(Traceable::SCORE, score);
 
             TRACE_POP();
 
-            node->skip_move = MOVE_NULL;
+            stack_node->skip_move = MOVE_NULL;
 
             if (score < se_beta) {
                 extensions++;
-                if (  !PV
+                if (  !PV_NODE
                     && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
                     extensions++;
                 }
@@ -841,26 +869,26 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
-            score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
+            score = -negamax<TRACE_MODE, SEARCH_TYPE>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
             TRACE_SET(Traceable::SCORE, -score);
         }
         else {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -pvs<TRACE, false>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, node + 1);
+            score = -negamax<TRACE_MODE, ZWS>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, stack_node + 1);
             TRACE_SET(Traceable::SCORE, -score);
 
             if (score > alpha && reductions > 1) {
                 TRACE_PUSH_SIBLING();
-                score = -pvs<TRACE, false>(depth - 1 + extensions, -alpha - 1, -alpha, node + 1);
+                score = -negamax<TRACE_MODE, ZWS>(depth - 1 + extensions, -alpha - 1, -alpha, stack_node + 1);
                 TRACE_SET(Traceable::SCORE, -score);
                 TRACE_POP();
             }
 
             if (score > alpha && score < beta) {
                 TRACE_PUSH_SIBLING();
-                score = -pvs<TRACE, PV>(depth - 1 + extensions, -beta, -alpha, node + 1);
+                score = -negamax<TRACE_MODE, SEARCH_TYPE>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
                 TRACE_SET(Traceable::SCORE, -score);
                 TRACE_POP();
             }
@@ -893,20 +921,19 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
                     m_hist.update_quiet_history(quiet,
                                                 m_board.last_move(),
                                                 depth,
-                                                m_board.gives_check(quiet),
                                                 quiet == best_move);
                 }
             }
 
             // Due to aspiration windows, our search may have failed high in the root.
             // Make sure we always have a best_move and a best_score.
-            if (ROOT && (!should_stop() || depth <= 2)) {
+            if (ROOT_NODE && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
                 m_results.pv_results[m_curr_pv_idx].score     = alpha;
             }
 
-            if constexpr (PV && !ROOT) {
-                node->pv[0] = MOVE_NULL;
+            if constexpr (PV_NODE && !ROOT_NODE) {
+                stack_node->pv[0] = MOVE_NULL;
             }
             break;
         }
@@ -918,30 +945,30 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
 
             // Make sure we update our best_move in the root.
-            if (ROOT && (!should_stop() || depth <= 2)) {
+            if (ROOT_NODE && (!should_stop() || depth <= 2)) {
                 m_results.pv_results[m_curr_pv_idx].best_move = move;
                 m_results.pv_results[m_curr_pv_idx].score     = alpha;
             }
 
             // Update the PV table.
-            if constexpr (PV) {
-                node->pv[0] = best_move;
+            if constexpr (PV_NODE) {
+                stack_node->pv[0] = best_move;
                 size_t i;
                 for (i = 0; i < MAX_DEPTH - 2; ++i) {
-                    Move pv_move = (node + 1)->pv[i];
+                    Move pv_move = (stack_node + 1)->pv[i];
                     if (pv_move == MOVE_NULL) {
                         break;
                     }
-                    node->pv[i + 1] = pv_move;
+                    stack_node->pv[i + 1] = pv_move;
                 }
-                node->pv[i + 1] = MOVE_NULL;
+                stack_node->pv[i + 1] = MOVE_NULL;
             }
         }
     }
 
     // Check if we have a checkmate or stalemate.
     if (!has_legal_moves) {
-        if (node->skip_move != MOVE_NULL) {
+        if (stack_node->skip_move != MOVE_NULL) {
             return alpha;
         }
 
@@ -953,7 +980,7 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
 
     // Store in transposition table.
     // Don't store in singular searches.
-    if (node->skip_move == MOVE_NULL) {
+    if (stack_node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
             // Beta-Cutoff, lowerbound score.
             tt.try_store(board_key,
@@ -1005,10 +1032,13 @@ Score SearchWorker::pvs(Depth depth, Score alpha, Score beta, SearchNode* node) 
     return best_score;
 }
 
-template <bool TRACE, bool PV>
+template <TraceMode TRACE_MODE, SearchType SEARCH_TYPE>
 Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
+    constexpr bool PV_NODE = SEARCH_TYPE == PVS;
+    constexpr bool TRACING = TRACE_MODE == TRACED;
+
     TRACE_SET(Traceable::QSEARCH, true);
-    TRACE_SET(Traceable::PV, PV);
+    TRACE_SET(Traceable::PV, PV_NODE);
     TRACE_SET(Traceable::ALPHA, alpha);
     TRACE_SET(Traceable::BETA, beta);
     TRACE_SET(Traceable::LAST_MOVE, m_board.last_move());
@@ -1051,7 +1081,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
-        Score score = -quiescence_search<TRACE, PV>(ply + 1, -beta, -alpha);
+        Score score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -beta, -alpha);
         TRACE_SET(Traceable::SCORE, -score);
         m_board.undo_move();
 
@@ -1183,7 +1213,7 @@ Score SearchWorker::draw_score() const {
            :  m_settings->contempt;
 }
 
-template <bool TRACE>
+template <bool TRACING>
 void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
     TRACE_PUSH();
     m_results.nodes++;
@@ -1191,13 +1221,13 @@ void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move mov
     m_eval.on_make_move(board, move);
 }
 
-template <bool TRACE>
+template <bool TRACING>
 void SearchWorker::on_undo_move(const illumina::Board& board, illumina::Move move) {
     TRACE_POP();
     m_eval.on_undo_move(board, move);
 }
 
-template <bool TRACE>
+template <bool TRACING>
 void SearchWorker::on_make_null_move(const illumina::Board& board) {
     TRACE_PUSH();
     m_results.nodes++;
@@ -1207,18 +1237,18 @@ void SearchWorker::on_make_null_move(const illumina::Board& board) {
     TRACE_SET(Traceable::LAST_MOVE_RAW, MOVE_NULL.raw());
 }
 
-template <bool TRACE>
+template <bool TRACING>
 void SearchWorker::on_undo_null_move(const illumina::Board& board) {
     TRACE_POP();
     m_eval.on_undo_null_move(board);
 }
 
-template <bool TRACE>
+template <bool TRACING>
 void SearchWorker::on_piece_added(const Board& board, Piece p, Square s) {
     m_eval.on_piece_added(board, p , s);
 }
 
-template <bool TRACE>
+template <bool TRACING>
 void SearchWorker::on_piece_removed(const Board& board, Piece p, Square s) {
     m_eval.on_piece_removed(board, p , s);
 }

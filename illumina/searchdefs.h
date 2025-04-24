@@ -20,7 +20,7 @@ using Depth = int;
 constexpr Depth MAX_DEPTH = 128;
 
 /**
- * Maximum number of multi pvs (as set by the MultiPV option).
+ * Maximum number of multi negamax (as set by the MultiPV option).
  */
 constexpr int MAX_PVS = MAX_GENERATED_MOVES;
 

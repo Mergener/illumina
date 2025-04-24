@@ -393,18 +393,58 @@ void State::quit() {
 }
 
 #ifdef TUNING_BUILD
+
+template <typename T>
+struct TuningOption {
+    std::string name;
+    T base;
+    T min;
+    T max;
+    T step;
+};
+
+static std::vector<TuningOption<double>> s_tunable_doubles;
+static std::vector<TuningOption<i64>> s_tunable_ints;
+
+void State::display_ob_tuning_params() {
+    for (const auto& tunable: s_tunable_ints) {
+        std::cout << tunable.name
+                  << ", " << "int"
+                  << ", " << tunable.base
+                  << ", " << tunable.min
+                  << ", " << tunable.max
+                  << ", " << tunable.step
+                  << ", 0.002" << std::endl; // R_END
+    }
+    for (const auto& tunable: s_tunable_doubles) {
+        std::cout << tunable.name
+                  << ", " << "float"
+                  << ", " << tunable.base
+                  << ", " << tunable.min
+                  << ", " << tunable.max
+                  << ", " << tunable.step
+                  << ", 0.002" << std::endl; // R_END
+    }
+}
+
 static void add_tuning_option(UCIOptionManager& options,
                               const std::string& opt_name,
                               int& opt_ref,
                               int default_value,
                               int min = INT_MIN,
-                              int max = INT_MAX) {
-    options.register_option<UCIOptionSpin>(opt_name, default_value, min, max)
-           .add_update_handler([&opt_ref](const UCIOption& opt) {
-               const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
-               opt_ref = spin.value();
-               recompute_search_constants();
-           });
+                              int max = INT_MAX,
+                              int step = 1) {
+    auto& option = options.register_option<UCIOptionSpin>(opt_name, default_value, min, max);
+
+    option.add_update_handler([&opt_ref](const UCIOption& opt) {
+       const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+       opt_ref = spin.value();
+       recompute_search_constants();
+   });
+
+    s_tunable_ints.push_back(
+        { option.name(), default_value, min, max, step }
+    );
 }
 
 static void add_tuning_option(UCIOptionManager& options,
@@ -412,26 +452,31 @@ static void add_tuning_option(UCIOptionManager& options,
                               double& opt_ref,
                               double default_value,
                               double min = -0x100000,
-                              double max = 0x100000) {
+                              double max = 0x100000,
+                              double step = 0.1) {
 #ifndef OPENBENCH_COMPLIANCE
-    options.register_option<UCIOptionSpin>(opt_name + std::string("_FP"),
+    auto& option = options.register_option<UCIOptionSpin>(opt_name + std::string("_FP"),
                                            default_value * 1000,
                                            min * 1000,
-                                           max * 1000)
-            .add_update_handler([&opt_ref](const UCIOption& opt) {
-                const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
-                opt_ref = double(spin.value()) / 1000.0;
-                recompute_search_constants();
-            });
+                                           max * 1000);
+    option.add_update_handler([&opt_ref](const UCIOption& opt) {
+        const auto& spin = dynamic_cast<const UCIOptionSpin&>(opt);
+        opt_ref = double(spin.value()) / 1000.0;
+        recompute_search_constants();
+    });
+
 #else
-    options.register_option<UCIOptionString>(opt_name + std::string("_FP"),
-                                             std::to_string(default_value))
-            .add_update_handler([&opt_ref](const UCIOption& opt) {
-                const auto& spin = dynamic_cast<const UCIOptionString&>(opt);
-                opt_ref = std::stod(spin.value());
-                recompute_search_constants();
-            });
+    auto& option = options.register_option<UCIOptionString>(opt_name + std::string("_FP"),
+                                             std::to_string(default_value));
+    option.add_update_handler([&opt_ref](const UCIOption& opt) {
+        const auto& spin = dynamic_cast<const UCIOptionString&>(opt);
+        opt_ref = std::stod(spin.value());
+        recompute_search_constants();
+    });
 #endif
+    s_tunable_doubles.push_back(
+        { option.name(), default_value, min, max, step }
+    );
 }
 #endif
 
