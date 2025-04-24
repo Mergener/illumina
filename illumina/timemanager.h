@@ -1,6 +1,8 @@
 #ifndef ILLUMINA_TIMEMANAGER_H
 #define ILLUMINA_TIMEMANAGER_H
 
+#include <atomic>
+
 #include "clock.h"
 #include "searchdefs.h"
 #include "tunablevalues.h"
@@ -37,7 +39,7 @@ private:
     ui64 m_soft_bound = 0;
     ui64 m_hard_bound = 0;
     ui64 m_elapsed = 0;
-    bool m_running = false;
+    std::atomic<bool> m_running = false;
     bool m_tourney_time = false;
 
     Move m_last_best_move   = MOVE_NULL;
@@ -49,11 +51,11 @@ private:
 };
 
 inline bool TimeManager::running() const {
-    return m_running;
+    return m_running.load(std::memory_order_relaxed);
 }
 
 inline ui64 TimeManager::elapsed() const {
-    return m_running ? delta_ms(now(), m_time_start) : m_elapsed;
+    return m_running.load(std::memory_order_relaxed) ? delta_ms(now(), m_time_start) : m_elapsed;
 }
 
 inline ui64 TimeManager::soft_bound() const {
@@ -65,11 +67,11 @@ inline ui64 TimeManager::hard_bound() const {
 }
 
 inline bool TimeManager::finished_soft() const {
-    return m_running && ui64(delta_ms(now(), m_time_start)) >= m_soft_bound;
+    return m_running.load(std::memory_order_relaxed) && ui64(delta_ms(now(), m_time_start)) >= m_soft_bound;
 }
 
 inline bool TimeManager::finished_hard() const {
-    return m_running && ui64(delta_ms(now(), m_time_start)) >= m_hard_bound;
+    return m_running.load(std::memory_order_relaxed) && ui64(delta_ms(now(), m_time_start)) >= m_hard_bound;
 }
 
 inline TimeManager::TimeManager() {
