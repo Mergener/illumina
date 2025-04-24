@@ -709,7 +709,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
-        auto [material, eval] = acquiesce<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
+        auto [material, eval] = acquiesce<TRACE_MODE, PVS>(ply, alpha, beta);
         return eval;
     }
 
@@ -1072,10 +1072,13 @@ std::pair<Score, Score> SearchWorker::acquiesce(Depth ply,
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
     if (stand_pat >= mat_beta) {
-        return { stand_pat, m_eval.get() };
+        return { stand_pat, PV_NODE ? m_eval.compute() : 0 };
     }
     if (stand_pat > mat_alpha) {
         mat_alpha = stand_pat;
+        if constexpr (PV_NODE) {
+            alpha = m_hist.correct_eval_with_corrhist(m_board, m_eval.compute());
+        }
     }
 
     check_limits();
@@ -1088,13 +1091,19 @@ std::pair<Score, Score> SearchWorker::acquiesce(Depth ply,
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
-            && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
+            && !has_good_see(m_board, move.source(), move.destination(), -1)) {
             continue;
         }
 
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
-        auto [material, eval] = -acquiesce<TRACE_MODE, SEARCH_TYPE>(ply + 1, -beta, -alpha, -mat_beta, -mat_alpha);
+        auto [material, eval] = acquiesce<TRACE_MODE, ZWS>(ply + 1, -beta, -alpha, -mat_alpha - 1, -mat_alpha);
+        material = -material; eval = -eval;
+        if (material > mat_alpha) {
+            auto [new_material, new_eval] = acquiesce<TRACE_MODE, PVS>(ply + 1, -beta, -alpha, -mat_beta, -mat_alpha);
+            material = -new_material; eval = -new_eval;
+        }
+
         TRACE_SET(Traceable::SCORE, -eval);
         m_board.undo_move();
 
