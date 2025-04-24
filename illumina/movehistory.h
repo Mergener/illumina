@@ -56,7 +56,6 @@ public:
     void update_quiet_history(Move move,
                               Move last_move,
                               Depth depth,
-                              bool gives_check,
                               bool good);
 
     MoveHistory();
@@ -134,22 +133,16 @@ inline void MoveHistory::reset() {
 inline int MoveHistory::quiet_history(Move move, Move last_move, bool gives_check) const {
     return int(
                i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move))
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->counter_move_history.get(last_move).get(move))
-             + i64(MV_HIST_CHECK_QHIST_WEIGHT   * (gives_check ? m_data->check_history.get(move) : 0)));
+             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->counter_move_history.get(last_move).get(move)));
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
                                               Move last_move,
                                               Depth depth,
-                                              bool gives_check,
                                               bool good) {
     update_history_by_depth(m_data->main_history.get(move), depth, good);
     if (last_move != MOVE_NULL) {
         update_history_by_depth(m_data->counter_move_history.get(last_move).get(move), depth, good);
-    }
-
-    if (gives_check) {
-        update_history_by_depth(m_data->check_history.get(move), depth, good);
     }
 }
 
