@@ -278,7 +278,7 @@ SearchResults Searcher::search(const Board& board,
     // We start by generating the legal moves for two reasons:
     //  1. Determine which moves must be searched. This is the intersection
     //  between legal moves and requested searchmoves.
-    //  2. Determine a initial (pseudo) best move, so that we can play it even
+    //  2. Determine an initial (pseudo) best move, so that we can play it even
     //  without having searched anything.
     Move legal_moves[MAX_GENERATED_MOVES];
     Move* end = generate_moves(board, &legal_moves[0]);
@@ -346,8 +346,9 @@ SearchResults Searcher::search(const Board& board,
     secondary_workers.resize(n_helper_threads);
     for (int i = 0; i < n_helper_threads; ++i) {
         helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
-            secondary_workers[i] = std::make_unique<SearchWorker>(false, board, &context, &settings);
-            secondary_workers[i]->iterative_deepening();
+            auto worker = std::make_unique<SearchWorker>(false, board, &context, &settings);
+            worker->iterative_deepening();
+            secondary_workers[i] = std::move(worker);
         });
     }
 
