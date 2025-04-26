@@ -1157,13 +1157,14 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
     pv_results.bound_type = bt;
 
     ui64 total_nodes = nodes();
-    for (const std::unique_ptr<SearchWorker>& worker: m_context->helper_workers()) {
-        if (worker == nullptr) {
-            continue;
-        }
-
-        total_nodes += worker->nodes();
-    }
+//  TODO: Uncomment and implement
+//    for (const std::unique_ptr<SearchWorker>& worker: m_context->helper_workers()) {
+//        if (worker == nullptr) {
+//            continue;
+//        }
+//
+//        total_nodes += worker->nodes();
+//    }
     pv_results.nodes = total_nodes;
 
     // Extract the PV line.
