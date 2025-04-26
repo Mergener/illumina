@@ -343,16 +343,14 @@ void State::search(SearchSettings settings, bool trace) {
     }
 
     // Prevent invoking two simultaneous searches.
-    if (m_searching.exchange(true, std::memory_order_acquire)) {
-        stop_search();
-        m_searching.store(true, std::memory_order_acquire);
-    }
+    stop_search();
 
     // Finally, fire the search thread.
     // Note that we need to capture the tracer in the lambda in order
     // to keep the tracer object alive.
     m_search_thread = new std::thread([this, settings, tracer]() {
         try {
+            std::unique_lock lock(m_search_mtx);
             m_search_start = Clock::now();
             SearchResults results = m_searcher.search(m_board, settings);
 
@@ -384,7 +382,6 @@ Score State::normalize_score_if_desired(Score score, const Board& board) const {
 void State::stop_search() {
     m_searcher.stop();
     if (m_search_thread != nullptr) {
-        m_search_thread->join();
         delete m_search_thread;
     }
 }
