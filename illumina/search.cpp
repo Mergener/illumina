@@ -855,12 +855,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 // Don't reduce nodes that have been on the PV as much.
                 reductions -= ttpv;
             }
-            else if (move_picker.stage() == MPS_BAD_CAPTURES) {
-                // Further reduce bad captures when we're in a very good position
-                // and probably don't need unsound sacrifices.
-                bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
-                reductions -= !stable * (reductions / 2);
-            }
 
             // Prevent too high or below zero reductions.
             reductions = std::clamp(reductions, 0, depth);
