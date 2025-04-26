@@ -73,7 +73,7 @@ public:
     ~Searcher() = default;
 
 private:
-    bool m_searching = false;
+    std::atomic_bool m_searching = false;
 
     std::atomic_bool m_stop = false;
     TranspositionTable m_tt;

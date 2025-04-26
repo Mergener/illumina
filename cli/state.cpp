@@ -345,6 +345,7 @@ void State::search(SearchSettings settings, bool trace) {
     // Prevent invoking two simultaneous searches.
     if (m_searching.exchange(true, std::memory_order_acquire)) {
         stop_search();
+        m_searching.store(true, std::memory_order_acquire);
     }
 
     // Finally, fire the search thread.

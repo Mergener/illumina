@@ -371,6 +371,7 @@ SearchResults Searcher::search(const Board& board,
     for (std::thread& thread: helper_threads) {
         thread.join();
     }
+    helper_threads.clear();
 
     // Fill in the search results object to be returned.
     // We assume that the best move is the one at MultiPV 1.
@@ -1157,14 +1158,13 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
     pv_results.bound_type = bt;
 
     ui64 total_nodes = nodes();
-//  TODO: Uncomment and implement
-//    for (const std::unique_ptr<SearchWorker>& worker: m_context->helper_workers()) {
-//        if (worker == nullptr) {
-//            continue;
-//        }
-//
-//        total_nodes += worker->nodes();
-//    }
+    for (const std::unique_ptr<SearchWorker>& worker: m_context->helper_workers()) {
+        if (worker == nullptr) {
+            continue;
+        }
+
+        total_nodes += worker->nodes();
+    }
     pv_results.nodes = total_nodes;
 
     // Extract the PV line.
@@ -1184,7 +1184,7 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
     }
 
     // Notify the time manager that we finished a pv iteration.
-    if (m_main && notify_tm) {
+    if (notify_tm) {
         m_context->time_manager().on_new_pv(pv_results.depth,
                                             pv_results.best_move,
                                             pv_results.score);
