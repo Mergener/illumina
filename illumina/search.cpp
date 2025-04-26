@@ -108,7 +108,7 @@ SearchContext::SearchContext(TranspositionTable* tt,
       { }
 
 void SearchContext::stop_search() const {
-    m_stop->store(true, std::memory_order_relaxed);
+    m_stop->store(true, std::memory_order_seq_cst);
 }
 
 TimeManager& SearchContext::time_manager() const {
@@ -369,7 +369,9 @@ SearchResults Searcher::search(const Board& board,
 
     // Wait for secondary threads to stop.
     for (std::thread& thread: helper_threads) {
-        thread.join();
+        if (thread.joinable()) {
+            thread.join();
+        }
     }
     helper_threads.clear();
 

@@ -51,9 +51,8 @@ private:
     Board m_board = Board::standard_startpos();
     UCIOptionManager m_options;
     Searcher         m_searcher;
-    std::thread*     m_search_thread = nullptr;
+    std::thread      m_search_thread;
     std::atomic_bool m_searching = false;
-    std::mutex       m_search_mtx;
     TimePoint        m_search_start;
     bool             m_frc = false;
     ui64             m_eval_random_seed = 0;
