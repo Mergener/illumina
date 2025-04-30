@@ -921,7 +921,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                     m_hist.update_quiet_history(quiet,
                                                 m_board.last_move(),
                                                 depth,
-                                                m_board.gives_check(quiet),
                                                 quiet == best_move);
                 }
             }
