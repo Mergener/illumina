@@ -993,8 +993,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             // Update corrhist.
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
-                && alpha >= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                && alpha >= raw_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - raw_eval);
             }
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
@@ -1008,8 +1008,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             // Update corrhist.
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
-                && alpha <= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                && alpha <= raw_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - raw_eval);
             }
         } else {
             // We have an exact score.
@@ -1023,8 +1023,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             // Update corrhist.
             if (   !in_check
                    && (best_move == MOVE_NULL || best_move.is_quiet())
-                   && alpha >= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                   && alpha >= raw_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - raw_eval);
             }
         }
     }
