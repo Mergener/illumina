@@ -132,8 +132,8 @@ inline void MoveHistory::reset() {
 
 inline int MoveHistory::quiet_history(Move move, Move last_move, bool gives_check) const {
     return int(
-               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move))
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->counter_move_history.get(last_move).get(move)));
+               i64(m_data->main_history.get(move))
+             + i64(m_data->counter_move_history.get(last_move).get(move)));
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
