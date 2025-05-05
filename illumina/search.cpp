@@ -676,7 +676,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     }
 
     // Null move pruning.
-    if (!PV_NODE
+    if (   !PV_NODE
         && !SKIPPING_NMP
         && !in_check
         && non_pawn_bb(m_board) != 0
@@ -692,6 +692,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         m_board.undo_null_move();
 
         if (score >= beta) {
+            tt.try_store(board_key, ply, MOVE_NULL, score, depth, static_eval, BT_LOWERBOUND, ttpv);
             return score;
         }
     }
