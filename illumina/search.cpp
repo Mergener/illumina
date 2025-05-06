@@ -1048,10 +1048,14 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
 
-    TranspositionTable& tt = m_context->tt();
     Score original_alpha = alpha;
+
+    TranspositionTable& tt = m_context->tt();
     TranspositionTableEntry tt_entry;
     bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
+    Move tt_move = found_in_tt && tt_entry.move().is_capture()
+                 ? tt_entry.move()
+                 : MOVE_NULL;
 
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
 
@@ -1075,7 +1079,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     }
 
     // Finally, start looping over available noisy moves.
-    MovePicker<true> move_picker(m_board, ply, m_hist);
+    MovePicker<true> move_picker(m_board, ply, m_hist, tt_move);
     SearchMove move;
     SearchMove best_move;
     Score best_score = stand_pat;
@@ -1113,7 +1117,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
     if (best_score <= original_alpha) {
         tt.try_store(m_board.hash_key(),
-                     ply, best_move,
+                     ply, MOVE_NULL,
                      best_score,
                      0, raw_eval,
                      BT_UPPERBOUND,
