@@ -1048,11 +1048,15 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
 
+    TranspositionTable& tt = m_context->tt();
     Score original_alpha = alpha;
+    TranspositionTableEntry tt_entry;
+    bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
 
     m_results.sel_depth = std::max(m_results.sel_depth, ply);
 
-    Score stand_pat = evaluate();
+    Score raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
+    Score stand_pat = raw_eval;
     if (!m_board.in_check()) {
         stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
     }
@@ -1107,12 +1111,11 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
     }
 
-    TranspositionTable& tt = m_context->tt();
     if (best_score <= original_alpha) {
         tt.try_store(m_board.hash_key(),
                      ply, best_move,
                      best_score,
-                     0, stand_pat,
+                     0, raw_eval,
                      BT_UPPERBOUND,
                      false);
     }
@@ -1120,7 +1123,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         tt.try_store(m_board.hash_key(),
                      ply, best_move,
                      best_score,
-                     0, stand_pat,
+                     0, raw_eval,
                      BT_LOWERBOUND,
                      false);
     }
@@ -1128,7 +1131,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         tt.try_store(m_board.hash_key(),
                      ply, best_move,
                      best_score,
-                     0, stand_pat,
+                     0, raw_eval,
                      BT_EXACT,
                      false);
     }
