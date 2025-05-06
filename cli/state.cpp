@@ -173,7 +173,7 @@ void State::evaluate() const {
     Evaluation eval;
     Board repl = m_board;
     eval.on_new_board(repl);
-    Score score = normalize_score_if_desired(eval.get(), repl);
+    Score score = normalize_score_if_desired(eval.compute(), repl);
 
     std::cout << "      ";
 
@@ -197,7 +197,7 @@ void State::evaluate() const {
             else {
                 repl.set_piece_at(s, PIECE_NULL);
                 eval.on_new_board(repl);
-                Score score_without_piece = normalize_score_if_desired(eval.get(), repl);
+                Score score_without_piece = normalize_score_if_desired(eval.compute(), repl);
                 repl.set_piece_at(s, p);
 
                 std::cout << std::setw(6)
