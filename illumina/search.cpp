@@ -202,7 +202,7 @@ private:
                            Score alpha, Score beta,
                            bool notify_tm);
 
-    Score evaluate() const;
+    Score evaluate();
     Score draw_score() const;
 
     template <bool TRACE>
@@ -681,7 +681,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     }
 
     // Null move pruning.
-    if (!PV_NODE
+    if (   !PV_NODE
         && !SKIPPING_NMP
         && !in_check
         && non_pawn_bb(m_board) != 0
@@ -697,6 +697,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         m_board.undo_null_move();
 
         if (score >= beta) {
+            tt.try_store(board_key, ply, MOVE_NULL, score, depth, static_eval, BT_LOWERBOUND, ttpv);
             return score;
         }
     }
@@ -1052,10 +1053,19 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
 
-    // Keep track on seldepth.
-    m_sel_depth = std::max(ply, m_sel_depth);
+    Score original_alpha = alpha;
 
-    Score stand_pat = evaluate();
+    TranspositionTable& tt = m_context->tt();
+    TranspositionTableEntry tt_entry;
+    bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
+    Move tt_move = found_in_tt && tt_entry.move().is_capture()
+                 ? tt_entry.move()
+                 : MOVE_NULL;
+
+    m_sel_depth = std::max(m_sel_depth, ply);
+
+    Score raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
+    Score stand_pat = raw_eval;
     if (!m_board.in_check()) {
         stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
     }
@@ -1074,7 +1084,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     }
 
     // Finally, start looping over available noisy moves.
-    MovePicker<true> move_picker(m_board, ply, m_hist);
+    MovePicker<true> move_picker(m_board, ply, m_hist, tt_move);
     SearchMove move;
     SearchMove best_move;
     Score best_score = stand_pat;
@@ -1110,10 +1120,35 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
     }
 
+    if (best_score <= original_alpha) {
+        tt.try_store(m_board.hash_key(),
+                     ply, MOVE_NULL,
+                     best_score,
+                     0, raw_eval,
+                     BT_UPPERBOUND,
+                     false);
+    }
+    else if (best_score >= beta) {
+        tt.try_store(m_board.hash_key(),
+                     ply, best_move,
+                     best_score,
+                     0, raw_eval,
+                     BT_LOWERBOUND,
+                     false);
+    }
+    else {
+        tt.try_store(m_board.hash_key(),
+                     ply, best_move,
+                     best_score,
+                     0, raw_eval,
+                     BT_EXACT,
+                     false);
+    }
+
     return best_score;
 }
 
-Score SearchWorker::evaluate() const {
+Score SearchWorker::evaluate() {
     // Check if we're in a known endgame.
     Endgame eg = identify_endgame(m_board);
 
@@ -1124,7 +1159,7 @@ Score SearchWorker::evaluate() const {
 
     // If we're not in a known endgame, use our regular
     // static evaluation function.
-    Score score = m_eval.get();
+    Score score = m_eval.compute();
     if (m_eval_random_margin != 0) {
         // User has requested evaluation randomness, apply the noise.
         i32 seed   = Score((m_eval_random_seed * m_board.hash_key()) & BITMASK(15));
