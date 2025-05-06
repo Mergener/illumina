@@ -614,7 +614,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         TRACE_SET(Traceable::TT_SCORE, tt_entry.score());
 
         // TT Cutoff.
-        if (!PV_NODE
+        if (   !PV_NODE
             && stack_node->skip_move == MOVE_NULL
             && tt_entry.depth() >= depth) {
             BoundType bt = tt_entry.bound_type();
@@ -625,6 +625,16 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 TRACE_SET(Traceable::TT_CUTOFF, true);
                 return score;
             }
+        }
+
+        // TT Pruning.
+        Depth depth_diff = depth - tt_entry.depth();
+        if (   !PV_NODE
+            && tt_entry.depth() > 10
+            && depth >= tt_entry.depth()
+            && tt_entry.bound_type() != BT_LOWERBOUND
+            && tt_entry.score() < (alpha - 3 * depth_diff - 5)) {
+            return tt_entry.score();
         }
     }
 
