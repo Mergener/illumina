@@ -3,6 +3,7 @@
 
 #include <istream>
 #include <ostream>
+#include <vector>
 
 #include "board.h"
 #include "searchdefs.h"
@@ -12,7 +13,7 @@ namespace illumina {
 
 class Evaluation {
 public:
-    Score get() const;
+    Score compute();
     void on_new_board(const Board& board);
     void on_make_move(const Board& board, Move move);
     void on_undo_move(const Board& board, Move move);
@@ -21,9 +22,18 @@ public:
     void on_piece_added(const Board& board, Piece , Square s);
     void on_piece_removed(const Board& board, Piece p, Square s);
 
+    void apply_lazy_updates();
+
 private:
     NNUE m_nnue;
     Color m_ctm;
+    std::array<Move, MAX_DEPTH> m_lazy_updates;
+    size_t m_n_lazy_updates = 0;
+
+    void apply_make_move(Move move);
+    void apply_undo_move(Move move);
+    void apply_make_null_move();
+    void apply_undo_null_move();
 };
 
 Score normalize_score(Score score, const Board& board);
