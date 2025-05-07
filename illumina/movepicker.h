@@ -41,6 +41,7 @@ public:
     bool finished() const;
     SearchMove next();
     void score_move(SearchMove& move);
+    void skip_quiets();
 
     explicit MovePicker(const Board& board,
                         Depth ply,
@@ -60,6 +61,7 @@ private:
     SearchMove*      m_moves_it;
     SearchMove*      m_moves_end;
     MoveRange        m_bad_captures_range;
+    bool             m_do_quiets = true;
 
     // Context-related fields
     const Board* m_board;
@@ -326,8 +328,13 @@ void MovePicker<QUIESCE>::advance_stage() {
             }
 
             case MPS_QUIET: {
-                if (QUIESCE) {
-                    // Skip this stage on quiescence search.
+                if constexpr (QUIESCE) {
+                    // Always skip this stage on quiescence search.
+                    advance_stage();
+                    return;
+                }
+
+                if (!m_do_quiets) {
                     advance_stage();
                     return;
                 }
@@ -386,6 +393,12 @@ inline SearchMove MovePicker<QUIESCE>::next() {
     if (finished()) {
         // We've finished generating moves.
         return MOVE_NULL;
+    }
+
+    if (   stage() == MPS_QUIET
+        && !m_do_quiets) {
+        advance_stage();
+        return next();
     }
 
     if (m_moves_it >= m_curr_move_range.end) {
@@ -454,6 +467,11 @@ inline bool MovePicker<QUIESCE>::finished() const {
 template <bool QUIESCE>
 inline MovePickingStage MovePicker<QUIESCE>::stage() const {
     return m_stage;
+}
+
+template <bool QUIESCE>
+inline void MovePicker<QUIESCE>::skip_quiets() {
+    m_do_quiets = false;
 }
 
 } // illumina

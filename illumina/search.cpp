@@ -762,9 +762,11 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
                 && move_idx >= s_lmp_count_table[improving][depth]
                 && move_picker.stage() > MPS_KILLER_MOVES
-                && !in_check
-                && move.is_quiet()) {
-                continue;
+                && !in_check) {
+                move_picker.skip_quiets();
+                if (move.is_quiet()) {
+                    continue;
+                }
             }
 
             Color them = opposite_color(m_board.color_to_move());
@@ -788,10 +790,12 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 && depth <= FP_MAX_DEPTH
                 && !in_check
                 && move != hash_move
-                && move.is_quiet()
                 && (static_eval + FP_MARGIN) < alpha
                 && !m_board.gives_check(move)) {
-                continue;
+                move_picker.skip_quiets();
+                if (move.is_quiet()) {
+                    continue;
+                }
             }
         }
 
