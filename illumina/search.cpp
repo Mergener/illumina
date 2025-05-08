@@ -604,11 +604,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry, stack_node->ply)
-                    && (   hash_move == MOVE_NULL
-                        || (   m_board.is_move_pseudo_legal(hash_move)
-                            && m_board.is_move_legal(hash_move)));
-
+    bool found_in_tt = false;
     if (found_in_tt) {
         hash_move = tt_entry.move();
 
@@ -697,7 +693,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         m_board.undo_null_move();
 
         if (score >= beta) {
-            tt.try_store(board_key, ply, MOVE_NULL, score, depth, static_eval, BT_LOWERBOUND, ttpv);
             return score;
         }
     }
@@ -992,14 +987,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // Don't store in singular searches.
     if (stack_node->skip_move == MOVE_NULL) {
         if (alpha >= beta) {
-            // Beta-Cutoff, lowerbound score.
-            tt.try_store(board_key,
-                         ply, best_move,
-                         best_score,
-                         depth, raw_eval,
-                         BT_LOWERBOUND,
-                         ttpv);
-
             // Update corrhist.
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
@@ -1007,14 +994,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else if (alpha <= original_alpha) {
-            // Couldn't raise alpha, score is an upperbound.
-            tt.try_store(board_key,
-                         ply, best_move,
-                         best_score,
-                         depth, raw_eval,
-                         BT_UPPERBOUND,
-                         ttpv);
-
             // Update corrhist.
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
@@ -1022,14 +1001,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else {
-            // We have an exact score.
-            tt.try_store(board_key,
-                         ply, best_move,
-                         best_score,
-                         depth, raw_eval,
-                         BT_EXACT,
-                         ttpv);
-
             // Update corrhist.
             if (   !in_check
                    && (best_move == MOVE_NULL || best_move.is_quiet())
@@ -1061,7 +1032,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
     TranspositionTable& tt = m_context->tt();
     TranspositionTableEntry tt_entry;
-    bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
+    bool found_in_tt = false;
     Move tt_move = found_in_tt && tt_entry.move().is_capture()
                  ? tt_entry.move()
                  : MOVE_NULL;
@@ -1122,31 +1093,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
             alpha = score;
         }
-    }
-
-    if (best_score <= original_alpha) {
-        tt.try_store(m_board.hash_key(),
-                     ply, MOVE_NULL,
-                     best_score,
-                     0, raw_eval,
-                     BT_UPPERBOUND,
-                     false);
-    }
-    else if (best_score >= beta) {
-        tt.try_store(m_board.hash_key(),
-                     ply, best_move,
-                     best_score,
-                     0, raw_eval,
-                     BT_LOWERBOUND,
-                     false);
-    }
-    else {
-        tt.try_store(m_board.hash_key(),
-                     ply, best_move,
-                     best_score,
-                     0, raw_eval,
-                     BT_EXACT,
-                     false);
     }
 
     return best_score;
