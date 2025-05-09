@@ -604,10 +604,11 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry, stack_node->ply)
-                    && (   hash_move == MOVE_NULL
-                        || (   m_board.is_move_pseudo_legal(hash_move)
-                            && m_board.is_move_legal(hash_move)));
+    bool found_in_tt = tt.probe(board_key, tt_entry, stack_node->ply);
+    if (   !m_board.is_move_pseudo_legal(tt_entry.move())
+        || !m_board.is_move_legal(tt_entry.move())) {
+        found_in_tt = false;
+    }
 
     if (found_in_tt) {
         hash_move = tt_entry.move();
