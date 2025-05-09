@@ -605,8 +605,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
     bool found_in_tt = tt.probe(board_key, tt_entry, stack_node->ply);
-    if (   !m_board.is_move_pseudo_legal(tt_entry.move())
-        || !m_board.is_move_legal(tt_entry.move())) {
+    if (   tt_entry.move() != MOVE_NULL
+        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+            || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
 
