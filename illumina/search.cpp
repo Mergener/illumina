@@ -1064,10 +1064,19 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
     TranspositionTable& tt = m_context->tt();
     TranspositionTableEntry tt_entry;
+    Move tt_move = MOVE_NULL;
     bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
-    Move tt_move = found_in_tt && tt_entry.move().is_capture()
-                 ? tt_entry.move()
-                 : MOVE_NULL;
+    if (   found_in_tt
+        && tt_entry.move() != MOVE_NULL
+        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+            || !m_board.is_move_legal(tt_entry.move()))) {
+        found_in_tt = false;
+    }
+    else {
+        tt_move = found_in_tt && tt_entry.move().is_capture()
+                ? tt_entry.move()
+                : MOVE_NULL;
+    }
 
     m_sel_depth = std::max(m_sel_depth, ply);
 
