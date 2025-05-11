@@ -4,15 +4,15 @@ namespace illumina {
 
 void TimeManager::setup(bool tourney_time) {
     m_time_start = now();
-    m_running.store(std::memory_order_seq_cst);
+    m_running = true;
     m_tourney_time = tourney_time;
 }
 
 void TimeManager::stop() {
-    if (!m_running.load(std::memory_order_relaxed)) {
+    if (!m_running) {
         return;
     }
-    m_running.store(std::memory_order_seq_cst);
+    m_running = false;
     m_elapsed = elapsed();
 }
 

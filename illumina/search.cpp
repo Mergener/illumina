@@ -179,10 +179,10 @@ private:
     int         m_curr_pv_idx = 0;
     Depth       m_sel_depth = 0;
 
-    std::atomic<Score> m_score = 0;
-    std::atomic<ui64>  m_nodes = 0;
-    std::atomic<Move>  m_best_move = MOVE_NULL;
-    std::atomic<Move>  m_ponder_move = MOVE_NULL;
+    Score m_score = 0;
+    ui64  m_nodes = 0;
+    Move  m_best_move = MOVE_NULL;
+    Move  m_ponder_move = MOVE_NULL;
 
     template <TraceMode TRACE_MODE,
         SearchType SEARCH_TYPE,
@@ -425,8 +425,8 @@ void SearchWorker::iterative_deepening() {
 
             // Make sure we set a valid move as the best move so that
             // we can return it if our search is interrupted early.
-            if (m_best_move.load(std::memory_order_relaxed) == MOVE_NULL) {
-                m_best_move.store(m_search_moves[0], std::memory_order_relaxed);
+            if (m_best_move == MOVE_NULL) {
+                m_best_move = m_search_moves[0];
             }
 
             check_limits();
@@ -480,7 +480,7 @@ void SearchWorker::aspiration_windows() {
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
 
-    Move best_move = m_best_move.load(std::memory_order_relaxed);
+    Move best_move = m_best_move;
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
@@ -502,7 +502,7 @@ void SearchWorker::aspiration_windows() {
         // a best move and a ponder move.
         if (   search_stack->pv[0] != MOVE_NULL
             && search_stack->pv[1] != MOVE_NULL) {
-            m_ponder_move.store(search_stack->pv[1], std::memory_order_relaxed);
+            m_ponder_move = search_stack->pv[1];
         }
 
         if (score > alpha && score < beta) {
@@ -517,15 +517,15 @@ void SearchWorker::aspiration_windows() {
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_root_depth;
 
-            m_score.store(prev_score, std::memory_order_relaxed);
-            m_best_move.store(best_move, std::memory_order_relaxed);
+            m_score = prev_score;
+            m_best_move = best_move;
             update_pv_results(search_stack, alpha, beta, false);
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
 
             prev_score = score;
-            best_move  = m_best_move.load(std::memory_order_relaxed);
+            best_move  = m_best_move;
             update_pv_results(search_stack, alpha, beta, true);
         }
 
@@ -574,7 +574,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Make sure we count the root node.
     if constexpr (ROOT_NODE) {
-        m_nodes.fetch_add(1, std::memory_order_relaxed);
+        m_nodes++;
     }
 
     // Check if we must stop our search.
@@ -941,8 +941,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             // Due to aspiration windows, our search may have failed high in the root.
             // Make sure we always have a best_move and a best_score.
             if (ROOT_NODE && (!should_stop() || depth <= 2)) {
-                m_best_move.store(move, std::memory_order_relaxed);
-                m_score.store(alpha, std::memory_order_relaxed);
+                m_best_move = move;
+                m_score = alpha;
             }
 
             if constexpr (PV_NODE && !ROOT_NODE) {
@@ -959,8 +959,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // Make sure we update our best_move in the root.
             if (ROOT_NODE && (!should_stop() || depth <= 2)) {
-                m_best_move.store(move, std::memory_order_relaxed);
-                m_score.store(alpha, std::memory_order_relaxed);
+                m_best_move = move;
+                m_score = alpha;
             }
 
             // Update the PV table.
@@ -1276,7 +1276,7 @@ Score SearchWorker::draw_score() const {
 template <bool TRACING>
 void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
     TRACE_PUSH();
-    m_nodes.fetch_add(1, std::memory_order_relaxed);
+    m_nodes++;
     m_context->tt().prefetch(board.estimate_hash_key_after(move));
     m_eval.on_make_move(board, move);
 }
@@ -1290,7 +1290,7 @@ void SearchWorker::on_undo_move(const illumina::Board& board, illumina::Move mov
 template <bool TRACING>
 void SearchWorker::on_make_null_move(const illumina::Board& board) {
     TRACE_PUSH();
-    m_nodes.fetch_add(1, std::memory_order_relaxed);
+    m_nodes++;
     m_eval.on_make_null_move(board);
 
     TRACE_SET(Traceable::LAST_MOVE, MOVE_NULL);
@@ -1318,19 +1318,19 @@ bool SearchWorker::should_stop() const {
 }
 
 Score SearchWorker::score() const {
-    return m_score.load(std::memory_order_relaxed);
+    return m_score;
 }
 
 ui64 SearchWorker::nodes() const {
-    return m_nodes.load(std::memory_order_relaxed);
+    return m_nodes;
 }
 
 Move SearchWorker::best_move() const {
-    return m_best_move.load(std::memory_order_relaxed);
+    return m_best_move;
 }
 
 Move SearchWorker::ponder_move() const {
-    return m_ponder_move.load(std::memory_order_relaxed);
+    return m_ponder_move;
 }
 
 SearchWorker::SearchWorker(bool main,
