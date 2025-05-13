@@ -668,6 +668,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     bool improving = ply > 2 && !in_check && ((stack_node - 2)->static_eval < static_eval);
     TRACE_SET(Traceable::IMPROVING, improving);
 
+    // Internal iterative reductions.
+    if (   depth >= IIR_MIN_DEPTH
+           && !found_in_tt
+           && stack_node->skip_move == MOVE_NULL) {
+        depth -= IIR_DEPTH_RED;
+    }
+
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
     Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
@@ -709,13 +716,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             tt.try_store(board_key, ply, MOVE_NULL, score, depth, static_eval, BT_LOWERBOUND, ttpv);
             return score;
         }
-    }
-
-    // Internal iterative reductions.
-    if (   depth >= IIR_MIN_DEPTH
-           && !found_in_tt
-           && stack_node->skip_move == MOVE_NULL) {
-        depth -= IIR_DEPTH_RED;
     }
 
     // Dive into the quiescence search when depth becomes zero.
