@@ -1,6 +1,8 @@
 #ifndef ILLUMINA_TIMEMANAGER_H
 #define ILLUMINA_TIMEMANAGER_H
 
+#include <atomic>
+
 #include "clock.h"
 #include "searchdefs.h"
 #include "tunablevalues.h"

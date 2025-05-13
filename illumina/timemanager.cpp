@@ -12,8 +12,8 @@ void TimeManager::stop() {
     if (!m_running) {
         return;
     }
-    m_elapsed = elapsed();
     m_running = false;
+    m_elapsed = elapsed();
 }
 
 void TimeManager::set_starting_bounds(ui64 soft, ui64 hard) {

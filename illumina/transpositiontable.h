@@ -74,7 +74,6 @@ private:
     std::unique_ptr<TranspositionTableEntry[]> m_buf = nullptr;
     size_t m_size_in_bytes;
     size_t m_max_entry_count;
-    size_t m_entry_count = 0;
     ui8 m_gen = 0;
 
     TranspositionTableEntry& entry_ref(ui64 key);
@@ -115,10 +114,6 @@ inline Score TranspositionTableEntry::score() const {
 
 inline Score TranspositionTableEntry::static_eval() const {
     return m_static_eval;
-}
-
-inline int TranspositionTable::hash_full() const {
-    return int(double(m_entry_count) / double(m_max_entry_count) * 1000);
 }
 
 inline size_t TranspositionTable::size() const {
