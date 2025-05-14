@@ -358,6 +358,14 @@ TEST_CASE(IsMovePseudoLegal) {
         Board b("r3k2r/8/8/8/8/8/8/2R1K2R b Kkq - 0 1");
         EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e8g8"))).to_be(true);
     }
+    {
+        Board b("fen rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq d3 0 7");
+        EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e4d3"))).to_be(true);
+    }
+    {
+        Board b("fen rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq - 0 7");
+        EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e4d3"))).to_be(false);
+    }
 }
 
 TEST_CASE(MoveGivesCheck) {

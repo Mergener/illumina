@@ -3,7 +3,7 @@ project(illumina)
 set(CMAKE_CXX_STANDARD 17)
 
 # Set illumina version.
-set(ILLUMINA_VERSION_MAJOR 2)
+set(ILLUMINA_VERSION_MAJOR 3)
 set(ILLUMINA_VERSION_MINOR 0)
 
 # Setup important paths.
@@ -130,7 +130,11 @@ endfunction()
 if (DEVELOPMENT)
     set(ILLUMINA_VERSION_NAME dev-${COMMIT_HASH})
 else()
-    set(ILLUMINA_VERSION_NAME ${ILLUMINA_VERSION_MAJOR}.${ILLUMINA_VERSION_MINOR})
+    if (ILLUMINA_VERSION_MINOR GREATER 1)
+        set(ILLUMINA_VERSION_NAME ${ILLUMINA_VERSION_MAJOR}.${ILLUMINA_VERSION_MINOR})
+    else()
+        set(ILLUMINA_VERSION_NAME ${ILLUMINA_VERSION_MAJOR})
+    endif()
 endif()
 
 message("Generating build files for version ${ILLUMINA_VERSION_NAME} on configuration ${CMAKE_BUILD_TYPE}.")

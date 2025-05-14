@@ -3,6 +3,7 @@
 
 #include <thread>
 #include <atomic>
+#include <mutex>
 
 #include "illumina.h"
 
@@ -50,7 +51,7 @@ private:
     Board m_board = Board::standard_startpos();
     UCIOptionManager m_options;
     Searcher         m_searcher;
-    std::thread*     m_search_thread = nullptr;
+    std::thread      m_search_thread;
     std::atomic_bool m_searching = false;
     TimePoint        m_search_start;
     bool             m_frc = false;

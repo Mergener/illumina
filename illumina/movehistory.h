@@ -70,7 +70,6 @@ private:
         std::array<std::array<Move, 2>, MAX_DEPTH> killers {};
         ButterflyArray<int> main_history {};
         PieceToArray<PieceToArray<int>> counter_move_history {};
-        PieceToArray<int> check_history {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
