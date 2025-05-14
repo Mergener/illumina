@@ -290,6 +290,7 @@ void State::setup_searcher() {
         bool show_wdl = m_options.option<UCIOptionCheck>("UCI_ShowWDL").value();
         bool has_pv_line = res.line.size() >= 1 && res.line[0] != MOVE_NULL;
 
+        // NPS might show INT64_MAX in some cases. That's why we std::min it.
         std::cout << "info"
                   << multipv_string(opt_multi_pv.value() > 1, res.pv_idx)
                   << " depth "    << res.depth
@@ -300,7 +301,7 @@ void State::setup_searcher() {
                   << " pv "       << (has_pv_line ? pv_to_string(res.line, m_board, m_frc) : "")
                   << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
-                  << " nps "      << ui64((double(res.nodes) / (double(res.time) / 1000.0)))
+                  << " nps "      << std::min(ui64((double(res.nodes) / (double(res.time) / 1000.0))), res.nodes)
                   << " time "     << res.time
                   << std::endl;
     });
