@@ -300,7 +300,7 @@ void State::setup_searcher() {
                   << " pv "       << (has_pv_line ? pv_to_string(res.line, m_board, m_frc) : "")
                   << " hashfull " << m_searcher.tt().hash_full()
                   << " nodes "    << res.nodes
-                  << " nps "      << ui64((double(res.nodes) / (double(std::min(res.time, ui64(1))) / 1000.0)))
+                  << " nps "      << ui64((double(res.nodes) / (double(std::max(res.time, ui64(1))) / 1000.0)))
                   << " time "     << res.time
                   << std::endl;
     });
