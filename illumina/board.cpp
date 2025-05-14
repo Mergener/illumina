@@ -5,6 +5,7 @@
 #include "movegen.h"
 #include "utils.h"
 #include "parsehelper.h"
+#include "movegen.h"
 
 namespace illumina {
 
@@ -681,7 +682,7 @@ bool Board::is_move_movement_valid(Move move) const {
         piece_movements = piece_attacks(src_piece, src, occ);
     }
     else {
-        piece_movements = (pawn_attacks(src, src_piece.color()) & (occ | ep_square()))
+        piece_movements = (pawn_attacks(src, src_piece.color()) & (occ | BIT(ep_square())))
                         | pawn_pushes(move.source(), src_piece.color(), occ);
     }
 
@@ -711,25 +712,27 @@ bool Board::is_move_pseudo_legal(Move move) const {
         // Source piece must have the color of the current player to move.
         return false;
     }
-    if (dst_piece != piece_at(dest)) {
-        return false;
-    }
 
-    // Check if move is a capture that isn't en passant.
-    if (move.is_capture() && move.type() != MT_EN_PASSANT) {
-        if (dst_piece == PIECE_NULL) {
-            // Non en passant captures must have a dst_piece.
+    if (move.type() != MT_EN_PASSANT) {
+        if (dst_piece != piece_at(dest)) {
             return false;
         }
-        if (dst_piece_color == src_piece_color) {
-            // We can only capture opposing pieces.
-            return false;
+        // Check if move is a capture that isn't en passant.
+        if (move.is_capture()) {
+            if (dst_piece == PIECE_NULL) {
+                // Non en passant captures must have a dst_piece.
+                return false;
+            }
+            if (dst_piece_color == src_piece_color) {
+                // We can only capture opposing pieces.
+                return false;
+            }
         }
-    }
-    else {
-        if (dst_piece != PIECE_NULL) {
-            // Non-captures (or en passants) cannot have 'dest' pieces.
-            return false;
+        else {
+            if (dst_piece != PIECE_NULL) {
+                // Non-captures cannot have 'dest' pieces.
+                return false;
+            }
         }
     }
 

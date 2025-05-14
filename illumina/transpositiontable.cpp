@@ -76,9 +76,6 @@ void TranspositionTable::try_store(ui64 key,
     // Always add when no existing entry is found.
     if (!entry.valid()) {
         entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen, ttpv);
-
-        // Since we're adding a completely new entry, update the counter.
-        m_entry_count++;
         return;
     }
 
@@ -116,7 +113,6 @@ void TranspositionTable::try_store(ui64 key,
 
 void TranspositionTable::clear() {
     std::memset(m_buf.get(), 0, m_max_entry_count * sizeof(TranspositionTableEntry));
-    m_entry_count = 0;
 }
 
 inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
@@ -133,11 +129,22 @@ void TranspositionTable::resize(size_t new_size) {
         auto new_buf         = std::make_unique<TranspositionTableEntry[]>(new_n_entries);
         m_buf                = std::move(new_buf);
         m_max_entry_count    = new_n_entries;
-        m_entry_count        = 0;
     }
     catch (const std::bad_alloc& bad_alloc) {
         std::cerr << "Failed to resize transposition table, not enough memory." << std::endl;
     }
+}
+
+int TranspositionTable::hash_full() const {
+    constexpr size_t SAMPLE_SIZE = 1000;
+    int filled = 0;
+    for (size_t i = 0; i < SAMPLE_SIZE; ++i) {
+        TranspositionTableEntry& entry = m_buf[i];
+        if (entry.valid()) {
+            filled += 1000;
+        }
+    }
+    return filled / SAMPLE_SIZE;
 }
 
 TranspositionTable::TranspositionTable(size_t size)

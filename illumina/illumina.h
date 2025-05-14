@@ -2,6 +2,7 @@
 #define ILLUMINA_ILLUMINA_H
 
 #include "attacks.h"
+#include "bench.h"
 #include "board.h"
 #include "clock.h"
 #include "debug.h"
