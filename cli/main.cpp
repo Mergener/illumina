@@ -58,8 +58,7 @@ int main(int argc, char* argv[]) {
 static void display_hello_text() {
     using namespace rang;
 
-    std::cout << style::bold
-              << fg::yellow;
+    std::cout << fg::blue;
 
     std::cout << R"(
   ___ _ _                 _
