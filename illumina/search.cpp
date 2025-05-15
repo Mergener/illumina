@@ -721,22 +721,28 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // ProbCut.
     Score pc_beta = beta + PROBCUT_BETA_MARGIN;
     if (   depth >= PROBCUT_DEPTH
-           && (!found_in_tt || tt_entry.depth() < (depth - 3) || tt_entry.score() >= pc_beta)
-           && !in_check
-           && std::abs(beta) < KNOWN_WIN) {
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist);
-        Score pc_score = -MATE_SCORE;
+        && (!found_in_tt || tt_entry.depth() < (depth - 3) || tt_entry.score() >= pc_beta)
+        && !in_check
+        && stack_node->skip_move == MOVE_NULL
+        && std::abs(beta) < KNOWN_WIN) {
+        // TT moves may be used if we're pretty sure they can cause a cutoff.
+        // We approximate a pawn value to 200 internal units, hence the division by 200.
+        Move pc_tt_move = MOVE_NULL;
+        if (   found_in_tt
+            && tt_entry.move() != MOVE_NULL
+            && has_good_see(m_board, hash_move.source(), hash_move.destination(), (pc_beta - static_eval) / 200)) {
+            pc_tt_move = hash_move;
+        }
+
+        MovePicker<false> pc_move_picker(m_board, ply, m_hist, pc_tt_move);
+        Score pc_score = -MAX_SCORE;
 
         int pc_searched_moves = 0;
         SearchMove move;
         while ((move = pc_move_picker.next()) != MOVE_NULL) {
             if (   pc_searched_moves > 0
-                   && pc_move_picker.stage() > MPS_GOOD_CAPTURES) {
+                && pc_move_picker.stage() > MPS_GOOD_CAPTURES) {
                 break;
-            }
-
-            if (move == stack_node->skip_move) {
-                continue;
             }
 
             m_board.make_move(move);
