@@ -98,14 +98,14 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              const RootInfo* root_info,
                              const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
                              TimeManager* time_manager)
-    : m_tt(tt),
-      m_listeners(listeners),
-      m_root_info(root_info),
-      m_stop(should_stop),
-      m_time_manager(time_manager),
-      m_search_start(now()),
-      m_helper_workers(helper_workers)
-      { }
+        : m_tt(tt),
+          m_listeners(listeners),
+          m_root_info(root_info),
+          m_stop(should_stop),
+          m_time_manager(time_manager),
+          m_search_start(now()),
+          m_helper_workers(helper_workers)
+{ }
 
 void SearchContext::stop_search() const {
     m_stop->store(true, std::memory_order_seq_cst);
@@ -185,9 +185,9 @@ private:
     Move  m_ponder_move = MOVE_NULL;
 
     template <TraceMode TRACE_MODE,
-        SearchType SEARCH_TYPE,
-        SkipNmpMode SKIP_NULL_MODE = DONT_SKIP_NMP,
-        RootMode ROOT_MODE = NON_ROOT>
+            SearchType SEARCH_TYPE,
+            SkipNmpMode SKIP_NULL_MODE = DONT_SKIP_NMP,
+            RootMode ROOT_MODE = NON_ROOT>
     Score negamax(Depth depth,
                   Score alpha,
                   Score beta,
@@ -327,8 +327,8 @@ SearchResults Searcher::search(const Board& board,
     else if (settings.white_time.has_value() || settings.black_time.has_value()) {
         // 'wtime/winc/btime/binc'
         our_time = board.color_to_move() == CL_WHITE
-                 ? settings.white_time.value_or(UINT64_MAX)
-                 : settings.black_time.value_or(UINT64_MAX);
+                   ? settings.white_time.value_or(UINT64_MAX)
+                   : settings.black_time.value_or(UINT64_MAX);
 
         m_tm.start_tourney_time(our_time, 0, 0, 0);
     }
@@ -402,8 +402,8 @@ void SearchWorker::iterative_deepening() {
     for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
         // If we finished soft, we don't want to start a new iteration.
         if (   m_main
-            && m_root_depth > 2
-            && m_context->time_manager().finished_soft()) {
+               && m_root_depth > 2
+               && m_context->time_manager().finished_soft()) {
             m_context->stop_search();
         }
 
@@ -435,8 +435,8 @@ void SearchWorker::iterative_deepening() {
 
             // If we finished soft, we don't want to start a new iteration.
             if (   m_main
-                && m_root_depth > 2
-                && m_context->time_manager().finished_soft()) {
+                   && m_root_depth > 2
+                   && m_context->time_manager().finished_soft()) {
                 m_context->stop_search();
             }
 
@@ -501,7 +501,7 @@ void SearchWorker::aspiration_windows() {
         // Update ponder move if and only if we have both
         // a best move and a ponder move.
         if (   search_stack->pv[0] != MOVE_NULL
-            && search_stack->pv[1] != MOVE_NULL) {
+               && search_stack->pv[1] != MOVE_NULL) {
             m_ponder_move = search_stack->pv[1];
         }
 
@@ -539,9 +539,9 @@ static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<TraceMode TRACE_MODE,
-         SearchType SEARCH_TYPE,
-         SkipNmpMode SKIP_NMP_MODE,
-         RootMode ROOT_MODE>
+        SearchType SEARCH_TYPE,
+        SkipNmpMode SKIP_NMP_MODE,
+        RootMode ROOT_MODE>
 Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* stack_node) {
     constexpr bool PV_NODE      = SEARCH_TYPE   == PVS;
     constexpr bool ROOT_NODE    = ROOT_MODE     == ROOT;
@@ -611,10 +611,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // on single threaded searches (~-2), so we only do it if we're
     // running SMP.
     if (   found_in_tt
-        && m_settings->n_threads > 1
-        && tt_entry.move() != MOVE_NULL
-        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-            || !m_board.is_move_legal(tt_entry.move()))) {
+           && m_settings->n_threads > 1
+           && tt_entry.move() != MOVE_NULL
+           && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+                  || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
 
@@ -634,8 +634,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             BoundType bt = tt_entry.bound_type();
             Score score  = tt_entry.score();
             if (   bt == BT_EXACT
-                || (bt == BT_UPPERBOUND && score <= alpha)
-                || (bt == BT_LOWERBOUND && score >= beta)) {
+                   || (bt == BT_UPPERBOUND && score <= alpha)
+                   || (bt == BT_LOWERBOUND && score >= beta)) {
                 TRACE_SET(Traceable::TT_CUTOFF, true);
                 return score;
             }
@@ -698,13 +698,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Null move pruning.
     if (   !PV_NODE
-        && !SKIPPING_NMP
-        && !in_check
-        && non_pawn_bb(m_board) != 0
-        && popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES
-        && static_eval >= beta
-        && depth >= NMP_MIN_DEPTH
-        && stack_node->skip_move == MOVE_NULL) {
+           && !SKIPPING_NMP
+           && !in_check
+           && non_pawn_bb(m_board) != 0
+           && popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES
+           && static_eval >= beta
+           && depth >= NMP_MIN_DEPTH
+           && stack_node->skip_move == MOVE_NULL) {
         Depth reduction = depth / 3 + 4;
 
         m_board.make_null_move();
@@ -715,6 +715,44 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         if (score >= beta) {
             tt.try_store(board_key, ply, MOVE_NULL, score, depth, static_eval, BT_LOWERBOUND, ttpv);
             return score;
+        }
+    }
+
+    // ProbCut.
+    Score pc_beta = beta + PROBCUT_BETA_MARGIN;
+    if (   depth >= PROBCUT_DEPTH
+           && (!found_in_tt || tt_entry.depth() < (depth - 3) || tt_entry.score() >= pc_beta)
+           && !in_check
+           && std::abs(beta) < KNOWN_WIN) {
+        MovePicker<true> pc_move_picker(m_board, ply, m_hist);
+        Score pc_score = -MATE_SCORE;
+
+        int pc_searched_moves = 0;
+        SearchMove move;
+        while ((move = pc_move_picker.next()) != MOVE_NULL) {
+            if (   pc_searched_moves > 0
+                   && pc_move_picker.stage() > MPS_GOOD_CAPTURES) {
+                break;
+            }
+
+            if (move == stack_node->skip_move) {
+                continue;
+            }
+
+            m_board.make_move(move);
+            pc_score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -pc_beta, -pc_beta + 1);
+            if (pc_score >= pc_beta) {
+                pc_score = -negamax<TRACE_MODE, ZWS>(PROBCUT_DEPTH, -pc_beta, -pc_beta + 1, stack_node + 1);
+            }
+            m_board.undo_move();
+            if (pc_score >= pc_beta) {
+                break;
+            }
+            pc_searched_moves++;
+        }
+
+        if (pc_score >= pc_beta) {
+            return pc_score;
         }
     }
 
@@ -769,7 +807,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
         // Low depth pruning.
         if (   non_pawn_bb(m_board)
-            && alpha > -KNOWN_WIN) {
+               && alpha > -KNOWN_WIN) {
             // Late move pruning.
             if (!ROOT_NODE
                 && alpha > -MATE_THRESHOLD
@@ -842,11 +880,11 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (score < se_beta) {
                 extensions++;
                 if (  !PV_NODE
-                    && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
+                      && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
                     extensions++;
                 }
             }
-            // Multi-cut pruning.
+                // Multi-cut pruning.
             else if (score >= beta) {
                 return score;
             }
@@ -858,9 +896,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         // Late move reductions.
         Depth reductions = 0;
         if (   n_searched_moves >= LMR_MIN_MOVE_IDX
-            && depth >= LMR_MIN_DEPTH
-            && !in_check
-            && !m_board.in_check()) {
+               && depth >= LMR_MIN_DEPTH
+               && !in_check
+               && !m_board.in_check()) {
             reductions = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
                 // Further reduce moves that are not improving the static evaluation.
@@ -1011,8 +1049,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // Update corrhist.
             if (   !in_check
-                && (best_move == MOVE_NULL || best_move.is_quiet())
-                && alpha >= static_eval) {
+                   && (best_move == MOVE_NULL || best_move.is_quiet())
+                   && alpha >= static_eval) {
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else if (alpha <= original_alpha) {
@@ -1026,8 +1064,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // Update corrhist.
             if (   !in_check
-                && (best_move == MOVE_NULL || best_move.is_quiet())
-                && alpha <= static_eval) {
+                   && (best_move == MOVE_NULL || best_move.is_quiet())
+                   && alpha <= static_eval) {
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else {
@@ -1073,34 +1111,34 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     Move tt_move = MOVE_NULL;
     bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
     if (   found_in_tt
-        && tt_entry.move() != MOVE_NULL) {
+           && tt_entry.move() != MOVE_NULL) {
         // On multithreaded searches, race conditions might make it so
         // that the TT move is invalid. The following check loses elo
         // on single threaded searches (~-2), so we only do it if we're
         // running SMP.
         if (   m_settings->n_threads > 1
-            && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                || !m_board.is_move_legal(tt_entry.move()))) {
+               && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+                      || !m_board.is_move_legal(tt_entry.move()))) {
             found_in_tt = false;
         }
         else {
             // We're in qsearch, never search non capture moves.
             tt_move = tt_entry.move().is_capture()
-                    ? tt_entry.move()
-                    : MOVE_NULL;
+                      ? tt_entry.move()
+                      : MOVE_NULL;
         }
     }
 
     if (   found_in_tt
-        && tt_entry.move() != MOVE_NULL
-        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-            || !m_board.is_move_legal(tt_entry.move()))) {
+           && tt_entry.move() != MOVE_NULL
+           && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+                  || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
     else {
         tt_move = found_in_tt && tt_entry.move().is_capture()
-                ? tt_entry.move()
-                : MOVE_NULL;
+                  ? tt_entry.move()
+                  : MOVE_NULL;
     }
 
     m_sel_depth = std::max(m_sel_depth, ply);
@@ -1132,7 +1170,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
-            && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
+               && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
             continue;
         }
 
@@ -1222,10 +1260,10 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
 
     Score score  = this->score();
     BoundType bt = score >= beta
-                 ? BT_LOWERBOUND
-                 : score <= alpha
-                 ? BT_UPPERBOUND
-                 : BT_EXACT;
+                   ? BT_LOWERBOUND
+                   : score <= alpha
+                     ? BT_UPPERBOUND
+                     : BT_EXACT;
 
     PVResults pv_results;
     pv_results.pv_idx     = m_curr_pv_idx;
@@ -1362,12 +1400,12 @@ SearchWorker::SearchWorker(bool main,
                            const Board& board,
                            SearchContext* context,
                            const SearchSettings* settings)
-    : m_settings(settings),
-      m_context(context),
-      m_main(main),
-      m_eval_random_margin(settings->eval_random_margin),
-      m_eval_random_seed(settings->eval_rand_seed),
-      m_board(board) {
+        : m_settings(settings),
+          m_context(context),
+          m_main(main),
+          m_eval_random_margin(settings->eval_random_margin),
+          m_eval_random_seed(settings->eval_rand_seed),
+          m_board(board) {
     m_eval.on_new_board(m_board);
 
     // Dispatch board callbacks to Worker's methods.
