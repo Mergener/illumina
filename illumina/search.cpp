@@ -585,7 +585,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     }
 
     // Check for draws and return the draw score, taking contempt into consideration.
-    if (!ROOT_NODE && (m_board.is_repetition_draw(2) || (m_board.rule50() >= 100) || m_board.is_insufficient_material_draw())) {
+    if (   !ROOT_NODE
+        && (   m_board.is_repetition_draw(2)
+            || (m_board.rule50() >= 100)
+            || m_board.is_insufficient_material_draw())) {
         return draw_score();
     }
 
@@ -611,10 +614,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // on single threaded searches (~-2), so we only do it if we're
     // running SMP.
     if (   found_in_tt
-           && m_settings->n_threads > 1
-           && tt_entry.move() != MOVE_NULL
-           && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                  || !m_board.is_move_legal(tt_entry.move()))) {
+        && m_settings->n_threads > 1
+        && tt_entry.move() != MOVE_NULL
+        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+            || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
 
@@ -670,15 +673,15 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Internal iterative reductions.
     if (   depth >= IIR_MIN_DEPTH
-           && !found_in_tt
-           && stack_node->skip_move == MOVE_NULL) {
+        && !found_in_tt
+        && stack_node->skip_move == MOVE_NULL) {
         depth -= IIR_DEPTH_RED;
     }
 
     // Reverse futility pruning.
     // If our position is too good, by a safe margin and low depth, prune.
     Score rfp_margin = RFP_MARGIN_BASE + RFP_DEPTH_MULT * depth;
-    if (!PV_NODE
+    if (   !PV_NODE
         && !in_check
         && stack_node->skip_move == MOVE_NULL
         && depth <= RFP_MAX_DEPTH
@@ -698,13 +701,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Null move pruning.
     if (   !PV_NODE
-           && !SKIPPING_NMP
-           && !in_check
-           && non_pawn_bb(m_board) != 0
-           && popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES
-           && static_eval >= beta
-           && depth >= NMP_MIN_DEPTH
-           && stack_node->skip_move == MOVE_NULL) {
+        && !SKIPPING_NMP
+        && !in_check
+        && non_pawn_bb(m_board) != 0
+        && popcount(m_board.color_bb(us)) >= NMP_MIN_PIECES
+        && static_eval >= beta
+        && depth >= NMP_MIN_DEPTH
+        && stack_node->skip_move == MOVE_NULL) {
         Depth reduction = depth / 3 + 4;
 
         m_board.make_null_move();
@@ -722,19 +725,21 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     Score pc_beta = beta + PROBCUT_BETA_MARGIN;
     if (   depth >= PROBCUT_DEPTH
         && (!found_in_tt || tt_entry.depth() < (depth - 3) || tt_entry.score() >= pc_beta)
-        && !in_check
         && stack_node->skip_move == MOVE_NULL
         && std::abs(beta) < KNOWN_WIN) {
         // TT moves may be used if we're pretty sure they can cause a cutoff.
-        // We approximate a pawn value to 200 internal units, hence the division by 200.
+        // We approximate a pawn value to 100 internal units, hence the division by 100.
         Move pc_tt_move = MOVE_NULL;
         if (   found_in_tt
             && tt_entry.move() != MOVE_NULL
-            && has_good_see(m_board, hash_move.source(), hash_move.destination(), (pc_beta - static_eval) / 200)) {
+            && has_good_see(m_board,
+                            hash_move.source(),
+                            hash_move.destination(),
+                            (pc_beta - static_eval) / 100)) {
             pc_tt_move = hash_move;
         }
 
-        MovePicker<false> pc_move_picker(m_board, ply, m_hist, pc_tt_move);
+        MovePicker<true> pc_move_picker(m_board, ply, m_hist, pc_tt_move);
         Score pc_score = -MAX_SCORE;
 
         int pc_searched_moves = 0;
@@ -748,7 +753,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             m_board.make_move(move);
             pc_score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -pc_beta, -pc_beta + 1);
             if (pc_score >= pc_beta) {
-                pc_score = -negamax<TRACE_MODE, ZWS>(PROBCUT_DEPTH, -pc_beta, -pc_beta + 1, stack_node + 1);
+                TRACE_PUSH_SIBLING();
+                pc_score = -negamax<TRACE_MODE, SEARCH_TYPE>(PROBCUT_DEPTH, -pc_beta, -pc_beta + 1, stack_node + 1);
+                TRACE_POP();
             }
             m_board.undo_move();
             if (pc_score >= pc_beta) {
