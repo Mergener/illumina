@@ -37,7 +37,7 @@ using CorrhistTable = std::array<std::array<CorrhistEntry, CORRHIST_ENTRIES>, CL
 
 class MoveHistory {
 public:
-    Move killer() const;
+    Move killer(Depth ply) const;
     bool is_killer(Depth ply, Move move) const;
     void set_killer(Depth ply, Move killer);
     void reset();
@@ -67,7 +67,7 @@ private:
     struct Data {
         CorrhistTable pawn_corrhist;
         CorrhistTable non_pawn_corrhist;
-        Move killer;
+        std::array<Move, MAX_DEPTH> killers {};
         ButterflyArray<int> main_history {};
         PieceToArray<PieceToArray<int>> counter_move_history {};
     };
@@ -107,16 +107,16 @@ const T& PieceToArray<T>::get(Move move) const {
     return (*this)[move.source_piece().color()][move.source_piece().type()][move.destination()];
 }
 
-inline Move MoveHistory::killer() const {
-    return m_data->killer;
+inline Move MoveHistory::killer(Depth ply) const {
+    return m_data->killers[ply];
 }
 
 inline bool MoveHistory::is_killer(Depth ply, Move move) const {
-    return move == m_data->killer;
+    return move == m_data->killers[ply];
 }
 
 inline void MoveHistory::set_killer(Depth ply, Move killer) {
-    m_data->killer = killer;
+    m_data->killers[ply] = killer;
 }
 
 inline void MoveHistory::reset() {
