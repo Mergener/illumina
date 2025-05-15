@@ -228,18 +228,14 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_killer_moves() {
     SearchMove* begin = m_moves_end;
 
-    auto& killers = m_mv_hist->killers(m_ply);
-    size_t n_killers = 0;
-    for (size_t i = 0; i < 2; ++i) {
-        Move killer = killers[i];
-        if (!m_board->is_move_pseudo_legal(killer)
-            || (m_board->in_check() && !m_board->is_move_legal(killer))) {
-            continue;
-        }
-        begin[n_killers++] = killer;
+    auto killer = m_mv_hist->killer();
+    if (   killer != MOVE_NULL
+        && m_board->is_move_pseudo_legal(killer)
+        && (!m_board->in_check() || !m_board->is_move_legal(killer))) {
+        begin[0] = killer;
+        m_moves_end++;
     }
 
-    m_moves_end += n_killers;
     m_curr_move_range = { begin, m_moves_end };
 }
 
