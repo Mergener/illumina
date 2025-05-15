@@ -107,7 +107,7 @@ const T& PieceToArray<T>::get(Move move) const {
     return (*this)[move.source_piece().color()][move.source_piece().type()][move.destination()];
 }
 
-Move MoveHistory::killer() const {
+inline Move MoveHistory::killer() const {
     return m_data->killer;
 }
 
