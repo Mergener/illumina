@@ -730,7 +730,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         // TT moves may be used if we're pretty sure they can cause a cutoff.
         // We approximate a pawn value to 100 internal units, hence the division by 100.
         Move pc_tt_move = MOVE_NULL;
-        if (   found_in_tt
+        if (   !PV_NODE
+            && found_in_tt
             && tt_entry.move() != MOVE_NULL
             && has_good_see(m_board,
                             hash_move.source(),
