@@ -76,7 +76,7 @@ This option requires the SQLiteCPP submodule to be cloned and may considerably i
 
 ## Tracing
 
-Illumina is capable of generating a trace of its entire search tree by running searches with `go trace`. By doing this, once the search stops a SQLite database will be created
+Illumina is capable of generating a trace of its entire search tree by running searches with `go trace`. Once the search stops, a SQLite database will be created
 at the path specified by the `TraceFile` option (defaults to `traces.db`). The SQLite database will contain all nodes the engine has searched during the `go trace` call.
 You can use the [Illumina Viewer Tool](https://github.com/Mergener/illumina-viewer) to load the generated trace file and walk the search tree nodes visually.
 
