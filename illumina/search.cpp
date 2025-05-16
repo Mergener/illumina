@@ -728,14 +728,17 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         && !in_check
         && std::abs(beta) < KNOWN_WIN) {
         MovePicker<true> pc_move_picker(m_board, ply, m_hist);
-        Score pc_score = -MAX_SCORE;
 
         int pc_searched_moves = 0;
         SearchMove move;
         while ((move = pc_move_picker.next()) != MOVE_NULL) {
-            if (   pc_searched_moves > 0
-                && pc_move_picker.stage() > MPS_GOOD_CAPTURES) {
-                break;
+            if (   pc_searched_moves > 0) {
+                if (!in_check && pc_move_picker.stage() > MPS_GOOD_CAPTURES) {
+                    break;
+                }
+                if (in_check && pc_move_picker.stage() > MPS_NOISY_EVASIONS) {
+                    break;
+                }
             }
 
             if (move == stack_node->skip_move) {
@@ -743,7 +746,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
 
             m_board.make_move(move);
-            pc_score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -pc_beta, -pc_beta + 1);
+            Score pc_score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -pc_beta, -pc_beta + 1);
             if (pc_score >= pc_beta) {
                 TRACE_PUSH_SIBLING();
                 pc_score = -negamax<TRACE_MODE, SEARCH_TYPE>(depth - 4, -pc_beta, -pc_beta + 1, stack_node + 1);
@@ -751,13 +754,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
             m_board.undo_move();
             if (pc_score >= pc_beta) {
-                break;
+                return pc_score;
             }
             pc_searched_moves++;
-        }
-
-        if (pc_score >= pc_beta) {
-            return pc_score;
         }
     }
 
