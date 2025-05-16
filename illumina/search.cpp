@@ -726,7 +726,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     if (   depth >= PROBCUT_DEPTH
         && (!found_in_tt || tt_entry.depth() < (depth - 3) || tt_entry.score() >= pc_beta)
         && std::abs(beta) < KNOWN_WIN) {
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist);
+        MovePicker<true> pc_move_picker(m_board, ply, m_hist, MOVE_NULL, (pc_beta - static_eval) / 200);
 
         int pc_searched_moves = 0;
         SearchMove move;
