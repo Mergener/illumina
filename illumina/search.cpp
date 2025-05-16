@@ -402,8 +402,8 @@ void SearchWorker::iterative_deepening() {
     for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
         // If we finished soft, we don't want to start a new iteration.
         if (   m_main
-               && m_root_depth > 2
-               && m_context->time_manager().finished_soft()) {
+            && m_root_depth > 2
+            && m_context->time_manager().finished_soft()) {
             m_context->stop_search();
         }
 
@@ -435,8 +435,8 @@ void SearchWorker::iterative_deepening() {
 
             // If we finished soft, we don't want to start a new iteration.
             if (   m_main
-                   && m_root_depth > 2
-                   && m_context->time_manager().finished_soft()) {
+                && m_root_depth > 2
+                && m_context->time_manager().finished_soft()) {
                 m_context->stop_search();
             }
 
@@ -616,7 +616,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     if (   found_in_tt
         && m_settings->n_threads > 1
         && tt_entry.move() != MOVE_NULL
-        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+     && (   !m_board.is_move_pseudo_legal(tt_entry.move())
             || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
@@ -812,14 +812,14 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
         // Low depth pruning.
         if (   non_pawn_bb(m_board)
-               && alpha > -KNOWN_WIN) {
+            && alpha > -KNOWN_WIN) {
             // Late move pruning.
             if (!ROOT_NODE
-                && alpha > -MATE_THRESHOLD
-                && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
-                && move_idx >= s_lmp_count_table[improving][depth]
-                && move_picker.stage() > MPS_KILLER_MOVES
-                && !in_check) {
+             && alpha > -MATE_THRESHOLD
+             && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
+             && move_idx >= s_lmp_count_table[improving][depth]
+             && move_picker.stage() > MPS_KILLER_MOVES
+             && !in_check) {
                 move_picker.skip_quiets();
                 if (move.is_quiet()) {
                     continue;
@@ -885,7 +885,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (score < se_beta) {
                 extensions++;
                 if (  !PV_NODE
-                      && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
+                   && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
                     extensions++;
                 }
             }
@@ -901,9 +901,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         // Late move reductions.
         Depth reductions = 0;
         if (   n_searched_moves >= LMR_MIN_MOVE_IDX
-               && depth >= LMR_MIN_DEPTH
-               && !in_check
-               && !m_board.in_check()) {
+            && depth >= LMR_MIN_DEPTH
+            && !in_check
+            && !m_board.in_check()) {
             reductions = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
                 // Further reduce moves that are not improving the static evaluation.
@@ -1054,8 +1054,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // Update corrhist.
             if (   !in_check
-                   && (best_move == MOVE_NULL || best_move.is_quiet())
-                   && alpha >= static_eval) {
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha >= static_eval) {
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else if (alpha <= original_alpha) {
@@ -1069,8 +1069,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // Update corrhist.
             if (   !in_check
-                   && (best_move == MOVE_NULL || best_move.is_quiet())
-                   && alpha <= static_eval) {
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha <= static_eval) {
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else {
@@ -1084,8 +1084,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // Update corrhist.
             if (   !in_check
-                   && (best_move == MOVE_NULL || best_move.is_quiet())
-                   && alpha >= static_eval) {
+                && (best_move == MOVE_NULL || best_move.is_quiet())
+                && alpha >= static_eval) {
                 m_hist.update_corrhist(m_board, depth, alpha - static_eval);
             }
         }
@@ -1116,13 +1116,13 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     Move tt_move = MOVE_NULL;
     bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
     if (   found_in_tt
-           && tt_entry.move() != MOVE_NULL) {
+        && tt_entry.move() != MOVE_NULL) {
         // On multithreaded searches, race conditions might make it so
         // that the TT move is invalid. The following check loses elo
         // on single threaded searches (~-2), so we only do it if we're
         // running SMP.
         if (   m_settings->n_threads > 1
-               && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+            && (   !m_board.is_move_pseudo_legal(tt_entry.move())
                       || !m_board.is_move_legal(tt_entry.move()))) {
             found_in_tt = false;
         }
@@ -1135,8 +1135,8 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     }
 
     if (   found_in_tt
-           && tt_entry.move() != MOVE_NULL
-           && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+        && tt_entry.move() != MOVE_NULL
+        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
                   || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
@@ -1175,7 +1175,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
-               && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
+            && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
             continue;
         }
 
