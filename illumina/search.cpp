@@ -727,19 +727,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         && (!found_in_tt || tt_entry.depth() < (depth - 3) || tt_entry.score() >= pc_beta)
         && !in_check
         && std::abs(beta) < KNOWN_WIN) {
-        // TT moves may be used if we're pretty sure they can cause a cutoff.
-        // We approximate a pawn value to 100 internal units, hence the division by 100.
-        Move pc_tt_move = MOVE_NULL;
-        if (   found_in_tt
-            && tt_entry.move() != MOVE_NULL
-            && has_good_see(m_board,
-                            hash_move.source(),
-                            hash_move.destination(),
-                            (pc_beta - static_eval) / 100)) {
-            pc_tt_move = hash_move;
-        }
-
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist, pc_tt_move);
+        MovePicker<true> pc_move_picker(m_board, ply, m_hist);
         Score pc_score = -MAX_SCORE;
 
         int pc_searched_moves = 0;
