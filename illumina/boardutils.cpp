@@ -56,7 +56,7 @@ bool has_good_see(const Board& board,
                   Square source,
                   Square dest,
                   int threshold) {
-    constexpr int PIECE_VALUES[] = { 0, 1, 3, 3, 5, 9, 999 };
+    constexpr int PIECE_VALUES[] = { 0, 1, 4, 4, 6, 12, 999 };
 
     int gain = 0; // End gained value, at the first source piece color perspective.
     int sign = 1;
