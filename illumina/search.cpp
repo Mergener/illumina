@@ -726,7 +726,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     if (   depth >= PROBCUT_DEPTH
         && (!found_in_tt || tt_entry.depth() < (depth - 3) || tt_entry.score() >= pc_beta)
         && std::abs(beta) < KNOWN_WIN) {
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist, MOVE_NULL, (pc_beta - static_eval) / 150);
+        Score pc_see = (pc_beta - static_eval) / 150;
+        Depth pc_depth = depth - 4;
+        MovePicker<true> pc_move_picker(m_board, ply, m_hist, MOVE_NULL, pc_see);
 
         int pc_searched_moves = 0;
         SearchMove move;
@@ -743,11 +745,12 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             Score pc_score = -quiescence_search<TRACE_MODE, ZWS>(ply + 1, -pc_beta, -pc_beta + 1);
             if (pc_score >= pc_beta) {
                 TRACE_PUSH_SIBLING();
-                pc_score = -negamax<TRACE_MODE, ZWS>(depth - 4, -pc_beta, -pc_beta + 1, stack_node + 1);
+                pc_score = -negamax<TRACE_MODE, ZWS>(pc_depth, -pc_beta, -pc_beta + 1, stack_node + 1);
                 TRACE_POP();
             }
             m_board.undo_move();
             if (pc_score >= pc_beta) {
+                tt.try_store(m_board.hash_key(), ply, move, pc_score, pc_depth, static_eval, BT_LOWERBOUND, ttpv);
                 return pc_score;
             }
             pc_searched_moves++;
