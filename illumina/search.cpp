@@ -728,7 +728,12 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         && std::abs(beta) < KNOWN_WIN) {
         Score pc_see = (pc_beta - static_eval) / 150;
         Depth pc_depth = depth - 4;
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist, MOVE_NULL, pc_see);
+        Move pc_hash_move = MOVE_NULL;
+        if (has_good_see(m_board, hash_move.source(), hash_move.destination(), pc_see)) {
+            pc_hash_move = hash_move;
+        }
+
+        MovePicker<true> pc_move_picker(m_board, ply, m_hist, pc_hash_move, pc_see);
 
         int pc_searched_moves = 0;
         SearchMove move;
