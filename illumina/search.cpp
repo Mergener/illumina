@@ -731,13 +731,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         int pc_searched_moves = 0;
         SearchMove move;
         while ((move = pc_move_picker.next()) != MOVE_NULL) {
-            if (   pc_searched_moves > 0) {
-                if (!in_check && pc_move_picker.stage() > MPS_GOOD_CAPTURES) {
-                    break;
-                }
-                if (in_check && pc_move_picker.stage() > MPS_NOISY_EVASIONS) {
-                    break;
-                }
+            if (pc_searched_moves > 0 && pc_move_picker.stage() > MPS_GOOD_CAPTURES) {
+                break;
             }
 
             if (move == stack_node->skip_move) {
