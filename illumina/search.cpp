@@ -755,7 +755,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             pc_score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -pc_beta, -pc_beta + 1);
             if (pc_score >= pc_beta) {
                 TRACE_PUSH_SIBLING();
-                pc_score = -negamax<TRACE_MODE, SEARCH_TYPE>(PROBCUT_DEPTH, -pc_beta, -pc_beta + 1, stack_node + 1);
+                pc_score = -negamax<TRACE_MODE, SEARCH_TYPE>(PROBCUT_DEPTH - 1, -pc_beta, -pc_beta + 1, stack_node + 1);
                 TRACE_POP();
             }
             m_board.undo_move();
