@@ -726,7 +726,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     if (   depth >= PROBCUT_DEPTH
         && (!found_in_tt || tt_entry.depth() < (depth - 3) || tt_entry.score() >= pc_beta)
         && std::abs(beta) < KNOWN_WIN) {
-        Score pc_see = (pc_beta - static_eval) / 150;
+        Score pc_see = (pc_beta - static_eval) / 100;
         Depth pc_depth = depth - 4;
         Move pc_hash_move = MOVE_NULL;
         if (has_good_see(m_board, hash_move.source(), hash_move.destination(), pc_see)) {
