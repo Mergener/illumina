@@ -46,7 +46,8 @@ public:
     explicit MovePicker(const Board& board,
                         Depth ply,
                         const MoveHistory& move_hist,
-                        Move hash_move = MOVE_NULL);
+                        Move hash_move = MOVE_NULL,
+                        int good_capt_see_threshold = 0);
 
 private:
     struct MoveRange {
@@ -62,6 +63,7 @@ private:
     SearchMove*      m_moves_end;
     MoveRange        m_bad_captures_range;
     bool             m_do_quiets = true;
+    int              m_good_capture_see_threshold = 0;
 
     // Context-related fields
     const Board* m_board;
@@ -133,7 +135,7 @@ void MovePicker<QUIESCE>::generate_simple_captures() {
     for (auto it = begin; it != m_moves_end; ++it) {
         SearchMove& m = *it;
 
-        bool good_see = has_good_see(*m_board, m.source(), m.destination());
+        bool good_see = has_good_see(*m_board, m.source(), m.destination(), m_good_capture_see_threshold);
         see_table[m.source()][m.destination()] = good_see;
         score_move(m);
 
@@ -272,13 +274,15 @@ template <bool QUIESCE>
 inline MovePicker<QUIESCE>::MovePicker(const Board& board,
                                        Depth ply,
                                        const MoveHistory& move_hist,
-                                       Move hash_move)
+                                       Move hash_move,
+                                       int good_capt_see_threshold)
     : m_curr_move_range({ &m_moves[0], &m_moves[0] }),
       m_moves_it(&m_moves[0]),
       m_moves_end(&m_moves[0]),
       m_board(&board), m_mv_hist(&move_hist),
       m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
-      m_hash_move(hash_move), m_ply(ply) {
+      m_hash_move(hash_move), m_ply(ply),
+      m_good_capture_see_threshold(good_capt_see_threshold) {
 }
 
 template<bool QUIESCE>
