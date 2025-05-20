@@ -321,7 +321,7 @@ SearchResults Searcher::search(const Board& board,
     std::vector<std::unique_ptr<SearchWorker>> secondary_workers;
     m_stop.store(false, std::memory_order::memory_order_seq_cst);
     m_tt.new_search();
-    m_corr_hist.reset();
+    m_corr_hist->reset();
     SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm, m_corr_hist.get());
 
     // Create main worker.
