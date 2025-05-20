@@ -178,6 +178,7 @@ private:
     int         m_curr_move_number = 0;
     int         m_curr_pv_idx = 0;
     Depth       m_sel_depth = 0;
+    CorrectionHistory m_corrhist;
 
     Score m_score = 0;
     ui64  m_nodes = 0;
@@ -658,9 +659,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     Score raw_eval;
     if (!in_check) {
         raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
-        static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
-        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
-        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        static_eval = m_corrhist.correct_eval(m_board, raw_eval);
+        TRACE_SET(Traceable::PAWN_CORRHIST, m_corrhist.pawn.get(m_board.hash_key(), m_board.color_to_move()) / CORRHIST_GRAIN);
+        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_corrhist.non_pawn.get(m_board.hash_key(), m_board.color_to_move()) / CORRHIST_GRAIN);
     }
     else {
         raw_eval    = 0;
@@ -1057,7 +1058,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha >= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                m_corrhist.update_all(m_board, depth, alpha - static_eval);
             }
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
@@ -1072,7 +1073,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha <= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                m_corrhist.update_all(m_board, depth, alpha - static_eval);
             }
         } else {
             // We have an exact score.
@@ -1087,7 +1088,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha >= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                m_corrhist.update_all(m_board, depth, alpha - static_eval);
             }
         }
     }
@@ -1152,7 +1153,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     Score raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
     Score stand_pat = raw_eval;
     if (!m_board.in_check()) {
-        stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
+        stand_pat = m_corrhist.correct_eval(m_board, stand_pat);
     }
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 

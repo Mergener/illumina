@@ -29,28 +29,12 @@ struct PieceToArray : std::array<std::array<std::array<T, SQ_COUNT>, PT_COUNT>, 
     const T& get(Move move) const;
 };
 
-struct CorrhistEntry {
-    i16  value;
-    ui16 key_low;
-};
-using CorrhistTable = std::array<std::array<CorrhistEntry, CORRHIST_ENTRIES>, CL_COUNT>;
-
 class MoveHistory {
 public:
     const std::array<Move, 2>& killers(Depth ply) const;
     bool is_killer(Depth ply, Move move) const;
     void set_killer(Depth ply, Move killer);
     void reset();
-
-    void update_corrhist(const Board& board,
-                         Depth depth,
-                         int diff);
-
-    int pawn_corrhist(const Board& board) const;
-    int non_pawn_corrhist(const Board& board) const;
-
-    int correct_eval_with_corrhist(const Board& board,
-                                   int static_eval) const;
 
     int  quiet_history(Move move, Move last_move, bool gives_check) const;
     void update_quiet_history(Move move,
@@ -65,19 +49,11 @@ private:
     // stack allocations, all history data is kept in an indirect fashion,
     // with its lifetime managed by a unique_ptr.
     struct Data {
-        CorrhistTable pawn_corrhist;
-        CorrhistTable non_pawn_corrhist;
         std::array<std::array<Move, 2>, MAX_DEPTH> killers {};
         ButterflyArray<int> main_history {};
         PieceToArray<PieceToArray<int>> counter_move_history {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
-
-    void update_corrhist_entry(CorrhistTable& table,
-                               ui64 key,
-                               Color color,
-                               int depth_score,
-                               int diff);
 
     static void update_history_by_depth(int& history,
                                         Depth depth,
@@ -85,6 +61,40 @@ private:
 
     static void update_history(int& history,
                                int bonus);
+};
+
+struct CorrectionHistoryTable {
+    struct Entry {
+        i16  value;
+        ui16 key_low;
+    };
+
+    std::array<std::array<Entry, CORRHIST_ENTRIES>, CL_COUNT> entries;
+
+    void update(ui64 key,
+                Color color,
+                int depth_score,
+                int diff);
+
+    int get(ui64 key, Color color) const;
+
+    void reset();
+};
+
+struct CorrectionHistory {
+    CorrectionHistoryTable pawn;
+    CorrectionHistoryTable non_pawn;
+
+    CorrectionHistory();
+
+    void reset();
+
+    int correct_eval(const Board& board,
+                     int static_eval)const ;
+
+    void update_all(const Board& board,
+                    Depth depth,
+                    int diff);
 };
 
 template<typename T>
@@ -145,69 +155,6 @@ inline void MoveHistory::update_quiet_history(Move move,
     }
 }
 
-inline void MoveHistory::update_corrhist_entry(CorrhistTable& table,
-                                               ui64 key,
-                                               Color color,
-                                               int depth_score,
-                                               int diff) {
-    int scaled_diff = diff * CORRHIST_GRAIN;
-    CorrhistEntry& entry = table[color][key % CORRHIST_ENTRIES];
-    entry.key_low = key & BITMASK(16);
-    i16& entry_value = entry.value;
-    entry_value = std::clamp((int(entry_value) * (CORRHIST_BASE_WEIGHT - depth_score) + scaled_diff * depth_score) / CORRHIST_BASE_WEIGHT,
-                             -MAX_CORRHIST, MAX_CORRHIST);
-}
-
-inline void MoveHistory::update_corrhist(const Board& board,
-                                         Depth depth,
-                                         int diff) {
-    Color color = board.color_to_move();
-    int depth_score = std::min(depth * depth + 2 * depth + 1, 128);
-
-    // Update pawn corrhist.
-    update_corrhist_entry(m_data->pawn_corrhist,
-                          board.pawn_key(),
-                          color,
-                          depth_score,
-                          diff);
-
-    // Update non-pawn corrhist.
-    update_corrhist_entry(m_data->non_pawn_corrhist,
-                          board.non_pawn_key(),
-                          color,
-                          depth_score,
-                          diff);
-}
-
-inline int MoveHistory::pawn_corrhist(const Board& board) const {
-    CorrhistEntry& entry = m_data->pawn_corrhist[board.color_to_move()]
-                                                [board.pawn_key() % CORRHIST_ENTRIES];
-    return entry.key_low == (board.pawn_key() & BITMASK(16))
-         ? entry.value
-         : 0;
-}
-
-inline int MoveHistory::non_pawn_corrhist(const Board& board) const {
-    CorrhistEntry& entry = m_data->non_pawn_corrhist[board.color_to_move()]
-                                                    [board.pawn_key() % CORRHIST_ENTRIES];
-    return entry.key_low == (board.non_pawn_key() & BITMASK(16))
-         ? entry.value
-         : 0;
-}
-
-inline int MoveHistory::correct_eval_with_corrhist(const Board& board,
-                                                   int static_eval) const {
-    if (std::abs(static_eval) >= KNOWN_WIN) {
-        return static_eval;
-    }
-
-    int unscaled_correction = pawn_corrhist(board)
-                            + non_pawn_corrhist(board);
-
-    return std::clamp(static_eval + unscaled_correction / CORRHIST_GRAIN,
-                      -KNOWN_WIN, KNOWN_WIN);
-}
-
 inline void MoveHistory::update_history_by_depth(int& history,
                                                  Depth depth,
                                                  bool good) {
@@ -224,6 +171,56 @@ inline void MoveHistory::update_history(int& history, int bonus) {
 }
 
 inline MoveHistory::MoveHistory() {
+    reset();
+}
+
+inline void CorrectionHistory::update_all(const Board& board, Depth depth, int diff) {
+    Color color = board.color_to_move();
+    int depth_score = std::min(depth * depth + 2 * depth + 1, 128);
+
+    pawn.update(board.pawn_key(), color, depth_score, diff);
+    non_pawn.update(board.non_pawn_key(), color, depth_score, diff);
+}
+
+inline int CorrectionHistoryTable::get(ui64 key, Color color) const {
+    const Entry& entry = entries[color][key % CORRHIST_ENTRIES];
+    return entry.key_low == (key & BITMASK(16))
+           ? entry.value
+           : 0;
+}
+
+inline void CorrectionHistoryTable::update(ui64 key, Color color, int depth_score, int diff) {
+    int scaled_diff = diff * CORRHIST_GRAIN;
+    Entry& entry = entries[color][key % CORRHIST_ENTRIES];
+    entry.key_low = key & BITMASK(16);
+    i16& entry_value = entry.value;
+    entry_value = std::clamp((int(entry_value) * (CORRHIST_BASE_WEIGHT - depth_score) + scaled_diff * depth_score) / CORRHIST_BASE_WEIGHT,
+                             -MAX_CORRHIST, MAX_CORRHIST);
+}
+
+inline int CorrectionHistory::correct_eval(const Board& board, int static_eval) const {
+    if (std::abs(static_eval) >= KNOWN_WIN) {
+        return static_eval;
+    }
+
+    Color color = board.color_to_move();
+    int unscaled_correction = pawn.get(board.pawn_key(), color)
+                            + non_pawn.get(board.non_pawn_key(), color);
+
+    return std::clamp(static_eval + unscaled_correction / CORRHIST_GRAIN,
+                      -KNOWN_WIN, KNOWN_WIN);
+}
+
+inline void CorrectionHistoryTable::reset() {
+    std::memset(entries.data(), 0, sizeof(entries));
+}
+
+inline void CorrectionHistory::reset() {
+    pawn.reset();
+    non_pawn.reset();
+}
+
+inline CorrectionHistory::CorrectionHistory() {
     reset();
 }
 
