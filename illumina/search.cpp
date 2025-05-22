@@ -584,14 +584,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         return alpha;
     }
 
-    // Check for draws and return the draw score, taking contempt into consideration.
-    if (   !ROOT_NODE
-        && (   m_board.is_repetition_draw(2)
-            || (m_board.rule50() >= 100)
-            || m_board.is_insufficient_material_draw())) {
-        return draw_score();
-    }
-
     // Setup some important values.
     TranspositionTable& tt = m_context->tt();
     ui64 board_key         = m_board.hash_key();
@@ -811,153 +803,160 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
         }
 
-        // Low depth pruning.
-        if (   non_pawn_bb(m_board)
-            && alpha > -KNOWN_WIN) {
-            // Late move pruning.
-            if (!ROOT_NODE
-             && alpha > -MATE_THRESHOLD
-             && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
-             && move_idx >= s_lmp_count_table[improving][depth]
-             && move_picker.stage() > MPS_KILLER_MOVES
-             && !in_check) {
-                move_picker.skip_quiets();
-                if (move.is_quiet()) {
-                    continue;
-                }
-            }
-
-            Color them = opposite_color(m_board.color_to_move());
-            Bitboard discovered_atks = discovered_attacks(m_board, move.source(), move.destination());
-            Bitboard their_valuable_pieces = m_board.piece_bb(Piece(them, PT_KING))
-                                             | m_board.piece_bb(Piece(them, PT_QUEEN))
-                                             | m_board.piece_bb(Piece(them, PT_ROOK));
-
-            // SEE pruning.
-            if ((!PV_NODE || m_root_depth > SEE_PRUNING_MAX_DEPTH)
-                && (discovered_atks & their_valuable_pieces) == 0
-                && depth <= SEE_PRUNING_MAX_DEPTH
-                && !m_board.in_check()
-                && move_picker.stage() > MPS_GOOD_CAPTURES
-                && !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
-                continue;
-            }
-
-            // Futility pruning.
-            if ((!PV_NODE || m_root_depth > FP_MAX_DEPTH)
-                && depth <= FP_MAX_DEPTH
-                && !in_check
-                && move != hash_move
-                && (static_eval + FP_MARGIN) < alpha
-                && !m_board.gives_check(move)) {
-                move_picker.skip_quiets();
-                if (move.is_quiet()) {
-                    continue;
-                }
-            }
-        }
-
-        // Singular extensions.
-        Depth extensions = 0;
-        if (!ROOT_NODE
-            && !in_check
-            && hash_move != MOVE_NULL
-            && stack_node->skip_move == MOVE_NULL
-            && tt_entry.bound_type() != BT_UPPERBOUND
-            && depth >= 8
-            && move == hash_move
-            && tt_entry.depth() >= (depth - 3)
-            && std::abs(tt_entry.score()) < MATE_THRESHOLD
-            && !m_board.gives_check(move)) {
-            Score se_beta = tt_entry.score() - depth * 3;
-
-            stack_node->skip_move = move;
-
-            TRACE_PUSH_SIBLING();
-            TRACE_SET(Traceable::SKIP_MOVE, stack_node->skip_move);
-
-            Score score = negamax<TRACE_MODE, ZWS>(depth / 2, se_beta - 1, se_beta, stack_node);
-            TRACE_SET(Traceable::SCORE, score);
-
-            TRACE_POP();
-
-            stack_node->skip_move = MOVE_NULL;
-
-            if (score < se_beta) {
-                extensions++;
-                if (  !PV_NODE
-                   && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
-                    extensions++;
-                }
-            }
-                // Multi-cut pruning.
-            else if (score >= beta) {
-                return score;
-            }
-        }
-
-        m_board.make_move(move);
-        TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
-
-        // Late move reductions.
-        Depth reductions = 0;
-        if (   n_searched_moves >= LMR_MIN_MOVE_IDX
-            && depth >= LMR_MIN_DEPTH
-            && !in_check
-            && !m_board.in_check()) {
-            reductions = s_lmr_table[n_searched_moves - 1][depth];
-            if (move.is_quiet()) {
-                // Further reduce moves that are not improving the static evaluation.
-                reductions += !improving;
-
-                // Further reduce moves that have been historically very bad.
-                reductions += m_hist.quiet_history(move,
-                                                   m_board.last_move(),
-                                                   m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
-
-                // Don't reduce nodes that have been on the PV as much.
-                reductions -= ttpv;
-            }
-            else if (move_picker.stage() == MPS_BAD_CAPTURES) {
-                // Further reduce bad captures when we're in a very good position
-                // and probably don't need unsound sacrifices.
-                bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
-                reductions -= !stable * (reductions / 2);
-            }
-
-            // Prevent too high or below zero reductions.
-            reductions = std::clamp(reductions, 0, depth);
-        }
-
         Score score;
-        if (n_searched_moves == 0) {
-            // Perform PVS. First move of the list is always PVS.
-            score = -negamax<TRACE_MODE, SEARCH_TYPE>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
-            TRACE_SET(Traceable::SCORE, -score);
+        if (m_board.rule50() < 99 || !move.is_quiet()) {
+            // Low depth pruning.
+            if (non_pawn_bb(m_board)
+                && alpha > -KNOWN_WIN) {
+                // Late move pruning.
+                if (!ROOT_NODE
+                    && alpha > -MATE_THRESHOLD
+                    && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
+                    && move_idx >= s_lmp_count_table[improving][depth]
+                    && move_picker.stage() > MPS_KILLER_MOVES
+                    && !in_check) {
+                    move_picker.skip_quiets();
+                    if (move.is_quiet()) {
+                        continue;
+                    }
+                }
+
+                Color them = opposite_color(m_board.color_to_move());
+                Bitboard discovered_atks = discovered_attacks(m_board, move.source(), move.destination());
+                Bitboard their_valuable_pieces = m_board.piece_bb(Piece(them, PT_KING))
+                                                 | m_board.piece_bb(Piece(them, PT_QUEEN))
+                                                 | m_board.piece_bb(Piece(them, PT_ROOK));
+
+                // SEE pruning.
+                if ((!PV_NODE || m_root_depth > SEE_PRUNING_MAX_DEPTH)
+                    && (discovered_atks & their_valuable_pieces) == 0
+                    && depth <= SEE_PRUNING_MAX_DEPTH
+                    && !m_board.in_check()
+                    && move_picker.stage() > MPS_GOOD_CAPTURES
+                    && !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
+                    continue;
+                }
+
+                // Futility pruning.
+                if ((!PV_NODE || m_root_depth > FP_MAX_DEPTH)
+                    && depth <= FP_MAX_DEPTH
+                    && !in_check
+                    && move != hash_move
+                    && (static_eval + FP_MARGIN) < alpha
+                    && !m_board.gives_check(move)) {
+                    move_picker.skip_quiets();
+                    if (move.is_quiet()) {
+                        continue;
+                    }
+                }
+            }
+
+            // Singular extensions.
+            Depth extensions = 0;
+            if (!ROOT_NODE
+                && !in_check
+                && hash_move != MOVE_NULL
+                && stack_node->skip_move == MOVE_NULL
+                && tt_entry.bound_type() != BT_UPPERBOUND
+                && depth >= 8
+                && move == hash_move
+                && tt_entry.depth() >= (depth - 3)
+                && std::abs(tt_entry.score()) < MATE_THRESHOLD
+                && !m_board.gives_check(move)) {
+                Score se_beta = tt_entry.score() - depth * 3;
+
+                stack_node->skip_move = move;
+
+                TRACE_PUSH_SIBLING();
+                TRACE_SET(Traceable::SKIP_MOVE, stack_node->skip_move);
+
+                score = negamax<TRACE_MODE, ZWS>(depth / 2, se_beta - 1, se_beta, stack_node);
+                TRACE_SET(Traceable::SCORE, score);
+
+                TRACE_POP();
+
+                stack_node->skip_move = MOVE_NULL;
+
+                if (score < se_beta) {
+                    extensions++;
+                    if (!PV_NODE
+                        && score < (se_beta - SE_DOUBLE_EXT_MARGIN)) {
+                        extensions++;
+                    }
+                }
+                    // Multi-cut pruning.
+                else if (score >= beta) {
+                    return score;
+                }
+            }
+
+            m_board.make_move(move);
+            TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
+            if (!m_board.is_repetition_draw(2) && !m_board.is_insufficient_material_draw()) {
+                // Late move reductions.
+                Depth reductions = 0;
+                if (n_searched_moves >= LMR_MIN_MOVE_IDX
+                    && depth >= LMR_MIN_DEPTH
+                    && !in_check
+                    && !m_board.in_check()) {
+                    reductions = s_lmr_table[n_searched_moves - 1][depth];
+                    if (move.is_quiet()) {
+                        // Further reduce moves that are not improving the static evaluation.
+                        reductions += !improving;
+
+                        // Further reduce moves that have been historically very bad.
+                        reductions += m_hist.quiet_history(move,
+                                                           m_board.last_move(),
+                                                           m_board.gives_check(move)) <= LMR_BAD_HISTORY_THRESHOLD;
+
+                        // Don't reduce nodes that have been on the PV as much.
+                        reductions -= ttpv;
+                    } else if (move_picker.stage() == MPS_BAD_CAPTURES) {
+                        // Further reduce bad captures when we're in a very good position
+                        // and probably don't need unsound sacrifices.
+                        bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
+                        reductions -= !stable * (reductions / 2);
+                    }
+
+                    // Prevent too high or below zero reductions.
+                    reductions = std::clamp(reductions, 0, depth);
+                }
+
+                if (n_searched_moves == 0) {
+                    // Perform PVS. First move of the list is always PVS.
+                    score = -negamax<TRACE_MODE, SEARCH_TYPE>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
+                    TRACE_SET(Traceable::SCORE, -score);
+                } else {
+                    // Perform a null window search. Searches after the first move are
+                    // performed with a null window. If the search fails high, do a
+                    // re-search with the full window.
+                    score = -negamax<TRACE_MODE, ZWS>(depth - 1 - reductions + extensions, -alpha - 1, -alpha,
+                                                      stack_node + 1);
+                    TRACE_SET(Traceable::SCORE, -score);
+
+                    if (score > alpha && reductions > 1) {
+                        TRACE_PUSH_SIBLING();
+                        score = -negamax<TRACE_MODE, ZWS>(depth - 1 + extensions, -alpha - 1, -alpha, stack_node + 1);
+                        TRACE_SET(Traceable::SCORE, -score);
+                        TRACE_POP();
+                    }
+
+                    if (score > alpha && score < beta) {
+                        TRACE_PUSH_SIBLING();
+                        score = -negamax<TRACE_MODE, SEARCH_TYPE>(depth - 1 + extensions, -beta, -alpha,
+                                                                  stack_node + 1);
+                        TRACE_SET(Traceable::SCORE, -score);
+                        TRACE_POP();
+                    }
+                }
+            } else {
+                score = -draw_score();
+            }
+            m_board.undo_move();
         }
         else {
-            // Perform a null window search. Searches after the first move are
-            // performed with a null window. If the search fails high, do a
-            // re-search with the full window.
-            score = -negamax<TRACE_MODE, ZWS>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, stack_node + 1);
-            TRACE_SET(Traceable::SCORE, -score);
-
-            if (score > alpha && reductions > 1) {
-                TRACE_PUSH_SIBLING();
-                score = -negamax<TRACE_MODE, ZWS>(depth - 1 + extensions, -alpha - 1, -alpha, stack_node + 1);
-                TRACE_SET(Traceable::SCORE, -score);
-                TRACE_POP();
-            }
-
-            if (score > alpha && score < beta) {
-                TRACE_PUSH_SIBLING();
-                score = -negamax<TRACE_MODE, SEARCH_TYPE>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
-                TRACE_SET(Traceable::SCORE, -score);
-                TRACE_POP();
-            }
+            score = draw_score();
         }
-
-        m_board.undo_move();
 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
