@@ -869,7 +869,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             && tt_entry.depth() >= (depth - 3)
             && std::abs(tt_entry.score()) < MATE_THRESHOLD
             && !m_board.gives_check(move)) {
-            Score se_beta = tt_entry.score() - depth * 3;
+            Score se_beta = tt_entry.score() - depth * (3 - improving);
 
             stack_node->skip_move = move;
 
