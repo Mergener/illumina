@@ -24,13 +24,7 @@ enum {
     MPS_KILLER_MOVES,
     MPS_QUIET,
     MPS_BAD_CAPTURES,
-    MPS_END_NOT_CHECK,
-
-    // For check positions, non-quiesce:
-    MPS_NOISY_EVASIONS = MPS_HASH_MOVE + 1,
-    MPS_KILLER_EVASIONS,
-    MPS_QUIET_EVASIONS,
-    MPS_END_IN_CHECK,
+    MPS_END,
 };
 using MovePickingStage = int;
 
@@ -68,7 +62,6 @@ private:
     // Context-related fields
     const Board* m_board;
     const MoveHistory* m_mv_hist;
-    const MovePickingStage m_end_stage;
     const Move  m_hash_move;
     const Depth m_ply;
 
@@ -79,8 +72,6 @@ private:
     void generate_simple_captures();
     void generate_en_passants();
     void generate_quiets();
-    void generate_quiet_evasions();
-    void generate_noisy_evasions();
     void generate_killer_moves();
     void generate_hash_move();
 };
@@ -108,7 +99,9 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_promotion_captures() {
     constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE);
     SearchMove* begin = m_moves_end;
-    m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
+    m_moves_end = !m_board->in_check()
+                ? generate_moves<MASK, false>(*m_board, m_moves_end)
+                : generate_evasions<MASK>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
@@ -116,7 +109,9 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_simple_promotions() {
     constexpr ui64 MASK = BIT(MT_SIMPLE_PROMOTION);
     SearchMove* begin = m_moves_end;
-    m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
+    m_moves_end = !m_board->in_check()
+                ? generate_moves<MASK, false>(*m_board, m_moves_end)
+                : generate_evasions<MASK>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
@@ -126,7 +121,9 @@ void MovePicker<QUIESCE>::generate_simple_captures() {
 
     SearchMove* begin = m_moves_end;
     SearchMove* bad_captures_begin = begin;
-    m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
+    m_moves_end = !m_board->in_check()
+                ? generate_moves<MASK, false>(*m_board, m_moves_end)
+                : generate_evasions<MASK>(*m_board, m_moves_end);
 
     // For simple captures, we need to classify them as good or bad.
     // Good captures are captures with static exchange evaluation
@@ -165,64 +162,9 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_en_passants() {
     constexpr ui64 MASK = BIT(MT_EN_PASSANT);
     SearchMove* begin = m_moves_end;
-    m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
-    m_curr_move_range = { begin, m_moves_end };
-}
-
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_quiet_evasions() {
-    constexpr ui64 MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH);
-    SearchMove* begin = m_moves_end;
-    m_moves_end = generate_evasions<MASK>(*m_board, m_moves_end);
-
-    for (auto it = begin; it != m_moves_end; ++it) {
-        SearchMove& m = *it;
-        score_move(m);
-    }
-
-    insertion_sort(begin, m_moves_end, [](SearchMove& a, SearchMove& b) {
-        return a.value() > b.value();
-    });
-
-    m_curr_move_range = { begin, m_moves_end };
-}
-
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_noisy_evasions() {
-    constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_SIMPLE_PROMOTION) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_EN_PASSANT);
-    SearchMove* begin = m_moves_end;
-    m_moves_end = generate_evasions<MASK>(*m_board, m_moves_end);
-
-    bool see_table[SQ_COUNT][SQ_COUNT];
-    for (auto it = begin; it != m_moves_end; ++it) {
-        SearchMove& m = *it;
-
-        bool good_see = has_good_see(*m_board, m.source(), m.destination());
-        see_table[m.source()][m.destination()] = good_see;
-        score_move(m);
-    }
-
-    insertion_sort(begin, m_moves_end, [&see_table](SearchMove& a, SearchMove& b) {
-        bool a_is_prom = a.is_promotion();
-        bool b_is_prom = b.is_promotion();
-        if (a_is_prom && !b_is_prom) {
-            return true;
-        }
-        if (!a_is_prom && b_is_prom) {
-            return false;
-        }
-
-        bool a_good_see = see_table[a.source()][a.destination()];
-        bool b_good_see = see_table[b.source()][b.destination()];
-        if (a_good_see && !b_good_see) {
-            return true;
-        }
-        if (!a_good_see && b_good_see) {
-            return false;
-        }
-
-        return a.value() > b.value();
-    });
+    m_moves_end = !m_board->in_check()
+                ? generate_moves<MASK, false>(*m_board, m_moves_end)
+                : generate_evasions<MASK>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
@@ -249,7 +191,9 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_quiets() {
     constexpr ui64 MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH) | BIT(MT_CASTLES);
     SearchMove* begin = m_moves_end;
-    m_moves_end = generate_moves<MASK, false>(*m_board, begin);
+    m_moves_end = !m_board->in_check()
+                ? generate_moves<MASK, false>(*m_board, m_moves_end)
+                : generate_evasions<MASK>(*m_board, m_moves_end);
 
     for (auto it = begin; it != m_moves_end; ++it) {
         score_move(*it);
@@ -280,7 +224,6 @@ inline MovePicker<QUIESCE>::MovePicker(const Board& board,
       m_moves_it(&m_moves[0]),
       m_moves_end(&m_moves[0]),
       m_board(&board), m_mv_hist(&move_hist),
-      m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
       m_hash_move(hash_move), m_ply(ply),
       m_good_capture_see_threshold(good_capt_see_threshold) {
 }
@@ -289,105 +232,67 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::advance_stage() {
     m_stage += 1;
 
-    if (!m_board->in_check()) {
-        switch (m_stage) {
-            case MPS_HASH_MOVE:
-                generate_hash_move();
-                break;
+    switch (m_stage) {
+        case MPS_HASH_MOVE:
+            generate_hash_move();
+            break;
 
-            case MPS_PROMOTION_CAPTURES: {
-                generate_promotion_captures();
-                break;
-            }
-
-            case MPS_PROMOTIONS: {
-                generate_simple_promotions();
-                break;
-            }
-
-            case MPS_GOOD_CAPTURES: {
-                generate_simple_captures();
-                break;
-            }
-
-            case MPS_EP: {
-                generate_en_passants();
-                break;
-            }
-
-            case MPS_BAD_CAPTURES: {
-                m_curr_move_range = m_bad_captures_range;
-                break;
-            }
-
-            case MPS_KILLER_MOVES: {
-                if (QUIESCE) {
-                    // Skip this stage on quiescence search.
-                    advance_stage();
-                    return;
-                }
-
-                generate_killer_moves();
-                break;
-            }
-
-            case MPS_QUIET: {
-                if constexpr (QUIESCE) {
-                    // Always skip this stage on quiescence search.
-                    advance_stage();
-                    return;
-                }
-
-                if (!m_do_quiets) {
-                    advance_stage();
-                    return;
-                }
-
-                generate_quiets();
-                break;
-            }
-
-            default:
-                break;
+        case MPS_PROMOTION_CAPTURES: {
+            generate_promotion_captures();
+            break;
         }
-    }
-    else {
-        switch (m_stage) {
-            case MPS_HASH_MOVE:
-                generate_hash_move();
-                break;
 
-            case MPS_NOISY_EVASIONS: {
-                generate_noisy_evasions();
-                break;
-            }
-
-            case MPS_KILLER_EVASIONS: {
-                if (QUIESCE) {
-                    // Skip this stage on quiescence search.
-                    advance_stage();
-                    return;
-                }
-
-                generate_killer_moves();
-                break;
-            }
-
-            case MPS_QUIET_EVASIONS: {
-                if (QUIESCE) {
-                    // Skip this stage on quiescence search.
-                    advance_stage();
-                    return;
-                }
-
-                generate_quiet_evasions();
-                break;
-            }
-
-            default:
-                break;
+        case MPS_PROMOTIONS: {
+            generate_simple_promotions();
+            break;
         }
+
+        case MPS_GOOD_CAPTURES: {
+            generate_simple_captures();
+            break;
+        }
+
+        case MPS_EP: {
+            generate_en_passants();
+            break;
+        }
+
+        case MPS_BAD_CAPTURES: {
+            m_curr_move_range = m_bad_captures_range;
+            break;
+        }
+
+        case MPS_KILLER_MOVES: {
+            if (QUIESCE) {
+                // Skip this stage on quiescence search.
+                advance_stage();
+                return;
+            }
+
+            generate_killer_moves();
+            break;
+        }
+
+        case MPS_QUIET: {
+            if constexpr (QUIESCE) {
+                // Always skip this stage on quiescence search.
+                advance_stage();
+                return;
+            }
+
+            if (!m_do_quiets) {
+                advance_stage();
+                return;
+            }
+
+            generate_quiets();
+            break;
+        }
+
+        default:
+            break;
     }
+
 
     m_moves_it = m_curr_move_range.begin;
 }
@@ -423,8 +328,7 @@ inline SearchMove MovePicker<QUIESCE>::next() {
     // Prevent killer move revisits.
     if (!QUIESCE
          &&  m_mv_hist->is_killer(m_ply, move)
-         && (m_stage != MPS_KILLER_MOVES
-         &&  m_stage != MPS_KILLER_EVASIONS)) {
+         && (m_stage != MPS_KILLER_MOVES)) {
         return next();
     }
 
@@ -465,7 +369,7 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
 
 template <bool QUIESCE>
 inline bool MovePicker<QUIESCE>::finished() const {
-    return m_stage >= m_end_stage;
+    return m_stage >= MPS_END;
 }
 
 template <bool QUIESCE>

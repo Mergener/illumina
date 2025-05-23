@@ -7,9 +7,9 @@ namespace illumina {
     ILLUMINA_ASSERT(moves != nullptr)
 
 template<ui64 MOVE_TYPE_MASK,
-    bool LEGAL,
-    ui64 PIECE_TYPE_MASK,
-    typename TMOVE>
+         bool LEGAL,
+         ui64 PIECE_TYPE_MASK,
+         typename TMOVE>
 TMOVE* generate_moves(const Board& board, TMOVE* moves) {
     MOVEGEN_ASSERTIONS();
 
