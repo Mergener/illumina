@@ -917,6 +917,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
                 // Don't reduce nodes that have been on the PV as much.
                 reductions -= ttpv;
+
+                // Further reduce non-captures when we think a capture is the best move.
+                reductions += found_in_tt && tt_entry.move().is_capture() && !move.is_capture();
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
