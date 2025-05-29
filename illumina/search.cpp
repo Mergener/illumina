@@ -967,12 +967,12 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
         if (score >= best_score) {
             best_score = score;
+            best_move = move;
         }
 
         if (score >= beta) {
             // Our search failed high.
             alpha     = score;
-            best_move = move;
             TRACE_SET(Traceable::BEST_MOVE, best_move);
             TRACE_SET(Traceable::BEST_MOVE_RAW, best_move.raw());
 

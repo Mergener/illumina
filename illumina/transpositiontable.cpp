@@ -79,6 +79,10 @@ void TranspositionTable::try_store(ui64 key,
         return;
     }
 
+    if (bound_type == BT_UPPERBOUND && entry.move() != MOVE_NULL) {
+        move = MOVE_NULL;
+    }
+
     // Always replace when current entry has no stored move.
     if (entry.move() == MOVE_NULL && move != MOVE_NULL) {
         entry.replace(key, move, search_score_to_tt(score, ply), depth, static_eval, bound_type, m_gen, ttpv);
