@@ -1,5 +1,6 @@
 #include "logger.h"
 
+#include <iostream>
 #include <mutex>
 
 namespace illumina {
