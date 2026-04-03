@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -77,7 +78,7 @@ NormalOptions parse_args(int argc, char* argv[]) {
     args.add_argument("-o", "--output")
         .required()
         .store_into(options.out_file_name)
-        .help("name of the output file. Extension will be '.txt'.");
+        .help("output file name.");
 
     args.add_argument("--search-node-limit")
         .default_value(options.search_node_limit)
@@ -167,12 +168,23 @@ NormalOptions parse_args(int argc, char* argv[]) {
 }
 
 std::string output_file_name(const NormalOptions& options, int thread_index) {
-    std::string out_file = options.out_file_name;
-    if (thread_index != 0) {
-        out_file += "_" + std::to_string(thread_index);
+    if (thread_index == 0) {
+        return options.out_file_name;
     }
-    out_file += ".txt";
-    return out_file;
+
+    std::filesystem::path output_path(options.out_file_name);
+    const std::filesystem::path extension = output_path.extension();
+
+    if (extension.empty()) {
+        output_path += "_" + std::to_string(thread_index);
+        return output_path.string();
+    }
+
+    output_path.replace_filename(output_path.stem().string()
+                                 + "_"
+                                 + std::to_string(thread_index)
+                                 + extension.string());
+    return output_path.string();
 }
 
 Game simulate_game(Searcher& white_searcher,
@@ -391,7 +403,7 @@ std::string time_str(ui64 elapsed_ms) {
 void log_configuration(const NormalOptions& options) {
     sync_cout() << "Using normal datagen settings:"
                 << "\n  threads: " << options.threads
-                << "\n  output: " << options.out_file_name << ".txt"
+                << "\n  output: " << options.out_file_name
                 << "\n  search_node_limit: " << options.search_node_limit
                 << "\n  min_random_plies: " << options.min_random_plies
                 << "\n  max_random_plies: " << options.max_random_plies
