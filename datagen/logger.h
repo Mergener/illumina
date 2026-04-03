@@ -3,9 +3,17 @@
 
 #include <ostream>
 
-#include "datagen_types.h"
-
 namespace illumina {
+
+struct ThreadContext {
+    int thread_index = 0;
+
+    bool is_main_thread() const;
+};
+
+inline bool ThreadContext::is_main_thread() const {
+    return thread_index == 0;
+}
 
 //
 // Idea taken from Stockfish.
