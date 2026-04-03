@@ -183,10 +183,11 @@ std::vector<DataPoint> simulate(Searcher& white_searcher,
     search_settings.post_qsearch_handler = [&](const Board& board, Score static_eval, Score qsearch_score) {
         auto r = dist(gen);
         if (r < options.extraction_ratio) {
+            auto score_sign = board.color_to_move() == CL_WHITE ? 1 : -1;
             all_data_points.push_back(DataPoint {
                 board.fen(),
-                static_eval,
-                qsearch_score
+                static_eval * score_sign,
+                qsearch_score * score_sign
             });
         }
     };
