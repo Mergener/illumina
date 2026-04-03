@@ -31,7 +31,7 @@ struct QNetOptions {
     ui64 search_node_limit = 2000;
     int min_random_plies = 12;
     int max_random_plies = 12;
-    double extraction_ratio = 0.001;
+    double extraction_ratio = 0.01;
 };
 
 QNetOptions parse_args(int argc, char* argv[]) {
