@@ -17,42 +17,25 @@
 
 namespace illumina {
 
-struct GamePlyData {
-    Score white_pov_score;
-    Move  best_move;
-};
-
-struct Game {
-    BoardResult result;
-    Board       start_pos;
-    std::vector<GamePlyData> ply_data;
-};
+namespace {
 
 struct DataPoint {
     std::string fen;
-    GamePlyData ply_data;
+    Score eval_score;
+    Score qsearch_score;
 };
 
-struct NormalOptions {
+struct QNetOptions {
     int threads = 1;
     std::string out_file_name {};
-    ui64 search_node_limit = 6000;
-    int min_random_plies = 8;
-    int max_random_plies = 16;
-    int win_adjudication_score = 1000;
-    int win_adjudication_plies = 6;
-    int min_positions_per_game = 12;
-    int max_positions_per_game = 16;
-    bool exclude_checks = true;
-    bool exclude_mate_scores = true;
-    bool exclude_last_move_captures = true;
+    ui64 search_node_limit = 2000;
+    int min_random_plies = 12;
+    int max_random_plies = 12;
+    double extraction_ratio = 0.001;
 };
 
-NormalOptions parse_args(int argc, char* argv[]) {
-    NormalOptions options {};
-    bool include_checks = false;
-    bool include_mate_scores = false;
-    bool include_last_move_captures = false;
+QNetOptions parse_args(int argc, char* argv[]) {
+    QNetOptions options {};
 
     argparse::ArgumentParser args(argv[0],
                                   "",
@@ -93,43 +76,10 @@ NormalOptions parse_args(int argc, char* argv[]) {
         .store_into(options.max_random_plies)
         .help("maximum number of random opening plies before the game starts.");
 
-    args.add_argument("--win-adjudication-score")
-        .default_value(options.win_adjudication_score)
-        .store_into(options.win_adjudication_score)
-        .help("absolute score threshold used for win adjudication.");
-
-    args.add_argument("--win-adjudication-plies")
-        .default_value(options.win_adjudication_plies)
-        .store_into(options.win_adjudication_plies)
-        .help("number of consecutive high-score plies needed for win adjudication.");
-
-    args.add_argument("--min-positions-per-game")
-        .default_value(options.min_positions_per_game)
-        .store_into(options.min_positions_per_game)
-        .help("minimum number of positions kept from each game.");
-
-    args.add_argument("--max-positions-per-game")
-        .default_value(options.max_positions_per_game)
-        .store_into(options.max_positions_per_game)
-        .help("maximum number of positions kept from each game.");
-
-    args.add_argument("--include-checks")
-        .default_value(false)
-        .implicit_value(true)
-        .store_into(include_checks)
-        .help("keep positions where the side to move is in check.");
-
-    args.add_argument("--include-mate-scores")
-        .default_value(false)
-        .implicit_value(true)
-        .store_into(include_mate_scores)
-        .help("keep positions whose search score is a mate score.");
-
-    args.add_argument("--include-last-move-captures")
-        .default_value(false)
-        .implicit_value(true)
-        .store_into(include_last_move_captures)
-        .help("keep positions whose previous move was a capture.");
+    args.add_argument("--extraction-ratio")
+        .default_value(options.extraction_ratio)
+        .store_into(options.extraction_ratio)
+        .help("ratio of all possible data points that gets sampled into the final data.");
 
     try {
         args.parse_args(argc, argv);
@@ -149,23 +99,11 @@ NormalOptions parse_args(int argc, char* argv[]) {
     if (options.max_random_plies < options.min_random_plies) {
         throw std::invalid_argument("max-random-plies must be >= min-random-plies");
     }
-    if (options.min_positions_per_game < 0) {
-        throw std::invalid_argument("min-positions-per-game must be non-negative");
-    }
-    if (options.max_positions_per_game < options.min_positions_per_game) {
-        throw std::invalid_argument("max-positions-per-game must be >= min-positions-per-game");
-    }
-    if (options.win_adjudication_plies < 1) {
-        throw std::invalid_argument("win-adjudication-plies must be at least 1");
-    }
 
-    options.exclude_checks = !include_checks;
-    options.exclude_mate_scores = !include_mate_scores;
-    options.exclude_last_move_captures = !include_last_move_captures;
     return options;
 }
 
-std::string output_file_name(const NormalOptions& options, int thread_index) {
+std::string output_file_name(const QNetOptions& options, int thread_index) {
     if (thread_index == 0) {
         return options.out_file_name;
     }
@@ -185,10 +123,10 @@ std::string output_file_name(const NormalOptions& options, int thread_index) {
     return output_path.string();
 }
 
-Game simulate_game(Searcher& white_searcher,
-                   Searcher& black_searcher,
-                   const NormalOptions& options) {
-    Game game;
+std::vector<DataPoint> simulate(Searcher& white_searcher,
+                                Searcher& black_searcher,
+                                const QNetOptions& options) {
+    std::vector<DataPoint> all_data_points;
 
     struct {
         Searcher* searcher;
@@ -196,6 +134,10 @@ Game simulate_game(Searcher& white_searcher,
         { &white_searcher },
         { &black_searcher }
     };
+
+    std::random_device rnd;
+    std::mt19937 gen(rnd());
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
 
     SearchSettings search_settings;
     search_settings.max_nodes = options.search_node_limit;
@@ -238,111 +180,29 @@ Game simulate_game(Searcher& white_searcher,
         done_creating_startpos = true;
     }
 
-    game.start_pos = board;
-    int hi_score_plies = 0;
-    Color hi_score_player = CL_WHITE;
+    search_settings.post_qsearch_handler = [&](const Board& board, Score static_eval, Score qsearch_score) {
+        auto r = dist(gen);
+        if (r < options.extraction_ratio) {
+            all_data_points.push_back(DataPoint {
+                board.fen(),
+                static_eval,
+                qsearch_score
+            });
+        }
+    };
 
     BoardResult result = board.result();
     while (!result.is_finished()) {
-        GamePlyData ply_data {};
         auto& player = players[board.color_to_move()];
 
         SearchResults search_results = player.searcher->search(board, search_settings);
         Move best_move = search_results.best_move;
 
-        ply_data.best_move = best_move;
-        ply_data.white_pov_score = board.color_to_move() == CL_WHITE
-                                   ? search_results.score
-                                   : -search_results.score;
-        ply_data.white_pov_score = std::clamp(ply_data.white_pov_score, -3000, 3000);
-
-        game.ply_data.push_back(ply_data);
-
-        if (ply_data.white_pov_score >= options.win_adjudication_score) {
-            hi_score_plies = hi_score_player == CL_WHITE ? hi_score_plies + 1 : 1;
-            hi_score_player = CL_WHITE;
-        }
-        else if (ply_data.white_pov_score <= -options.win_adjudication_score) {
-            hi_score_plies = hi_score_player == CL_BLACK ? hi_score_plies + 1 : 1;
-            hi_score_player = CL_BLACK;
-        }
-        else {
-            hi_score_plies = 0;
-        }
-
-        if (hi_score_plies >= options.win_adjudication_plies) {
-            result = { hi_score_player, BoardOutcome::CHECKMATE };
-            break;
-        }
-
         board.make_move(best_move);
         result = board.result();
     }
 
-    game.result = result;
-    return game;
-}
-
-std::vector<DataPoint> select_data_points(const Game& game,
-                                          const NormalOptions& options) {
-    static thread_local std::mt19937 rng(std::random_device{}());
-
-    std::vector<DataPoint> extracted_data;
-    Board board = game.start_pos;
-
-    for (const GamePlyData& ply_data : game.ply_data) {
-        board.make_move(ply_data.best_move);
-
-        if (options.exclude_checks && board.in_check()) {
-            continue;
-        }
-        if (options.exclude_last_move_captures && board.last_move().is_capture()) {
-            continue;
-        }
-        if (options.exclude_mate_scores && is_mate_score(ply_data.white_pov_score)) {
-            continue;
-        }
-
-        extracted_data.push_back({ board.fen(false), ply_data });
-    }
-
-    std::shuffle(extracted_data.begin(), extracted_data.end(), rng);
-
-    size_t n_data_points = std::min(size_t(options.min_positions_per_game) + game.ply_data.size() / 32,
-                                    size_t(options.max_positions_per_game));
-    n_data_points = std::min(n_data_points, extracted_data.size());
-    extracted_data.erase(extracted_data.begin() + n_data_points, extracted_data.end());
-
-    return extracted_data;
-}
-
-std::string_view wdl_value(const Game& game) {
-    switch (game.result.outcome) {
-    case BoardOutcome::CHECKMATE:
-        return game.result.winner.value_or(CL_WHITE) == CL_WHITE ? "1.0" : "0.0";
-    case BoardOutcome::UNFINISHED:
-    case BoardOutcome::STALEMATE:
-    case BoardOutcome::DRAW_BY_REPETITION:
-    case BoardOutcome::DRAW_BY_50_MOVES_RULE:
-    case BoardOutcome::DRAW_BY_INSUFFICIENT_MATERIAL:
-        return "0.5";
-    }
-
-    return "0.5";
-}
-
-ui64 write_marlinflow(std::ostream& stream,
-                      const Game& game,
-                      const std::vector<DataPoint>& extracted_data) {
-    const std::string_view wdl = wdl_value(game);
-
-    for (const DataPoint& data : extracted_data) {
-        stream << data.fen << " | "
-               << data.ply_data.white_pov_score << " | "
-               << wdl << '\n';
-    }
-
-    return extracted_data.size();
+    return all_data_points;
 }
 
 std::string bytes_str(ui64 bytes) {
@@ -398,24 +258,28 @@ std::string time_str(ui64 elapsed_ms) {
          + std::to_string(elapsed_seconds % one_minute);
 }
 
-void log_configuration(const NormalOptions& options) {
-    sync_cout() << "Using normal datagen settings:"
+void log_configuration(const QNetOptions& options) {
+    sync_cout() << "Using qnet datagen settings:"
                 << "\n  threads: " << options.threads
                 << "\n  output: " << options.out_file_name
                 << "\n  search_node_limit: " << options.search_node_limit
                 << "\n  min_random_plies: " << options.min_random_plies
                 << "\n  max_random_plies: " << options.max_random_plies
-                << "\n  win_adjudication_score: " << options.win_adjudication_score
-                << "\n  win_adjudication_plies: " << options.win_adjudication_plies
-                << "\n  min_positions_per_game: " << options.min_positions_per_game
-                << "\n  max_positions_per_game: " << options.max_positions_per_game
-                << "\n  exclude_checks: " << options.exclude_checks
-                << "\n  exclude_mate_scores: " << options.exclude_mate_scores
-                << "\n  exclude_last_move_captures: " << options.exclude_last_move_captures
                 << sync_endl;
 }
 
-[[noreturn]] void thread_main(int thread_index, const NormalOptions& options) {
+ui64 write_datapoints(std::ostream& stream,
+                      const std::vector<DataPoint>& extracted_data) {
+    for (const DataPoint& data : extracted_data) {
+        stream << data.fen << " | "
+               << data.eval_score << " | "
+               << data.qsearch_score << '\n';
+    }
+
+    return extracted_data.size();
+}
+
+[[noreturn]] void thread_main(int thread_index, const QNetOptions& options) {
     ThreadContext ctx {};
     ctx.thread_index = thread_index;
 
@@ -440,11 +304,10 @@ void log_configuration(const NormalOptions& options) {
         white_searcher.tt().new_search();
         black_searcher.tt().new_search();
 
-        Game game = simulate_game(white_searcher, black_searcher, options);
-        std::vector<DataPoint> data = select_data_points(game, options);
+        auto data = simulate(white_searcher, black_searcher, options);
 
         std::stringstream sstream;
-        ui64 data_points = write_marlinflow(sstream, game, data);
+        ui64 data_points = write_datapoints(sstream, data);
 
         const std::string data_str = sstream.str();
         fstream << data_str << std::flush;
@@ -475,8 +338,10 @@ void log_configuration(const NormalOptions& options) {
     }
 }
 
-int run_normal_datagen(int argc, char* argv[]) {
-    NormalOptions options = parse_args(argc, argv);
+} // namespace
+
+int run_qnet_datagen(int argc, char* argv[]) {
+    QNetOptions options = parse_args(argc, argv);
 
     std::cout << "Starting data generation with " << options.threads << " threads." << std::endl;
     log_configuration(options);
@@ -492,4 +357,4 @@ int run_normal_datagen(int argc, char* argv[]) {
     thread_main(0, options);
 }
 
-} // namespace illumina
+} // illumina

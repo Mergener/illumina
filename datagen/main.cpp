@@ -8,9 +8,11 @@
 namespace illumina {
 
 int run_normal_datagen(int argc, char* argv[]);
+int run_qnet_datagen(int argc, char* argv[]);
 
 static std::unordered_map<std::string, std::function<int(int, char**)>> s_modes = {
     { "normal", run_normal_datagen },
+    { "qnet", run_qnet_datagen },
 };
 
 static const auto s_default_mode = run_normal_datagen;

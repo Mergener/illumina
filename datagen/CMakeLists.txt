@@ -1,6 +1,6 @@
 foreach (ARCH ${ARCHS})
     set(TARGET datagen_${ARCH})
-    add_executable(${TARGET} main.cpp normal.cpp logger.cpp logger.h)
+    add_executable(${TARGET} main.cpp normal.cpp qnet.cpp logger.cpp logger.h common.h)
     apply_arch_options(${TARGET} ${ARCH})
     set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME datagen_${ARCH})
     target_link_libraries(${TARGET} PRIVATE illumina_lib_${ARCH})

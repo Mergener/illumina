@@ -765,6 +765,15 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
         Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
+
+        if (   PV_NODE
+            && score > alpha
+            && score < beta
+            && !in_check
+            && m_settings->post_qsearch_handler != nullptr) {
+            m_settings->post_qsearch_handler(m_board, raw_eval, score);
+        }
+
         TRACE_SET(Traceable::SCORE, score);
         return score;
     }

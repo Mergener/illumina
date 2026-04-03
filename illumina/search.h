@@ -41,6 +41,12 @@ struct SearchSettings {
     std::optional<i64>   move_time;
     std::optional<std::vector<Move>> search_moves;
     ISearchTracer* tracer = nullptr;
+
+    // Used for qnet datagen. Called right after qsearch ends with the current board
+    // state, static eval score and qsearch score.
+    // Only gets called for exact scores.
+    // Scores are color-to-move relative.
+    std::function<void(const Board&, Score, Score)> post_qsearch_handler;
 };
 
 struct SearchResults {
