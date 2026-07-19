@@ -16,6 +16,7 @@ static constexpr size_t CORRHIST_ENTRIES = 16384;
 static constexpr int CORRHIST_GRAIN = 256;
 static constexpr int CORRHIST_BASE_WEIGHT = 1024;
 static constexpr int MAX_CORRHIST = 16384;
+static constexpr int CONTHIST_N_PLIES = 1;
 
 template <typename T>
 struct ButterflyArray : std::array<std::array<T, SQ_COUNT>, SQ_COUNT> {
@@ -52,11 +53,12 @@ public:
     int correct_eval_with_corrhist(const Board& board,
                                    int static_eval) const;
 
-    int  quiet_history(Move move, Move last_move) const;
+    int  quiet_history(Move move, const Board& board, Depth ply) const;
     void update_quiet_history(Move move,
-                              Move last_move,
+                              const Board& board,
                               Depth depth,
-                              bool good);
+                              bool good,
+                              Depth ply);
 
     MoveHistory();
 
@@ -69,7 +71,7 @@ private:
         CorrhistTable non_pawn_corrhist;
         std::array<std::array<Move, 2>, MAX_DEPTH> killers {};
         ButterflyArray<int> main_history {};
-        PieceToArray<PieceToArray<int>> counter_move_history {};
+        std::array<PieceToArray<PieceToArray<int>>, CONTHIST_N_PLIES> cont_hist {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
@@ -129,19 +131,31 @@ inline void MoveHistory::reset() {
     std::memset(m_data.get(), 0, sizeof(Data));
 }
 
-inline int MoveHistory::quiet_history(Move move, Move last_move) const {
-    return int(
-               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move))
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->counter_move_history.get(last_move).get(move)));
+inline int MoveHistory::quiet_history(Move move, const Board& board, Depth ply) const {
+    auto hist = i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move));
+
+    for (auto i = 0; i < CONTHIST_N_PLIES && i < ply; ++i) {
+        Move previous_move = board.last_move(i);
+        if (previous_move != MOVE_NULL) {
+            hist += MV_HIST_COUNTER_MOVE_WEIGHT * m_data->cont_hist[i].get(previous_move).get(move);
+        }
+    }
+
+    return static_cast<int>(hist);
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
-                                              Move last_move,
+                                              const Board& board,
                                               Depth depth,
-                                              bool good) {
+                                              bool good,
+                                              Depth ply) {
     update_history_by_depth(m_data->main_history.get(move), depth, good);
-    if (last_move != MOVE_NULL) {
-        update_history_by_depth(m_data->counter_move_history.get(last_move).get(move), depth, good);
+
+    for (auto i = 0; i < CONTHIST_N_PLIES && i < ply; ++i) {
+        Move previous_move = board.last_move(i);
+        if (previous_move != MOVE_NULL) {
+            update_history_by_depth(m_data->cont_hist[i].get(previous_move).get(move), depth, good);
+        }
     }
 }
 

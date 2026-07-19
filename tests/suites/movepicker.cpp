@@ -124,7 +124,7 @@ void test_move_picker() {
                     // Save all history.
                     for (auto& h: history) {
                         auto [depth, src, dest] = h;
-                        mv_hist.update_quiet_history(Move::new_normal(src, dest, WHITE_QUEEN), MOVE_NULL, depth, true);
+                        mv_hist.update_quiet_history(Move::new_normal(src, dest, WHITE_QUEEN), board, depth, true, ply);
                     }
                 }
             }
@@ -161,7 +161,7 @@ void test_move_picker() {
                     for (int i = 0; i < 100; ++i) {
                         // Pick a move.
                         Move move = validation_moves[random(size_t(0), n_expected_moves)];
-                        mv_hist.update_quiet_history(move, MOVE_NULL, random(1, 15), true);
+                        mv_hist.update_quiet_history(move, board, random(1, 15), true, ply);
                     }
                 }
                 else {
@@ -379,4 +379,20 @@ TEST_CASE(MovePickerTestsMetamorphic) {
 
 TEST_CASE(MovePickerQuiesceTestsMetamorphic) {
     test_move_picker<true, true>();
+}
+
+TEST_CASE(MoveHistoryIgnoresNullMoveContinuations) {
+    Board board = Board::standard_startpos();
+    board.make_null_move();
+
+    Move move = Move::parse_uci(board, "e7e6");
+    MoveHistory root_history;
+    MoveHistory null_move_history;
+
+    root_history.update_quiet_history(move, board, Depth(8), true, Depth(0));
+    null_move_history.update_quiet_history(move, board, Depth(8), true, Depth(1));
+
+    int expected = root_history.quiet_history(move, board, false, Depth(1));
+    int actual = null_move_history.quiet_history(move, board, false, Depth(1));
+    EXPECT(actual).to_be(expected);
 }

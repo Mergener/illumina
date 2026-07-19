@@ -896,7 +896,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
         }
 
-        auto move_history = m_hist.quiet_history(move, m_board.last_move());
+        auto move_history = m_hist.quiet_history(move, m_board, ply);
 
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
@@ -982,9 +982,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
                 for (Move quiet: quiets_played) {
                     m_hist.update_quiet_history(quiet,
-                                                m_board.last_move(),
+                                                m_board,
                                                 depth,
-                                                quiet == best_move);
+                                                quiet == best_move,
+                                                ply);
                 }
             }
 
