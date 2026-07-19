@@ -135,7 +135,10 @@ inline int MoveHistory::quiet_history(Move move, const Board& board, bool gives_
     auto hist = i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move));
 
     for (auto i = 0; i < CONTHIST_N_PLIES && i < ply; ++i) {
-        hist += MV_HIST_COUNTER_MOVE_WEIGHT * m_data->cont_hist[i].get(board.last_move(i)).get(move);
+        Move previous_move = board.last_move(i);
+        if (previous_move != MOVE_NULL) {
+            hist += MV_HIST_COUNTER_MOVE_WEIGHT * m_data->cont_hist[i].get(previous_move).get(move);
+        }
     }
 
     return static_cast<int>(hist);
@@ -149,7 +152,10 @@ inline void MoveHistory::update_quiet_history(Move move,
     update_history_by_depth(m_data->main_history.get(move), depth, good);
 
     for (auto i = 0; i < CONTHIST_N_PLIES && i < ply; ++i) {
-        update_history_by_depth(m_data->cont_hist[i].get(board.last_move(i)).get(move), depth, good);
+        Move previous_move = board.last_move(i);
+        if (previous_move != MOVE_NULL) {
+            update_history_by_depth(m_data->cont_hist[i].get(previous_move).get(move), depth, good);
+        }
     }
 }
 
