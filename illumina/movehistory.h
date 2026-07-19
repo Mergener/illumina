@@ -16,7 +16,7 @@ static constexpr size_t CORRHIST_ENTRIES = 16384;
 static constexpr int CORRHIST_GRAIN = 256;
 static constexpr int CORRHIST_BASE_WEIGHT = 1024;
 static constexpr int MAX_CORRHIST = 16384;
-static constexpr int CONTHIST_N_PLIES = 1;
+static constexpr int CONTHIST_N_PLIES = 2;
 
 template <typename T>
 struct ButterflyArray : std::array<std::array<T, SQ_COUNT>, SQ_COUNT> {
