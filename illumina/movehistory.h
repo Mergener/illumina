@@ -53,7 +53,7 @@ public:
     int correct_eval_with_corrhist(const Board& board,
                                    int static_eval) const;
 
-    int  quiet_history(Move move, const Board& board, bool gives_check, Depth ply) const;
+    int  quiet_history(Move move, const Board& board, Depth ply) const;
     void update_quiet_history(Move move,
                               const Board& board,
                               Depth depth,
@@ -131,7 +131,7 @@ inline void MoveHistory::reset() {
     std::memset(m_data.get(), 0, sizeof(Data));
 }
 
-inline int MoveHistory::quiet_history(Move move, const Board& board, bool gives_check, Depth ply) const {
+inline int MoveHistory::quiet_history(Move move, const Board& board, Depth ply) const {
     auto hist = i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move));
 
     for (auto i = 0; i < CONTHIST_N_PLIES && i < ply; ++i) {

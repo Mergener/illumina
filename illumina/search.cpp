@@ -896,6 +896,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
         }
 
+        auto move_history = m_hist.quiet_history(move, m_board, ply);
+
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
 
@@ -911,10 +913,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 reductions += !improving;
 
                 // Further reduce moves that have been historically very bad.
-                reductions += m_hist.quiet_history(move,
-                                                   m_board,
-                                                   m_board.gives_check(move),
-                                                   ply) <= LMR_BAD_HISTORY_THRESHOLD;
+                reductions += move_history <= LMR_BAD_HISTORY_THRESHOLD;
 
                 // Don't reduce nodes that have been on the PV as much.
                 reductions -= ttpv;
