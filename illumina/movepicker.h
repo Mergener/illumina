@@ -459,7 +459,7 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     }
     else {
         // Adjust score based on move history.
-        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move(), m_board->gives_check(move)));
+        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move()));
     }
 }
 
