@@ -257,7 +257,7 @@ inline void Board::set_castle_rook_square(Color color, Side side, Square square)
 }
 
 inline bool Board::has_castling_rights(Color color, Side side) const {
-    ui8 idx = color * 2 + ui8(side);
+    auto idx = ui8(color * 2 + ui8(side));
     return (castling_rights() & BIT(idx)) != 0;
 }
 
@@ -312,8 +312,8 @@ inline void Board::set_castling_rights(CastlingRights castling_rights) {
 }
 
 inline void Board::set_castling_rights(Color color, Side side, bool allow) {
-    CastlingRights curr_rights = castling_rights();
-    ui8 bit = color * 2 + side;
+    auto curr_rights = castling_rights();
+    auto bit = ui8(color * 2 + side);
 
     if (allow) {
         set_castling_rights(set_bit(curr_rights, bit));
@@ -335,7 +335,7 @@ template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::set_piece_at_internal(Square s, Piece p) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-    Piece prev_piece = piece_at(s);
+    auto prev_piece = piece_at(s);
     if (p == prev_piece) {
         return;
     }
@@ -370,10 +370,10 @@ inline void Board::piece_added(Square s, Piece p) {
         m_listener.on_add_piece(*this, p, s);
     }
 
-    Color piece_color = p.color();
+    auto piece_color = p.color();
 
-    Bitboard& new_color_bb  = color_bb_ref(piece_color);
-    Bitboard& new_piece_bb  = piece_bb_ref(p);
+    auto& new_color_bb  = color_bb_ref(piece_color);
+    auto& new_piece_bb  = piece_bb_ref(p);
 
     new_piece_bb = set_bit(new_piece_bb, s);
     new_color_bb = set_bit(new_color_bb, s);
@@ -394,13 +394,13 @@ inline void Board::piece_added(Square s, Piece p) {
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_removed(Square s) {
-    Piece prev_piece = piece_at(s);
+    auto prev_piece = piece_at(s);
     if (m_listener.on_remove_piece) {
         m_listener.on_remove_piece(*this, prev_piece, s);
     }
 
-    Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
-    Bitboard& prev_color_bb = color_bb_ref(prev_piece.color());
+    auto& prev_piece_bb = piece_bb_ref(prev_piece);
+    auto& prev_color_bb = color_bb_ref(prev_piece.color());
 
     prev_piece_bb = unset_bit(prev_piece_bb, s);
     prev_color_bb = unset_bit(prev_color_bb, s);
@@ -434,7 +434,7 @@ inline Square Board::first_attacker_of(Color c, Square s) const {
 
 template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>
 inline Square Board::first_attacker_of(Color c, Square s, Bitboard occ) const {
-    Bitboard their_pawns   = piece_bb(Piece(c, PT_PAWN));
+    auto their_pawns   = piece_bb(Piece(c, PT_PAWN));
     Bitboard pawn_targets;
     if constexpr (QUIET_PAWN_MOVES) {
         pawn_targets = pawn_pushes(s, opposite_color(c), occ);
@@ -442,43 +442,43 @@ inline Square Board::first_attacker_of(Color c, Square s, Bitboard occ) const {
     else {
         pawn_targets = pawn_attacks(s, opposite_color(c));
     }
-    Bitboard pawn_attacker = pawn_targets & their_pawns;
+    auto pawn_attacker = pawn_targets & their_pawns;
     if (pawn_attacker) {
         return lsb(pawn_attacker);
     }
 
-    Bitboard their_knights   = piece_bb(Piece(c, PT_KNIGHT));
-    Bitboard knight_atks     = knight_attacks(s);
-    Bitboard knight_attacker = knight_atks & their_knights;
+    auto their_knights   = piece_bb(Piece(c, PT_KNIGHT));
+    auto knight_atks     = knight_attacks(s);
+    auto knight_attacker = knight_atks & their_knights;
     if (knight_attacker) {
         return lsb(knight_attacker);
     }
 
-    Bitboard their_bishops   = piece_bb(Piece(c, PT_BISHOP));
-    Bitboard bishop_atks     = bishop_attacks(s, occ);
-    Bitboard bishop_attacker = bishop_atks & their_bishops;
+    auto their_bishops   = piece_bb(Piece(c, PT_BISHOP));
+    auto bishop_atks     = bishop_attacks(s, occ);
+    auto bishop_attacker = bishop_atks & their_bishops;
     if (bishop_attacker) {
         return lsb(bishop_attacker);
     }
 
-    Bitboard their_rooks   = piece_bb(Piece(c, PT_ROOK));
-    Bitboard rook_atks     = rook_attacks(s, occ);
-    Bitboard rook_attacker = rook_atks & their_rooks;
+    auto their_rooks   = piece_bb(Piece(c, PT_ROOK));
+    auto rook_atks     = rook_attacks(s, occ);
+    auto rook_attacker = rook_atks & their_rooks;
     if (rook_attacker) {
         return lsb(rook_attacker);
     }
 
-    Bitboard their_queens   = piece_bb(Piece(c, PT_QUEEN));
-    Bitboard queen_atks     = rook_atks | bishop_atks;
-    Bitboard queen_attacker = queen_atks & their_queens;
+    auto their_queens   = piece_bb(Piece(c, PT_QUEEN));
+    auto queen_atks     = rook_atks | bishop_atks;
+    auto queen_attacker = queen_atks & their_queens;
     if (queen_attacker) {
         return lsb(queen_attacker);
     }
 
     if constexpr (!EXCLUDE_KING_ATKS) {
-        Bitboard their_king_bb  = piece_bb(Piece(c, PT_KING));
-        Bitboard king_atks      = king_attacks(s);
-        Bitboard king_attacker  = king_atks & their_king_bb;
+        auto their_king_bb  = piece_bb(Piece(c, PT_KING));
+        auto king_atks      = king_attacks(s);
+        auto king_attacker  = king_atks & their_king_bb;
         if (king_attacker) {
             return lsb(king_attacker);
         }
@@ -495,10 +495,10 @@ inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
     if constexpr (pt == PT_KING) {
         return piece_bb(Piece(c, PT_KING)) & king_attacks(s);
     }
-    Bitboard occ = occupancy();
+    auto occ = occupancy();
     if constexpr (pt == PT_PAWN) {
         Bitboard pawn_targets;
-        Bitboard our_pawns = piece_bb(Piece(c, PT_PAWN));
+        auto our_pawns = piece_bb(Piece(c, PT_PAWN));
         if constexpr (QUIET_PAWN_MOVES) {
             pawn_targets = reverse_pawn_pushes(s, c, occ & ~(our_pawns));
         }
@@ -521,7 +521,7 @@ inline Bitboard Board::all_attackers_of_type(Color c, Square s) const {
 
 template <bool QUIET_PAWN_MOVES, bool EXCLUDE_KING_ATKS>
 inline Bitboard Board::all_attackers_of(Color c, Square s) const {
-    Bitboard ret = 0;
+    auto ret = Bitboard(0);
 
     ret |= all_attackers_of_type<PT_PAWN, QUIET_PAWN_MOVES>(c, s);
     ret |= all_attackers_of_type<PT_KNIGHT>(c, s);
@@ -538,25 +538,25 @@ inline Bitboard Board::all_attackers_of(Color c, Square s) const {
 
 template <bool CHECK>
 inline bool Board::is_move_legal(Move move) const {
-    Color us        = color_to_move();
-    Square our_king = king_square(us);
+    auto us        = color_to_move();
+    auto our_king = king_square(us);
     if (our_king == SQ_NULL) {
         // Any pseudo legal move is legal with no king
         // on the board.
         return true;
     }
 
-    Color them      = opposite_color(us);
-    Bitboard occ    = occupancy();
-    Square src      = move.source();
-    Square dest     = move.destination();
-    Piece src_piece = move.source_piece();
+    auto them      = opposite_color(us);
+    auto occ    = occupancy();
+    auto src      = move.source();
+    auto dest     = move.destination();
+    auto src_piece = move.source_piece();
 
     // Regardless of the position being a check or not, pinned
     // pieces can only move alongside their pins.
     if (is_pinned(src)) {
-        Square pinner    = m_pinners[src];
-        Bitboard between = between_bb(our_king, pinner);
+        auto pinner    = m_pinners[src];
+        auto between = between_bb(our_king, pinner);
         between          = set_bit(between, pinner);
 
         if (!bit_is_set(between, dest)) {
@@ -567,26 +567,26 @@ inline bool Board::is_move_legal(Move move) const {
 
     // En-passant must be treated with extra care.
     if (move.type() == MT_EN_PASSANT) {
-        Square capt_pawn_sq = dest + pawn_push_direction(them);
-        Bitboard ep_occ     = occ;
+        auto capt_pawn_sq = dest + pawn_push_direction(them);
+        auto ep_occ     = occ;
 
         // Pretend there are no pawns
         ep_occ = unset_bit(ep_occ, capt_pawn_sq);
         ep_occ = unset_bit(ep_occ, src);
 
-        Bitboard king_rank_bb = rank_bb(square_rank(our_king));
+        auto king_rank_bb = rank_bb(square_rank(our_king));
 
-        Bitboard their_rooks    = piece_bb(Piece(them, PT_ROOK));
-        Bitboard their_queens   = piece_bb(Piece(them, PT_QUEEN));
-        Bitboard their_hor_atks = rook_attacks(our_king, ep_occ) & (their_rooks | their_queens) & king_rank_bb;
+        auto their_rooks    = piece_bb(Piece(them, PT_ROOK));
+        auto their_queens   = piece_bb(Piece(them, PT_QUEEN));
+        auto their_hor_atks = rook_attacks(our_king, ep_occ) & (their_rooks | their_queens) & king_rank_bb;
 
         if (rook_attacks(our_king, ep_occ) & their_hor_atks) {
             return false;
         }
 
         if (CHECK) {
-            Bitboard their_bishops        = piece_bb(Piece(them, PT_BISHOP));
-            Bitboard their_diag_attackers = their_bishops | their_queens;
+            auto their_bishops        = piece_bb(Piece(them, PT_BISHOP));
+            auto their_diag_attackers = their_bishops | their_queens;
             if (bishop_attacks(our_king, occ) & their_diag_attackers) {
                 return false;
             }
@@ -600,18 +600,18 @@ inline bool Board::is_move_legal(Move move) const {
 
         // The conditional above does not cover cases where the king runs
         // in the same direction a slider is attacking them.
-        Bitboard occ_without_king = occ & (~BIT(our_king));
+        auto occ_without_king = occ & (~BIT(our_king));
 
-        Bitboard their_bishops = piece_bb(Piece(them, PT_BISHOP));
-        Bitboard their_rooks   = piece_bb(Piece(them, PT_ROOK));
-        Bitboard their_queens  = piece_bb(Piece(them, PT_QUEEN));
+        auto their_bishops = piece_bb(Piece(them, PT_BISHOP));
+        auto their_rooks   = piece_bb(Piece(them, PT_ROOK));
+        auto their_queens  = piece_bb(Piece(them, PT_QUEEN));
 
-        Bitboard their_diag_atks = bishop_attacks(dest, occ_without_king) & (their_bishops | their_queens);
+        auto their_diag_atks = bishop_attacks(dest, occ_without_king) & (their_bishops | their_queens);
         if (their_diag_atks != 0) {
             return false;
         }
 
-        Bitboard their_line_atks = rook_attacks(dest, occ_without_king) & (their_rooks | their_queens);
+        auto their_line_atks = rook_attacks(dest, occ_without_king) & (their_rooks | their_queens);
         if (their_line_atks != 0) {
             return false;
         }
@@ -625,8 +625,8 @@ inline bool Board::is_move_legal(Move move) const {
         // We're in a single check and trying to move a piece that is not the king.
         // The piece we're trying to move can only move to a square between the king
         // and the checker...
-        Square atk_square = first_attacker_of(them, our_king);
-        Bitboard between  = between_bb(our_king, atk_square);
+        auto atk_square = first_attacker_of(them, our_king);
+        auto between  = between_bb(our_king, atk_square);
         between = set_bit(between, atk_square); // ... or capture the checker!
 
         if (!bit_is_set(between, dest)) {

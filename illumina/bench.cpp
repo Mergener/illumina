@@ -35,15 +35,15 @@ BenchResults bench(const BenchSettings& settings) {
     searcher.tt().resize(settings.hash_size_mb * 1024 * 1024);
 
     // Search every position.
-    TimePoint before = Clock::now();
+    auto before = Clock::now();
     BenchResults results;
     for (const Board& board: settings.boards) {
         searcher.tt().new_search();
 
-        TimePoint search_before = Clock::now();
-        SearchResults search_results = searcher.search(board,
+        auto search_before = Clock::now();
+        auto search_results = searcher.search(board,
                                                        settings.search_settings);
-        TimePoint search_after = Clock::now();
+        auto search_after = Clock::now();
 
         results.search_time_ms += delta_ms(search_after, search_before);
         results.total_nodes += search_results.total_nodes;
@@ -53,8 +53,8 @@ BenchResults bench(const BenchSettings& settings) {
             settings.on_board_searched(board, search_results.score, search_results.best_move);
         }
     }
-    TimePoint after = Clock::now();
-    ui64 elapsed_ms = delta_ms(after, before);
+    auto after = Clock::now();
+    auto elapsed_ms = delta_ms(after, before);
 
     // Compute NPS and save final results to bench results object.
     results.bench_time_ms = elapsed_ms;

@@ -87,12 +87,12 @@ Bitboard g_rook_attacks[SQ_COUNT][N_ATTACK_KEYS]{};
 static Bitboard compute_ray_attacks_direction(Square src_square,
                                               Direction direction,
                                               Bitboard occupancy) {
-    Bitboard attacks = 0;
-    Square current_square = src_square;
+    auto attacks = Bitboard(0);
+    auto current_square = src_square;
 
     while (true) {
-        BoardFile file = square_file(current_square);
-        BoardRank rank = square_rank(current_square);
+        auto file = square_file(current_square);
+        auto rank = square_rank(current_square);
 
         if ((direction == DIR_NORTH || direction == DIR_NORTHWEST || direction == DIR_NORTHEAST)
             && rank == RNK_8) {
@@ -129,7 +129,7 @@ static Bitboard compute_ray_attacks_direction(Square src_square,
 static Bitboard compute_ray_attacks(Square src_square,
                                     Bitboard pseudo_attacks,
                                     Bitboard occupancy) {
-    Bitboard attacks = 0;
+    auto attacks = Bitboard(0);
 
     for (Direction d: DIRECTIONS) {
         attacks |= compute_ray_attacks_direction(src_square, d, occupancy);
@@ -143,18 +143,18 @@ static Bitboard compute_ray_attacks(Square src_square,
 static void generate_slider_attacks(const Bitboard masks[SQ_COUNT],
                                     const Bitboard all_pseudo_attacks[SQ_COUNT],
                                     Bitboard attacks[SQ_COUNT][N_ATTACK_KEYS]) {
-    for (Square s = 0; s < SQ_COUNT; ++s) {
-        Bitboard mask = masks[s];
+    for (auto s = Square(0); s < SQ_COUNT; ++s) {
+        auto mask = masks[s];
 
-        Bitboard pseudo_attacks = all_pseudo_attacks[s];
+        auto pseudo_attacks = all_pseudo_attacks[s];
 
         // We can use the Carry-Rippler algorithm to extract all relevant
         // occupancies from a pseudo-attacks bitboard. Note that we can ignore
         // bits on the outer edges since they would never block any other square.
-        Bitboard occ = 0;
+        auto occ = Bitboard(0);
         do {
-            ui64 key = _pext_u64(occ, mask);
-            Bitboard ray_attacks = compute_ray_attacks(s, pseudo_attacks, occ);
+            auto key = _pext_u64(occ, mask);
+            auto ray_attacks = compute_ray_attacks(s, pseudo_attacks, occ);
             attacks[s][key] = ray_attacks;
             occ = (occ - mask) & mask;
         } while (occ);

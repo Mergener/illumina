@@ -162,8 +162,8 @@ template <typename TOption, typename... TArgs>
 inline TOption& UCIOptionManager::register_option(const std::string& name, TArgs&&... args) {
     static_assert(std::is_base_of_v<UCIOption, TOption>, "TOption must be derived from UCIOption.");
 
-    std::unique_ptr<TOption> option_ptr = std::make_unique<TOption>(name, args...);
-    TOption& option = *option_ptr;
+    auto option_ptr = std::make_unique<TOption>(name, args...);
+    auto& option = *option_ptr;
     m_options[name] = std::move(option_ptr);
 
     return option;
@@ -174,7 +174,7 @@ T& UCIOptionManager::option(std::string_view name) {
     static_assert(std::is_base_of_v<UCIOption, T>,
                   "T must be derived from UCIOption.");
 
-    std::string name_str = std::string(name);
+    auto name_str = std::string(name);
     auto it = m_options.find(name_str);
     if (it == m_options.end()) {
         throw std::out_of_range("Option not found: " + name_str);
@@ -187,7 +187,7 @@ const T& UCIOptionManager::option(std::string_view name) const {
     static_assert(std::is_base_of_v<UCIOption, T>,
                   "T must be derived from UCIOption.");
 
-    std::string name_str = std::string(name);
+    auto name_str = std::string(name);
     auto it = m_options.find(name_str);
     if (it == m_options.end()) {
         throw std::out_of_range("Option not found: " + name_str);

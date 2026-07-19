@@ -66,15 +66,15 @@ private:
 
 template <Color C>
 size_t NNUE::feature_index(Square square, Piece piece) {
-    Color color     = piece.color();
-    size_t type_idx = piece.type() - 1;
+    auto color     = piece.color();
+    auto type_idx = size_t(piece.type() - 1);
 
     if constexpr (C == CL_BLACK) {
         square = mirror_vertical(square);
         color  = opposite_color(color);
     }
 
-    size_t index = 0;
+    auto index = size_t(0);
     index = index * CL_COUNT + color;
     index = index * (PT_COUNT - 1) + type_idx;
     index = index * SQ_COUNT + square;
@@ -120,71 +120,71 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
     }
 
 #ifdef HAS_AVX2
-    constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
-    for (size_t i = 0; i < L1_SIZE; i += STRIDE) {
-        __m256i* white_accum_ptr = reinterpret_cast<__m256i*>(&m_accum.white[i]);
-        __m256i* black_accum_ptr = reinterpret_cast<__m256i*>(&m_accum.black[i]);
+    constexpr auto STRIDE = sizeof(__m256i) / sizeof(i16);
+    for (auto i = size_t(0); i < L1_SIZE; i += STRIDE) {
+        auto* white_accum_ptr = reinterpret_cast<__m256i*>(&m_accum.white[i]);
+        auto* black_accum_ptr = reinterpret_cast<__m256i*>(&m_accum.black[i]);
 
         if constexpr (N_ENABLED >= 1) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_white_idxs[0] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(white_accum_ptr);
-            __m256i sum     = _mm256_add_epi16(accum, weights);
+            const auto* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_white_idxs[0] * L1_SIZE + i]);
+            auto weights = _mm256_load_si256(weights_ptr);
+            auto accum   = _mm256_load_si256(white_accum_ptr);
+            auto sum     = _mm256_add_epi16(accum, weights);
             _mm256_store_si256(white_accum_ptr, sum);
         }
         if constexpr (N_ENABLED >= 2) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_white_idxs[1] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(white_accum_ptr);
-            __m256i sum     = _mm256_add_epi16(accum, weights);
+            const auto* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_white_idxs[1] * L1_SIZE + i]);
+            auto weights = _mm256_load_si256(weights_ptr);
+            auto accum   = _mm256_load_si256(white_accum_ptr);
+            auto sum     = _mm256_add_epi16(accum, weights);
             _mm256_store_si256(white_accum_ptr, sum);
         }
         if constexpr (N_DISABLED >= 1) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_white_idxs[0] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(white_accum_ptr);
-            __m256i sub     = _mm256_sub_epi16(accum, weights);
+            const auto* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_white_idxs[0] * L1_SIZE + i]);
+            auto weights = _mm256_load_si256(weights_ptr);
+            auto accum   = _mm256_load_si256(white_accum_ptr);
+            auto sub     = _mm256_sub_epi16(accum, weights);
             _mm256_store_si256(white_accum_ptr, sub);
         }
         if constexpr (N_DISABLED >= 2) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_white_idxs[1] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(white_accum_ptr);
-            __m256i sub     = _mm256_sub_epi16(accum, weights);
+            const auto* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_white_idxs[1] * L1_SIZE + i]);
+            auto weights = _mm256_load_si256(weights_ptr);
+            auto accum   = _mm256_load_si256(white_accum_ptr);
+            auto sub     = _mm256_sub_epi16(accum, weights);
             _mm256_store_si256(white_accum_ptr, sub);
         }
 
         if constexpr (N_ENABLED >= 1) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_black_idxs[0] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(black_accum_ptr);
-            __m256i sum     = _mm256_add_epi16(accum, weights);
+            const auto* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_black_idxs[0] * L1_SIZE + i]);
+            auto weights = _mm256_load_si256(weights_ptr);
+            auto accum   = _mm256_load_si256(black_accum_ptr);
+            auto sum     = _mm256_add_epi16(accum, weights);
             _mm256_store_si256(black_accum_ptr, sum);
         }
         if constexpr (N_ENABLED >= 2) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_black_idxs[1] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(black_accum_ptr);
-            __m256i sum     = _mm256_add_epi16(accum, weights);
+            const auto* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_black_idxs[1] * L1_SIZE + i]);
+            auto weights = _mm256_load_si256(weights_ptr);
+            auto accum   = _mm256_load_si256(black_accum_ptr);
+            auto sum     = _mm256_add_epi16(accum, weights);
             _mm256_store_si256(black_accum_ptr, sum);
         }
         if constexpr (N_DISABLED >= 1) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_black_idxs[0] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(black_accum_ptr);
-            __m256i sub     = _mm256_sub_epi16(accum, weights);
+            const auto* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_black_idxs[0] * L1_SIZE + i]);
+            auto weights = _mm256_load_si256(weights_ptr);
+            auto accum   = _mm256_load_si256(black_accum_ptr);
+            auto sub     = _mm256_sub_epi16(accum, weights);
             _mm256_store_si256(black_accum_ptr, sub);
         }
         if constexpr (N_DISABLED >= 2) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_black_idxs[1] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(black_accum_ptr);
-            __m256i sub     = _mm256_sub_epi16(accum, weights);
+            const auto* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_black_idxs[1] * L1_SIZE + i]);
+            auto weights = _mm256_load_si256(weights_ptr);
+            auto accum   = _mm256_load_si256(black_accum_ptr);
+            auto sub     = _mm256_sub_epi16(accum, weights);
             _mm256_store_si256(black_accum_ptr, sub);
         }
     }
 #else
-    for (size_t i = 0; i < L1_SIZE; ++i) {
+    for (auto i = size_t(0); i < L1_SIZE; ++i) {
         if constexpr (N_ENABLED >= 1) {
             m_accum.white[i] += m_net->l1_weights[en_white_idxs[0] * L1_SIZE + i];
         }

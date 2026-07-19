@@ -63,7 +63,7 @@ TEST_CASE(StaticListIterators) {
     int_list.push_back(2);
     int_list.push_back(3);
 
-    int sum = 0;
+    auto sum = 0;
     for (int& i: int_list) {
         sum += i;
     }
@@ -77,13 +77,13 @@ TEST_CASE(StaticListCopyAndAssignment) {
     int_list.push_back(2);
     int_list.push_back(3);
 
-    StaticList<int, 5> int_list_copy(int_list);
+    auto int_list_copy = StaticList<int, 5>(int_list);
     EXPECT(int_list_copy.size()).to_be(3);
     EXPECT(int_list_copy[0]).to_be(1);
     EXPECT(int_list_copy[1]).to_be(2);
     EXPECT(int_list_copy[2]).to_be(3);
 
-    StaticList<int, 5> int_list_assigned {};
+    auto int_list_assigned = StaticList<int, 5>{};
     int_list_assigned = int_list;
     EXPECT(int_list_assigned.size()).to_be(3);
     EXPECT(int_list_assigned[0]).to_be(1);

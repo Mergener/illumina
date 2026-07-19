@@ -16,10 +16,10 @@ TEST_CASE(Perft) {
         std::vector<size_t> expected_result;
 
         void run() {
-            Board board(fen);
+        auto board = Board(fen);
 
-            for (int depth = 1; depth <= std::min(expected_result.size(), size_t(5)); ++depth) {
-                ui64 res = perft(board, depth, { false });
+            for (auto depth = 1; depth <= std::min(expected_result.size(), size_t(5)); ++depth) {
+                auto res = perft(board, depth, { false });
                 EXPECT(int(res)).to_be(int(expected_result[depth - 1]));
 
                 if (depth <= 4) {

@@ -17,20 +17,20 @@ TEST_CASE(SetPieceAt) {
 
         void test() {
             // Collect values before board edition to compare later
-            ui64 prev_key      = b.hash_key();
-            Piece prev_piece   = b.piece_at(s);
-            Bitboard prev_p_bb = b.piece_bb(p);
-            Bitboard prev_prev_piece_bb = b.piece_bb(prev_piece);
+            auto prev_key      = b.hash_key();
+            auto prev_piece   = b.piece_at(s);
+            auto prev_p_bb = b.piece_bb(p);
+            auto prev_prev_piece_bb = b.piece_bb(prev_piece);
 
-            Bitboard prev_occ = b.occupancy();
+            auto prev_occ = b.occupancy();
 
             b.set_piece_at(s, p);
 
             // Get values after piece edition
-            Bitboard prev_piece_bb = b.piece_bb(prev_piece);
-            Bitboard p_bb = b.piece_bb(p);
-            Bitboard occ  = b.occupancy();
-            ui64 key      = b.hash_key();
+            auto prev_piece_bb = b.piece_bb(prev_piece);
+            auto p_bb = b.piece_bb(p);
+            auto occ  = b.occupancy();
+            auto key      = b.hash_key();
 
             EXPECT(b.piece_at(s)).to_be(p);
 
@@ -67,7 +67,7 @@ TEST_CASE(SetPieceAt) {
 
 TEST_CASE(BoardFENConstructor) {
     // Test default constructor
-    Board board_default("");
+    auto board_default = Board("");
     EXPECT(board_default.color_to_move()).to_be(CL_WHITE);
     EXPECT(board_default.occupancy()).to_be(0ULL);
     EXPECT(board_default.piece_bb(Piece(CL_WHITE, PT_PAWN))).to_be(0ULL);
@@ -94,7 +94,7 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_default.legal()).to_be(false);
 
     // Test constructor with FEN string representing the starting position
-    Board board_startpos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    auto board_startpos = Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     EXPECT(board_startpos.color_to_move()).to_be(CL_WHITE);
     EXPECT(board_startpos.occupancy()).to_be(0xffff00000000ffffULL);
     EXPECT(board_startpos.piece_bb(Piece(CL_WHITE, PT_PAWN))).to_be(0xff00ULL);
@@ -119,7 +119,7 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_startpos.legal()).to_be(true);
 
     // Test constructor with FEN string representing custom positions.
-    Board board_custompos_1("7k/8/8/3K4/8/8/P7/8 b - - 32 1");
+    auto board_custompos_1 = Board("7k/8/8/3K4/8/8/P7/8 b - - 32 1");
     EXPECT(board_custompos_1.color_to_move()).to_be(CL_BLACK);
     EXPECT(board_custompos_1.occupancy()).to_be(0x8000000800000100ULL);
     EXPECT(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_PAWN))).to_be(0x100ULL);
@@ -145,7 +145,7 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(board_custompos_1.legal()).to_be(true);
 
     // Test FRC construction with FEN.
-    Board frc_board_1("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w KQkq - 0 1");
+    auto frc_board_1 = Board("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w KQkq - 0 1");
     EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
     EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_D1);
     EXPECT(frc_board_1.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
@@ -156,7 +156,7 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_KING)).to_be(true);
     EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_QUEEN)).to_be(true);
 
-    Board frc_board_2("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w FDfd - 0 1");
+    auto frc_board_2 = Board("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w FDfd - 0 1");
     EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
     EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_D1);
     EXPECT(frc_board_1.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
@@ -167,7 +167,7 @@ TEST_CASE(BoardFENConstructor) {
     EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_KING)).to_be(true);
     EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_QUEEN)).to_be(true);
 
-    Board frc_board_3("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w Kkq - 0 1");
+    auto frc_board_3 = Board("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w Kkq - 0 1");
     EXPECT(frc_board_3.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
     EXPECT(frc_board_3.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
     EXPECT(frc_board_3.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_D8);
@@ -184,29 +184,29 @@ TEST_CASE(MakeUndoNullMove) {
         const char* fen;
 
         void run() {
-            Board board(fen);
+            auto board = Board(fen);
             if (board.in_check() || !board.legal()) {
                 // Don't test null moves in check/illegal positions.
                 return;
             }
 
-            std::string start_fen = board.fen();
-            ui64 start_key        = board.hash_key();
-            Color start_color     = board.color_to_move();
+            auto start_fen = board.fen();
+            auto start_key        = board.hash_key();
+            auto start_color     = board.color_to_move();
 
             board.make_null_move();
 
             EXPECT(board.legal()).to_be(true);
-            std::string null_fen = board.fen();
-            ui64 null_key        = board.hash_key();
-            Color null_color     = board.color_to_move();
+            auto null_fen = board.fen();
+            auto null_key        = board.hash_key();
+            auto null_color     = board.color_to_move();
 
             board.undo_null_move();
 
             EXPECT(board.legal()).to_be(true);
-            std::string curr_fen = board.fen();
-            ui64 curr_key        = board.hash_key();
-            Color curr_color     = board.color_to_move();
+            auto curr_fen = board.fen();
+            auto curr_key        = board.hash_key();
+            auto curr_color     = board.color_to_move();
 
             // Test against current values.
             EXPECT(curr_fen).to_be(start_fen);
@@ -355,15 +355,15 @@ TEST_CASE(MakeUndoNullMove) {
 
 TEST_CASE(IsMovePseudoLegal) {
     {
-        Board b("r3k2r/8/8/8/8/8/8/2R1K2R b Kkq - 0 1");
+        auto b = Board("r3k2r/8/8/8/8/8/8/2R1K2R b Kkq - 0 1");
         EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e8g8"))).to_be(true);
     }
     {
-        Board b("fen rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq d3 0 7");
+        auto b = Board("fen rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq d3 0 7");
         EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e4d3"))).to_be(true);
     }
     {
-        Board b("fen rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq - 0 7");
+        auto b = Board("fen rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq - 0 7");
         EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e4d3"))).to_be(false);
     }
 }
@@ -375,8 +375,8 @@ TEST_CASE(MoveGivesCheck) {
         bool gives_check;
 
         void run() {
-            Board board(fen);
-            Move move = Move::parse_uci(board, move_str);
+            auto board = Board(fen);
+            auto move = Move::parse_uci(board, move_str);
 
             EXPECT(board.gives_check(move)).to_be(gives_check);
         }
@@ -402,8 +402,8 @@ TEST_CASE(MoveGivesCheck) {
 TEST_CASE(PawnKeys) {
     {
         // Test for startpos.
-        Board startpos = Board::standard_startpos();
-        Board board = startpos;
+        auto startpos = Board::standard_startpos();
+        auto board = startpos;
         board.make_move(Move::parse_uci(board, "g1f3"));
         board.make_move(Move::parse_uci(board, "g8f6"));
         EXPECT(board.pawn_key()).to_be(startpos.pawn_key());

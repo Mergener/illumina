@@ -17,7 +17,7 @@ static struct {
 } s_random_context;
 
 static ui8 random_ui8() {
-    ui8 e = s_random_context.a - lrot(s_random_context.b, 7);
+    auto e = s_random_context.a - lrot(s_random_context.b, 7);
 
     s_random_context.a = s_random_context.b ^ lrot(s_random_context.c, 13);
     s_random_context.b = s_random_context.c + lrot(s_random_context.d, 37);
@@ -39,7 +39,7 @@ static ui64 random_ui64() {
 }
 
 static void fill_keys(ui64* it, size_t size) {
-    ui64* last = it + size / sizeof(ui64);
+    auto* last = it + size / sizeof(ui64);
 
     while (it != last) {
         *it = random_ui64();
@@ -56,7 +56,7 @@ void init_zob() {
     fill_keys(g_en_passant_square_keys, sizeof(g_en_passant_square_keys));
 
     // Make sure empty pieces' key is 0.
-    for (Square s = 0; s < SQ_COUNT; ++s) {
+    for (auto s = Square(0); s < SQ_COUNT; ++s) {
         g_piece_square_keys[PT_NULL][CL_WHITE][s] = 0;
         g_piece_square_keys[PT_NULL][CL_BLACK][s] = 0;
     }

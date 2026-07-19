@@ -10,14 +10,20 @@
 namespace illumina {
 
 Board::Board(std::string_view fen_str) {
-    ParseHelper parse_helper(fen_str);
+    auto parse_helper = ParseHelper(fen_str);
+
+    // Accept the optional prefix used by UCI position commands.
+    auto first_chunk = parse_helper.read_chunk();
+    if (first_chunk != "fen") {
+        parse_helper.rewind_all();
+    }
 
     // Read and parse piece list.
     {
-        std::string_view chunk = parse_helper.read_chunk();
+        auto chunk = parse_helper.read_chunk();
 
-        BoardFile file = FL_A;
-        BoardRank rank = RNK_8;
+        auto file = BoardFile(FL_A);
+        auto rank = BoardRank(RNK_8);
         for (char c: chunk) {
             if (c == '/') {
                 rank--;
@@ -28,8 +34,8 @@ Board::Board(std::string_view fen_str) {
             }
             else {
                 // Invalid piece characters will simply make empty squares.
-                Square s = make_square(file, rank);
-                Piece p  = Piece::from_char(c);
+                auto s = make_square(file, rank);
+                auto p  = Piece::from_char(c);
                 if (p == PIECE_NULL) {
                     throw std::invalid_argument(std::string("Invalid piece '") + c + "'");
                 }
@@ -44,14 +50,14 @@ Board::Board(std::string_view fen_str) {
 
     // Read and parse color to move.
     {
-        std::string_view chunk = parse_helper.read_chunk();
+        auto chunk = parse_helper.read_chunk();
         if (chunk.empty()) {
             compute_pins();
             compute_checkers();
             return;
         }
 
-        char color_char = std::tolower(chunk[0]);
+        auto color_char = char(std::tolower(chunk[0]));
         if (color_char != 'w' && color_char != 'b') {
             throw std::invalid_argument(std::string("Invalid color '") + color_char + "'");
         }
@@ -66,7 +72,7 @@ Board::Board(std::string_view fen_str) {
 
     // Read and parse castling rights.
     {
-        std::string_view chunk = parse_helper.read_chunk();
+        auto chunk = parse_helper.read_chunk();
         if (chunk.empty()) {
             return;
         }
@@ -77,8 +83,8 @@ Board::Board(std::string_view fen_str) {
                 //  Traditional - uses KQkq (uppercase for white, lowercase for black)
                 //  ShredderFen - uses file identifiers, with same capitalization rules as above
                 // We need to cater to both of them.
-                Color king_color = std::isupper(c) ? CL_WHITE : CL_BLACK;
-                Piece rook  = Piece(king_color, PT_ROOK);
+                auto king_color = std::isupper(c) ? CL_WHITE : CL_BLACK;
+                auto rook  = Piece(king_color, PT_ROOK);
 
                 switch (c) {
                     case 'K':
@@ -94,13 +100,13 @@ Board::Board(std::string_view fen_str) {
                     default:
                         // Here comes the ShredderFen type of castling rights notation for
                         // fischer random chess.
-                        BoardFile file = file_from_char(c);
+                        auto file = file_from_char(c);
                         if (file == FL_NULL) {
                             throw std::invalid_argument(std::string("Invalid castling rights token '") + c + "'");
                         }
 
-                        BoardRank rank = king_color == CL_WHITE ? RNK_1 : RNK_8;
-                        Square expected_rook_square = make_square(file, rank);
+                        auto rank = king_color == CL_WHITE ? RNK_1 : RNK_8;
+                        auto expected_rook_square = make_square(file, rank);
                         if (piece_at(expected_rook_square) != rook) {
                             throw std::invalid_argument(std::string("Expected ") + rook.to_char() + " on "
                                                         + square_name(expected_rook_square) + ", got " + piece_at(expected_rook_square).to_char()
@@ -108,7 +114,7 @@ Board::Board(std::string_view fen_str) {
                         }
 
                         // We need to detect whether this rook is a king-side or queen-side rook.
-                        Side side = file > square_file(king_square(king_color))
+                        auto side = file > square_file(king_square(king_color))
                                          ? SIDE_KING
                                          : SIDE_QUEEN;
 
@@ -122,19 +128,19 @@ Board::Board(std::string_view fen_str) {
                 }
 
                 // We have figured out our castling rights. Now we need to find the corresponding castle rooks.
-                Square king_sq          = king_square(king_color);
-                BoardRank rank          = square_rank(king_sq);
-                Bitboard eligible_rooks = rank_bb(rank) & piece_bb(rook);
+                auto king_sq          = king_square(king_color);
+                auto rank          = square_rank(king_sq);
+                auto eligible_rooks = rank_bb(rank) & piece_bb(rook);
 
-                for (size_t i = 0; i < SIDE_COUNT; ++i) {
-                    Side side = Side(i);
+                for (auto i = size_t(0); i < SIDE_COUNT; ++i) {
+                    auto side = Side(i);
                     if (!has_castling_rights(king_color, side)) {
                         // No castling rights, we don't need to worry about the rook on
                         // this side.
                         continue;
                     }
 
-                    Square& rook_square = m_castle_rook_squares[king_color][i];
+                    auto& rook_square = m_castle_rook_squares[king_color][i];
                     if (piece_at(rook_square) == rook) {
                         // We're good, m_castle_rook_squares is already pointing to a valid
                         // rook in this position.
@@ -149,7 +155,7 @@ Board::Board(std::string_view fen_str) {
 
                     // We need to figure out a rook in the king's rank that could be eligible
                     // for castling.
-                    BoardFile king_file = square_file(king_sq);
+                auto king_file = square_file(king_sq);
                     if (side == SIDE_QUEEN) {
                         rook_square = lsb(eligible_rooks);
                         eligible_rooks &= -1;
@@ -175,13 +181,13 @@ Board::Board(std::string_view fen_str) {
 
     // Read and parse en passant square.
     {
-        std::string_view chunk = parse_helper.read_chunk();
+        auto chunk = parse_helper.read_chunk();
         if (chunk.empty()) {
             return;
         }
 
         if (chunk != "-") {
-            Square ep_square = parse_square(chunk);
+            auto ep_square = parse_square(chunk);
             if (ep_square == SQ_NULL) {
                 throw std::invalid_argument(std::string("Invalid en passant square '") + std::string(chunk) + "'");
             }
@@ -191,13 +197,13 @@ Board::Board(std::string_view fen_str) {
 
     // Read and parse rule 50 counter.
     {
-        std::string_view chunk = parse_helper.read_chunk();
+        auto chunk = parse_helper.read_chunk();
         if (chunk.empty()) {
             return;
         }
 
         int rule50;
-        bool ok = try_parse_int(chunk, rule50);
+        auto ok = try_parse_int(chunk, rule50);
         if (!ok) {
             throw std::invalid_argument(std::string("Invalid half-move clock '") + std::string(chunk) + "'");
         }
@@ -206,13 +212,13 @@ Board::Board(std::string_view fen_str) {
 
     // Read and parse move counter.
     {
-        std::string_view chunk = parse_helper.read_chunk();
+        auto chunk = parse_helper.read_chunk();
         if (chunk.empty()) {
             return;
         }
 
         int move_counter;
-        bool ok = try_parse_int(chunk, move_counter);
+        auto ok = try_parse_int(chunk, move_counter);
         if (!ok) {
             throw std::invalid_argument(std::string("Invalid move counter number '") + std::string(chunk) + "'");
         }
@@ -225,11 +231,11 @@ std::string Board::fen(bool shredder_fen) const {
 
     // Write piece placements.
     for (BoardRank r: RANKS_REVERSE) {
-        int n_empty = 0;
+        auto n_empty = 0;
 
         for (BoardFile f: FILES) {
-            Square s = make_square(f, r);
-            Piece p  = piece_at(s);
+            auto s = make_square(f, r);
+            auto p  = piece_at(s);
 
             if (p != PIECE_NULL) {
                 if (n_empty > 0) {
@@ -279,7 +285,7 @@ std::string Board::fen(bool shredder_fen) const {
     stream << ' ';
 
     // Write en-passant square.
-    Square ep_sq = ep_square();
+    auto ep_sq = ep_square();
     if (ep_sq != SQ_NULL) {
         stream << square_name(ep_sq);
     }
@@ -304,8 +310,8 @@ std::string Board::pretty() const {
     for (BoardRank r: RANKS_REVERSE) {
         stream << static_cast<int>(r) + 1 << " [";
 
-        for (BoardFile f = FL_A; f <= FL_H; f++) {
-            Square s = make_square(f, r);
+        for (auto f = BoardFile(FL_A); f <= FL_H; f++) {
+            auto s = make_square(f, r);
 
             stream << " " << piece_at(s).to_char();
         }
@@ -320,12 +326,12 @@ void Board::make_move(Move move) {
         m_listener.on_make_move(*this, move);
     }
 
-    Color moving_color  = color_to_move();
-    Color opponent      = opposite_color(color_to_move());
-    Square source       = move.source();
-    Square destination  = move.destination();
-    Piece source_piece  = move.source_piece();
-    PieceType source_pt = source_piece.type();
+    auto moving_color  = color_to_move();
+    auto opponent      = opposite_color(color_to_move());
+    auto source       = move.source();
+    auto destination  = move.destination();
+    auto source_piece  = move.source_piece();
+    auto source_pt = source_piece.type();
 
     m_prev_states.push_back(m_state);
     m_state.rule50++;
@@ -388,8 +394,8 @@ void Board::make_move(Move move) {
             set_ep_square(SQ_NULL);
             set_piece_at_internal<true, false>(destination, source_piece);
 
-            Square prev_rook_square = move.castles_rook_src_square();
-            Side castling_side      = move.castles_side();
+            auto prev_rook_square = move.castles_rook_src_square();
+            auto castling_side      = move.castles_side();
 
             // Move the rook.
             if (piece_at(prev_rook_square).type() != PT_KING) {
@@ -413,17 +419,17 @@ void Board::make_move(Move move) {
 }
 
 void Board::undo_move() {
-    Move move = last_move();
+    auto move = last_move();
     if (m_listener.on_undo_move) {
         m_listener.on_undo_move(*this, move);
     }
 
     set_color_to_move(opposite_color(color_to_move()));
-    Color moving_color = color_to_move();
+    auto moving_color = color_to_move();
 
-    Square source       = move.source();
-    Square destination  = move.destination();
-    Piece source_piece  = move.source_piece();
+    auto source       = move.source();
+    auto destination  = move.destination();
+    auto source_piece  = move.source_piece();
 
     set_piece_at_internal<true, false>(source, source_piece);
 
@@ -446,11 +452,11 @@ void Board::undo_move() {
                 set_piece_at_internal<true, false>(destination, PIECE_NULL);
             }
 
-            Square prev_rook_square = move.castles_rook_src_square();
-            Side castling_side      = move.castles_side();
+            auto prev_rook_square = move.castles_rook_src_square();
+            auto castling_side      = move.castles_side();
 
             // Move the rook.
-            Square castled_rook_sq = castled_rook_square(moving_color, castling_side);
+            auto castled_rook_sq = castled_rook_square(moving_color, castling_side);
             if (piece_at(castled_rook_sq).type() != PT_KING) {
                 set_piece_at_internal<true, false>(castled_rook_sq,
                                                    PIECE_NULL);
@@ -475,44 +481,44 @@ bool Board::is_attacked_by(Color c, Square s) const {
 }
 
 bool Board::is_attacked_by(Color c, Square s, Bitboard occ) const {
-    Bitboard their_bishops   = piece_bb(Piece(c, PT_BISHOP));
-    Bitboard bishop_atks     = bishop_attacks(s, occ);
-    Bitboard bishop_attacker = bishop_atks & their_bishops;
+    auto their_bishops   = piece_bb(Piece(c, PT_BISHOP));
+    auto bishop_atks     = bishop_attacks(s, occ);
+    auto bishop_attacker = bishop_atks & their_bishops;
     if (bishop_attacker) {
         return true;
     }
 
-    Bitboard their_rooks   = piece_bb(Piece(c, PT_ROOK));
-    Bitboard rook_atks     = rook_attacks(s, occ);
-    Bitboard rook_attacker = rook_atks & their_rooks;
+    auto their_rooks   = piece_bb(Piece(c, PT_ROOK));
+    auto rook_atks     = rook_attacks(s, occ);
+    auto rook_attacker = rook_atks & their_rooks;
     if (rook_attacker) {
         return true;
     }
 
-    Bitboard their_queens   = piece_bb(Piece(c, PT_QUEEN));
-    Bitboard queen_atks     = rook_atks | bishop_atks;
-    Bitboard queen_attacker = queen_atks & their_queens;
+    auto their_queens   = piece_bb(Piece(c, PT_QUEEN));
+    auto queen_atks     = rook_atks | bishop_atks;
+    auto queen_attacker = queen_atks & their_queens;
     if (queen_attacker) {
         return true;
     }
 
-    Bitboard their_knights   = piece_bb(Piece(c, PT_KNIGHT));
-    Bitboard knight_atks     = knight_attacks(s);
-    Bitboard knight_attacker = knight_atks & their_knights;
+    auto their_knights   = piece_bb(Piece(c, PT_KNIGHT));
+    auto knight_atks     = knight_attacks(s);
+    auto knight_attacker = knight_atks & their_knights;
     if (knight_attacker) {
         return true;
     }
 
-    Bitboard their_pawns   = piece_bb(Piece(c, PT_PAWN));
-    Bitboard pawn_atks     = pawn_attacks(s, opposite_color(c));
-    Bitboard pawn_attacker = pawn_atks & their_pawns;
+    auto their_pawns   = piece_bb(Piece(c, PT_PAWN));
+    auto pawn_atks     = pawn_attacks(s, opposite_color(c));
+    auto pawn_attacker = pawn_atks & their_pawns;
     if (pawn_attacker) {
         return true;
     }
 
-    Bitboard their_king_bb  = piece_bb(Piece(c, PT_KING));
-    Bitboard king_atks      = king_attacks(s);
-    Bitboard king_attacker  = king_atks & their_king_bb;
+    auto their_king_bb  = piece_bb(Piece(c, PT_KING));
+    auto king_atks      = king_attacks(s);
+    auto king_attacker  = king_atks & their_king_bb;
     if (king_attacker) {
         return true;
     }
@@ -552,18 +558,18 @@ void Board::compute_pins() {
     m_pinned_bb = 0;
 
     for (Color c: COLORS) {
-        Color them      = opposite_color(c);
+        auto them      = opposite_color(c);
         if (piece_bb(Piece(c, PT_KING)) == 0) {
             continue;
         }
-        Square our_king = king_square(c);
+        auto our_king = king_square(c);
 
-        Bitboard their_bishops = piece_bb(Piece(them, PT_BISHOP));
-        Bitboard their_rooks   = piece_bb(Piece(them, PT_ROOK));
-        Bitboard their_queens  = piece_bb(Piece(them, PT_QUEEN));
+        auto their_bishops = piece_bb(Piece(them, PT_BISHOP));
+        auto their_rooks   = piece_bb(Piece(them, PT_ROOK));
+        auto their_queens  = piece_bb(Piece(them, PT_QUEEN));
 
-        Bitboard their_diagonal_atks = (their_bishops | their_queens) & bishop_attacks(our_king, 0);
-        Bitboard their_line_atks     = (their_rooks   | their_queens) & rook_attacks(our_king, 0);
+        auto their_diagonal_atks = (their_bishops | their_queens) & bishop_attacks(our_king, 0);
+        auto their_line_atks     = (their_rooks   | their_queens) & rook_attacks(our_king, 0);
 
         scan_pins(their_diagonal_atks, our_king, c);
         scan_pins(their_line_atks, our_king, c);
@@ -571,13 +577,13 @@ void Board::compute_pins() {
 }
 
 void Board::scan_pins(Bitboard attackers, Square king_square, Color pinned_color) {
-    Bitboard occ = occupancy();
+    auto occ = occupancy();
 
     while (attackers) {
-        Square s  = lsb(attackers);
+        auto s  = lsb(attackers);
         attackers = unset_lsb(attackers);
 
-        Bitboard between = between_bb(s, king_square) & occ;
+    auto between = between_bb(s, king_square) & occ;
 
         if (between == 0 || unset_lsb(between) != 0) {
             // More than one piece (or none) in between, none being pinned just yet.
@@ -585,8 +591,8 @@ void Board::scan_pins(Bitboard attackers, Square king_square, Color pinned_color
         }
 
         // A piece might be pinned
-        Square pinned_sq = lsb(between);
-        Piece piece      = piece_at(pinned_sq);
+    auto pinned_sq = lsb(between);
+    auto piece      = piece_at(pinned_sq);
         if (piece.color() == pinned_color) {
             // Piece is being pinned
             m_pinned_bb          = set_bit(m_pinned_bb, pinned_sq);
@@ -611,8 +617,8 @@ BoardResult Board::result() const {
     else {
         // Check for stalemate or checkmate.
         Move moves[MAX_GENERATED_MOVES];
-        Move* begin = moves;
-        Move* end   = generate_moves(*this, moves);
+        auto* begin = moves;
+        auto* end   = generate_moves(*this, moves);
 
         if (begin == end) {
             // No moves generated, we either have stalemate or checkmate.
@@ -647,21 +653,21 @@ bool Board::is_castles_pseudo_legal(Square king_square, Color c, Side castling_s
         return false;
     }
 
-    Square rook_square = castle_rook_square(c, castling_side);
+    auto rook_square = castle_rook_square(c, castling_side);
     if (piece_at(rook_square) != Piece(c, PT_ROOK)) {
         return false;
     }
 
-    Bitboard occ = occupancy();
-    Bitboard inner_castle_path = between_bb(king_square, rook_square);
+    auto occ = occupancy();
+    auto inner_castle_path = between_bb(king_square, rook_square);
     if (inner_castle_path & occ) {
         // There cannot be any pieces between the king and the rook.
         return false;
     }
 
-    Bitboard king_path = unset_bit(between_bb_inclusive(king_square, castled_king_square(c, castling_side)), king_square);
+    auto king_path = unset_bit(between_bb_inclusive(king_square, castled_king_square(c, castling_side)), king_square);
     while (king_path) {
-        Square s = lsb(king_path);
+        auto s = lsb(king_path);
         if (is_attacked_by(opposite_color(c), s)) {
             return false;
         }
@@ -672,10 +678,10 @@ bool Board::is_castles_pseudo_legal(Square king_square, Color c, Side castling_s
 }
 
 bool Board::is_move_movement_valid(Move move) const {
-    Bitboard occ    = occupancy();
-    Square src      = move.source();
-    Square dest     = move.destination();
-    Piece src_piece = move.source_piece();
+    auto occ    = occupancy();
+    auto src      = move.source();
+    auto dest     = move.destination();
+    auto src_piece = move.source_piece();
 
     Bitboard piece_movements;
     if (src_piece.type() != PT_PAWN) {
@@ -690,13 +696,13 @@ bool Board::is_move_movement_valid(Move move) const {
 }
 
 bool Board::is_move_pseudo_legal(Move move) const {
-    Square src               = move.source();
-    Square dest              = move.destination();
-    Piece src_piece          = move.source_piece();
-    Piece dst_piece          = move.captured_piece();
-    Color src_piece_color    = src_piece.color();
-    Color dst_piece_color    = dst_piece.color();
-    PieceType src_piece_type = src_piece.type();
+    auto src               = move.source();
+    auto dest              = move.destination();
+    auto src_piece          = move.source_piece();
+    auto dst_piece          = move.captured_piece();
+    auto src_piece_color    = src_piece.color();
+    auto dst_piece_color    = dst_piece.color();
+    auto src_piece_type = src_piece.type();
 
     if (src == dest && move.type() != MT_CASTLES) {
         // Destination can't be equal to source, except on some
@@ -807,16 +813,16 @@ bool Board::is_move_pseudo_legal(Move move) const {
 }
 
 void Board::compute_checkers() {
-    Color us   = color_to_move();
-    Color them = opposite_color(us);
+    auto us   = color_to_move();
+    auto them = opposite_color(us);
     if (piece_bb(Piece(them, PT_KING)) == 0) {
         // No king, no checkers.
         m_state.n_checkers = 0;
         return;
     }
 
-    Square king_sq     = king_square(us);
-    Bitboard checkers  = all_attackers_of<false, true>(them, king_sq);
+    auto king_sq     = king_square(us);
+    auto checkers  = all_attackers_of<false, true>(them, king_sq);
     m_state.n_checkers = popcount(checkers);
 }
 
@@ -831,39 +837,39 @@ Board Board::standard_startpos() {
 template <Color C>
 static void distribute_frc_pieces(Board& board) {
     // Determine color-specific constants.
-    constexpr BoardRank BACK_RANK = C == CL_WHITE ? RNK_1 : RNK_8;
-    constexpr BoardRank PAWN_RANK = C == CL_WHITE ? RNK_2 : RNK_7;
+    constexpr auto BACK_RANK = BoardRank(C == CL_WHITE ? RNK_1 : RNK_8);
+    constexpr auto PAWN_RANK = BoardRank(C == CL_WHITE ? RNK_2 : RNK_7);
 
     // Initialize our back-rank squares with all bits set to 1.
-    Bitboard remaining_squares = rank_bb(BACK_RANK);
+    auto remaining_squares = rank_bb(BACK_RANK);
 
     // Determine king position.
-    BoardFile king_file = random(FL_B, FL_G + 1);
-    Square king_square  = make_square(king_file, BACK_RANK);
+    auto king_file = random(FL_B, FL_G + 1);
+    auto king_square  = make_square(king_file, BACK_RANK);
     remaining_squares   = unset_bit(remaining_squares, king_square);
 
     // Determine rook positions.
-    BoardFile q_rook_file = random(FL_A, king_file);
-    Square q_rook_square  = make_square(q_rook_file, BACK_RANK);
+    auto q_rook_file = random(FL_A, king_file);
+    auto q_rook_square  = make_square(q_rook_file, BACK_RANK);
     remaining_squares     = unset_bit(remaining_squares, q_rook_square);
 
-    BoardFile k_rook_file = random(king_file + 1, FL_H + 1);
-    Square k_rook_square  = make_square(k_rook_file, BACK_RANK);
+    auto k_rook_file = random(king_file + 1, FL_H + 1);
+    auto k_rook_square  = make_square(k_rook_file, BACK_RANK);
     remaining_squares     = unset_bit(remaining_squares, k_rook_square);
 
     // Determine bishop positions.
-    Square bishop_a_square = random_square(remaining_squares);
+    auto bishop_a_square = random_square(remaining_squares);
     remaining_squares = unset_bit(remaining_squares, bishop_a_square);
-    Square bishop_b_square = random_square(remaining_squares & ~color_complex_of(bishop_a_square));
+    auto bishop_b_square = random_square(remaining_squares & ~color_complex_of(bishop_a_square));
     remaining_squares = unset_bit(remaining_squares, bishop_b_square);
 
     // Determine knight positions.
-    Square knight_a_square = random_square(remaining_squares);
+    auto knight_a_square = random_square(remaining_squares);
     remaining_squares = unset_bit(remaining_squares, knight_a_square);
-    Square knight_b_square = random_square(remaining_squares);
+    auto knight_b_square = random_square(remaining_squares);
     remaining_squares = unset_bit(remaining_squares, knight_b_square);
 
-    Square queen_square = lsb(remaining_squares);
+    auto queen_square = lsb(remaining_squares);
 
     // Place pieces.
     board.set_piece_at(king_square, Piece(C, PT_KING));
@@ -889,12 +895,12 @@ static void distribute_frc_pieces(Board& board) {
 
 template <Color C>
 static void mirror_frc_pieces(Board& board) {
-    Color THEM = opposite_color(C);
+    auto THEM = opposite_color(C);
 
-    Bitboard their_pieces = board.color_bb(THEM);
+    auto their_pieces = board.color_bb(THEM);
     while (their_pieces) {
-        Square s = lsb(their_pieces);
-        Square new_square = mirror_vertical(s);
+        auto s = lsb(their_pieces);
+        auto new_square = mirror_vertical(s);
         board.set_piece_at(new_square, Piece(C, board.piece_at(s).type()));
         their_pieces = unset_lsb(their_pieces);
     }
@@ -940,7 +946,7 @@ bool Board::detect_frc() const {
 }
 
 bool Board::is_repetition_draw(int max_appearances) const {
-    int appearances = 1;
+    auto appearances = 1;
 
     for (auto it = m_prev_states.crbegin(); it != m_prev_states.crend(); ++it) {
         const auto& state = *it;
@@ -961,18 +967,18 @@ bool Board::is_repetition_draw(int max_appearances) const {
 
 
 bool Board::color_has_sufficient_material(Color color) const {
-    Bitboard pawns = piece_bb(Piece(color, PT_PAWN));
+    auto pawns = piece_bb(Piece(color, PT_PAWN));
     if (pawns) {
         return true;
     }
 
-    Bitboard heavy_pieces = piece_bb(Piece(color, PT_ROOK)) | piece_bb(Piece(color, PT_QUEEN));
+    auto heavy_pieces = piece_bb(Piece(color, PT_ROOK)) | piece_bb(Piece(color, PT_QUEEN));
     if (heavy_pieces) {
         return true;
     }
 
-    Bitboard minor_pieces_and_king = color_bb(color);
-    ui64 n_minor_pieces = popcount(minor_pieces_and_king) - 1;
+    auto minor_pieces_and_king = color_bb(color);
+    auto n_minor_pieces = popcount(minor_pieces_and_king) - 1;
     if (n_minor_pieces > 2) {
         return true;
     }
@@ -980,8 +986,8 @@ bool Board::color_has_sufficient_material(Color color) const {
     if (n_minor_pieces == 2) {
         // We have two minor pieces. We can deliver mate with either knight + bishop
         // or two opposite colored bishops.
-        Bitboard knight_bb = piece_bb(Piece(color, PT_KNIGHT));
-        Bitboard bishop_bb = piece_bb(Piece(color, PT_BISHOP));
+        auto knight_bb = piece_bb(Piece(color, PT_KNIGHT));
+        auto bishop_bb = piece_bb(Piece(color, PT_BISHOP));
 
         if (bishop_bb && knight_bb) {
             return true;
@@ -997,18 +1003,18 @@ bool Board::color_has_sufficient_material(Color color) const {
 
 bool Board::gives_check(Move move) const {
     // Normal check.
-    Piece p      = move.source_piece();
-    Color c      = p.color();
-    Square ks    = king_square(opposite_color(c));
-    Bitboard occ = occupancy();
-    Bitboard atks_from_dest = piece_attacks(p, move.destination(), occ);
+    auto p      = move.source_piece();
+    auto c      = p.color();
+    auto ks    = king_square(opposite_color(c));
+    auto occ = occupancy();
+    auto atks_from_dest = piece_attacks(p, move.destination(), occ);
 
     if (bit_is_set(atks_from_dest, ks)) {
         return true;
     }
 
     // Check if we can have a potential discovered check.
-    Bitboard between = between_bb(move.source(), ks);
+    auto between = between_bb(move.source(), ks);
     if (bit_is_set(between, move.destination())) {
         // Piece is moving along the line between it and the king.
         // No discovered check is happening.
@@ -1017,10 +1023,10 @@ bool Board::gives_check(Move move) const {
 
     // Discovered check -- remove the piece from the occupancy and see
     // if a slider would attack the king.
-    Bitboard disc_occ = unset_bit(occ, move.source());
-    Bitboard queens = piece_bb(Piece(c, PT_QUEEN));
-    Bitboard vert_sliders = queens | piece_bb(Piece(c, PT_ROOK));
-    Bitboard diag_sliders = queens | piece_bb(Piece(c, PT_BISHOP));
+    auto disc_occ = unset_bit(occ, move.source());
+    auto queens = piece_bb(Piece(c, PT_QUEEN));
+    auto vert_sliders = queens | piece_bb(Piece(c, PT_ROOK));
+    auto diag_sliders = queens | piece_bb(Piece(c, PT_BISHOP));
 
     if (move.type() == MT_EN_PASSANT) {
         disc_occ = unset_bit(disc_occ, ep_square() - pawn_push_direction(c));
@@ -1051,19 +1057,19 @@ bool Board::gives_check(Move move) const {
 ui64 Board::estimate_hash_key_after(Move move) const {
     ILLUMINA_ASSERT(is_move_pseudo_legal(move));
 
-    ui64 key = hash_key();
+    auto key = hash_key();
 
     key ^= zob_color_to_move_key(color_to_move());
     key ^= zob_color_to_move_key(opposite_color(color_to_move()));
 
-    Square src = move.source();
-    Square dst = move.destination();
+    auto src = move.source();
+    auto dst = move.destination();
 
-    Piece src_piece = move.source_piece();
+    auto src_piece = move.source_piece();
     key ^= zob_piece_square_key(src_piece, src);
     key ^= zob_piece_square_key(src_piece, dst);
 
-    Piece dst_piece = piece_at(dst);
+    auto dst_piece = piece_at(dst);
     key ^= zob_piece_square_key(dst_piece, dst);
 
     return key;

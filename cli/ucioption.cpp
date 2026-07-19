@@ -107,7 +107,7 @@ i64 UCIOptionSpin::max_value() const {
 }
 
 void UCIOptionSpin::parse_and_set_handler(std::string_view str) {
-    i64 parsed_val = parse_int(str);
+    auto parsed_val = parse_int(str);
     if (parsed_val < min_value() || parsed_val > max_value()) {
         throw std::invalid_argument(std::to_string(parsed_val) + " is out of expected bounds ("
                                     + std::to_string(min_value()) + ", "
@@ -201,7 +201,7 @@ UCIOptionCheck::UCIOptionCheck(std::string name, bool default_val)
 //
 
 void UCIOptionCombo::parse_and_set_handler(std::string_view str) {
-    bool ok = false;
+    auto ok = false;
     for (const std::string& opt: m_opts) {
         if (opt == str) {
             ok = true;

@@ -12,17 +12,17 @@ void Evaluation::on_new_board(const Board& board) {
     m_ctm = board.color_to_move();
 
     // Activate every feature individually.
-    Bitboard bb = board.occupancy();
+    auto bb = board.occupancy();
     while (bb) {
-        Square s = lsb(bb);
+        auto s = lsb(bb);
         m_nnue.enable_feature(s, board.piece_at(s));
         bb = unset_lsb(bb);
     }
 }
 
 void Evaluation::apply_lazy_updates() {
-    for (size_t i = 0; i < m_n_lazy_updates; ++i) {
-        Move move = m_lazy_updates[i];
+    for (auto i = size_t(0); i < m_n_lazy_updates; ++i) {
+        auto move = m_lazy_updates[i];
         if (move != MOVE_NULL) {
             apply_make_move(move);
         }
@@ -61,7 +61,7 @@ void Evaluation::on_undo_null_move(const Board& board) {
 
 void Evaluation::apply_make_move(Move move) {
     m_nnue.push_accumulator();
-    Color moved_color = m_ctm;
+    auto moved_color = m_ctm;
     m_ctm = opposite_color(m_ctm);
 
     switch (move.type()) {
@@ -140,16 +140,16 @@ static std::pair<double, double> wdl_params(Score score, const Board& board) {
     constexpr double AS[] = {-50.97445783, 210.31918996, -445.02953945, 518.19869977};
     constexpr double BS[] = {56.58194844, -159.07046468, 144.13419462, 41.10541912};
 
-    int material = 1 * popcount(board.piece_type_bb(PT_PAWN))
-                   + 3 * popcount(board.piece_type_bb(PT_KNIGHT))
-                   + 3 * popcount(board.piece_type_bb(PT_BISHOP))
-                   + 5 * popcount(board.piece_type_bb(PT_ROOK))
-                   + 9 * popcount(board.piece_type_bb(PT_QUEEN));
+    auto material = int(1 * popcount(board.piece_type_bb(PT_PAWN))
+                      + 3 * popcount(board.piece_type_bb(PT_KNIGHT))
+                      + 3 * popcount(board.piece_type_bb(PT_BISHOP))
+                      + 5 * popcount(board.piece_type_bb(PT_ROOK))
+                      + 9 * popcount(board.piece_type_bb(PT_QUEEN)));
 
-    double x = std::clamp(material, 17, 78) / 58.0;
+    auto x = std::clamp(material, 17, 78) / 58.0;
 
-    double p_a = ((AS[0] * x + AS[1]) * x + AS[2]) * x + AS[3];
-    double p_b = ((BS[0] * x + BS[1]) * x + BS[2]) * x + BS[3];
+    auto p_a = ((AS[0] * x + AS[1]) * x + AS[2]) * x + AS[3];
+    auto p_b = ((BS[0] * x + BS[1]) * x + BS[2]) * x + BS[3];
 
     return { p_a, p_b };
 }
@@ -173,9 +173,9 @@ WDL wdl_from_score(Score score, const Board& board) {
 
     auto [a, b] = wdl_params(score, board);
 
-    int w = std::round(1000.0 / (1.0 + std::exp((a - double(score)) / b)));
-    int l = std::round(1000.0 / (1.0 + std::exp((a + double(score)) / b)));
-    int d = 1000 - w - l;
+    auto w = int(std::round(1000.0 / (1.0 + std::exp((a - double(score)) / b))));
+    auto l = int(std::round(1000.0 / (1.0 + std::exp((a + double(score)) / b))));
+    auto d = 1000 - w - l;
 
     return { w, d, l };
 }

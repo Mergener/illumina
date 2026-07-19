@@ -35,7 +35,7 @@ inline std::string_view ParseHelper::read_chunk() {
     }
 
     // Read the string until whitespace is found (chunk ends).
-    size_t start = m_pos;
+    auto start = m_pos;
     while (m_pos < m_str.size()) {
         if (std::isspace(m_str[m_pos])) {
             break;

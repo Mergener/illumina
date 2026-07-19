@@ -112,12 +112,12 @@ inline const std::array<Move, 2>& MoveHistory::killers(Depth ply) const {
 }
 
 inline bool MoveHistory::is_killer(Depth ply, Move move) const {
-    const std::array<Move, 2>& arr = killers(ply);
+    const auto& arr = killers(ply);
     return arr[0] == move || arr[1] == move;
 }
 
 inline void MoveHistory::set_killer(Depth ply, Move killer) {
-    std::array<Move, 2>& arr = m_data->killers[ply];
+    auto& arr = m_data->killers[ply];
     if (killer == arr[0]) {
         return;
     }
@@ -150,10 +150,10 @@ inline void MoveHistory::update_corrhist_entry(CorrhistTable& table,
                                                Color color,
                                                int depth_score,
                                                int diff) {
-    int scaled_diff = diff * CORRHIST_GRAIN;
-    CorrhistEntry& entry = table[color][key % CORRHIST_ENTRIES];
+    auto scaled_diff = diff * CORRHIST_GRAIN;
+    auto& entry = table[color][key % CORRHIST_ENTRIES];
     entry.key_low = key & BITMASK(16);
-    i16& entry_value = entry.value;
+    auto& entry_value = entry.value;
     entry_value = std::clamp((int(entry_value) * (CORRHIST_BASE_WEIGHT - depth_score) + scaled_diff * depth_score) / CORRHIST_BASE_WEIGHT,
                              -MAX_CORRHIST, MAX_CORRHIST);
 }
@@ -161,8 +161,8 @@ inline void MoveHistory::update_corrhist_entry(CorrhistTable& table,
 inline void MoveHistory::update_corrhist(const Board& board,
                                          Depth depth,
                                          int diff) {
-    Color color = board.color_to_move();
-    int depth_score = std::min(depth * depth + 2 * depth + 1, 128);
+    auto color = board.color_to_move();
+    auto depth_score = std::min(depth * depth + 2 * depth + 1, 128);
 
     // Update pawn corrhist.
     update_corrhist_entry(m_data->pawn_corrhist,
@@ -180,7 +180,7 @@ inline void MoveHistory::update_corrhist(const Board& board,
 }
 
 inline int MoveHistory::pawn_corrhist(const Board& board) const {
-    CorrhistEntry& entry = m_data->pawn_corrhist[board.color_to_move()]
+    auto& entry = m_data->pawn_corrhist[board.color_to_move()]
                                                 [board.pawn_key() % CORRHIST_ENTRIES];
     return entry.key_low == (board.pawn_key() & BITMASK(16))
          ? entry.value
@@ -188,7 +188,7 @@ inline int MoveHistory::pawn_corrhist(const Board& board) const {
 }
 
 inline int MoveHistory::non_pawn_corrhist(const Board& board) const {
-    CorrhistEntry& entry = m_data->non_pawn_corrhist[board.color_to_move()]
+    auto& entry = m_data->non_pawn_corrhist[board.color_to_move()]
                                                     [board.pawn_key() % CORRHIST_ENTRIES];
     return entry.key_low == (board.non_pawn_key() & BITMASK(16))
          ? entry.value
@@ -201,7 +201,7 @@ inline int MoveHistory::correct_eval_with_corrhist(const Board& board,
         return static_eval;
     }
 
-    int unscaled_correction = pawn_corrhist(board)
+    auto unscaled_correction = pawn_corrhist(board)
                             + non_pawn_corrhist(board);
 
     return std::clamp(static_eval + unscaled_correction / CORRHIST_GRAIN,
@@ -211,15 +211,15 @@ inline int MoveHistory::correct_eval_with_corrhist(const Board& board,
 inline void MoveHistory::update_history_by_depth(int& history,
                                                  Depth depth,
                                                  bool good) {
-    int delta = (depth < MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD)
+    auto delta = (depth < MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD)
               ? (depth * depth)
               : (MV_HIST_QUIET_HIGH_DEPTH_FACTOR * depth * depth);
-    int sign  = good ? 1 : -1;
+    auto sign  = good ? 1 : -1;
     update_history(history, sign * delta);
 }
 
 inline void MoveHistory::update_history(int& history, int bonus) {
-    int clamped_bonus = std::clamp(bonus, -MAX_HISTORY, MAX_HISTORY);
+    auto clamped_bonus = std::clamp(bonus, -MAX_HISTORY, MAX_HISTORY);
     history          += clamped_bonus - history * std::abs(clamped_bonus) / MAX_HISTORY;
 }
 

@@ -28,13 +28,13 @@ void NNUE::clear() {
 
 int NNUE::forward(Color color) const {
 #ifdef HAS_AVX2
-    constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
-    __m256i sum = _mm256_setzero_si256();
+    constexpr auto STRIDE = sizeof(__m256i) / sizeof(i16);
+    auto sum = _mm256_setzero_si256();
 
     auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
     auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
-    for (size_t i = 0; i < L1_SIZE / STRIDE; ++i)
+    for (auto i = size_t(0); i < L1_SIZE / STRIDE; ++i)
     {
         __m256i accum_val;
         __m256i clamped;
@@ -66,17 +66,17 @@ int NNUE::forward(Color color) const {
 
     return (_mm_cvtsi128_si32(sum0) + m_net->output_bias) * SCALE / Q;
 #else
-    int sum = 0;
+    auto sum = 0;
 
     auto& our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
     auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
 
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        int our_activated = std::clamp(int(our_accum[i]), 0, Q1);
+    for (auto i = size_t(0); i < L1_SIZE; ++i) {
+        auto our_activated = std::clamp(int(our_accum[i]), 0, Q1);
         our_activated *= our_activated;
         sum += our_activated * m_net->output_weights[i];
 
-        int their_activated = std::clamp(int(their_accum[i]), 0, Q1);
+        auto their_activated = std::clamp(int(their_accum[i]), 0, Q1);
         their_activated *= their_activated;
         sum += their_activated * m_net->output_weights[L1_SIZE + i];
     }
@@ -113,14 +113,14 @@ template <typename T>
 static void copy_params_from_json(const nlohmann::json& j,
                                   std::string_view json_field_name,
                                   T& arr) {
-    nlohmann::json j_arr = j[json_field_name];
-    for (size_t i = 0; i < arr.size(); ++i) {
+    auto j_arr = j[json_field_name];
+    for (auto i = size_t(0); i < arr.size(); ++i) {
         arr[i] = j_arr.at(i);
     }
 }
 
 EvalNetwork::EvalNetwork(std::istream& stream) {
-    nlohmann::json j = nlohmann::json::parse(stream);
+    auto j = nlohmann::json::parse(stream);
 
     copy_params_from_json(j, "l1_weights", l1_weights);
     copy_params_from_json(j, "l1_biases", l1_biases);
@@ -130,8 +130,8 @@ EvalNetwork::EvalNetwork(std::istream& stream) {
 }
 
 void init_nnue() {
-    std::string str = std::string(g_default_networkData, g_default_networkSize);
-    std::istringstream stream(str);
+    auto str = std::string(g_default_networkData, g_default_networkSize);
+    auto stream = std::istringstream(str);
     s_default_network = new EvalNetwork(stream);
 }
 

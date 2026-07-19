@@ -25,7 +25,7 @@ void TimeManager::set_starting_bounds(ui64 soft, ui64 hard) {
 
 void TimeManager::start_movetime(ui64 movetime_ms) {
     setup(false);
-    ui64 bound = movetime_ms - std::min(movetime_ms, ui64(LAG_MARGIN));
+    auto bound = movetime_ms - std::min(movetime_ms, ui64(LAG_MARGIN));
     set_starting_bounds(bound, bound);
 }
 
@@ -34,7 +34,7 @@ void TimeManager::start_tourney_time(ui64 our_time_ms,
                                      ui64 their_time_ms,
                                      ui64 their_inc_ms,
                                      int moves_to_go) {
-    ui64 max_time = our_time_ms - std::min(our_time_ms, ui64(LAG_MARGIN));
+    auto max_time = our_time_ms - std::min(our_time_ms, ui64(LAG_MARGIN));
     our_time_ms  += our_inc_ms * 45 - LAG_MARGIN;
     setup(true);
 
@@ -73,7 +73,7 @@ void TimeManager::on_new_pv(Depth depth,
 
     // If the last few plies had stable results, quicken
     // the search softly.
-    Score cp_delta = score - m_last_best_score;
+    auto cp_delta = score - m_last_best_score;
     if (   best_move == m_last_best_move
            && (cp_delta > TM_STABILITY_MIN_CP_DELTA && cp_delta < TM_STABILITY_MAX_CP_DELTA)) {
         // We have the same last move and a close score to the previous

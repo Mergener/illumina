@@ -120,7 +120,7 @@ void SearchTracer::push_node() {
 }
 
 void SearchTracer::push_sibling_node() {
-    NodeInfo new_node = m_curr_node;
+    auto new_node = m_curr_node;
     new_node.index = m_curr_tree.next_node_index++;
     m_node_stack.push_back(m_curr_node);
     m_curr_node = new_node;
@@ -167,7 +167,7 @@ void SearchTracer::flush_nodes() {
     }
 
     try {
-        SQLite::Transaction transaction(m_db);
+        auto transaction = SQLite::Transaction(m_db);
 
         // Build SQL insert statement from traceables.
         std::stringstream ss;
@@ -183,10 +183,10 @@ void SearchTracer::flush_nodes() {
 
         ss << ");";
 
-        SQLite::Statement statement(m_db, ss.str());
+        auto statement = SQLite::Statement(m_db, ss.str());
 
         for (const NodeInfo& node : m_node_batch) {
-            int i = 0;
+            auto i = 0;
 
             // Bind ever-present attributes to statement.
             statement.bind(++i, i64(node.index));
@@ -211,7 +211,7 @@ void SearchTracer::flush_nodes() {
 static bool column_exists(const SQLite::Database& db,
                           const std::string& table_name,
                           const std::string& column_name) {
-    SQLite::Statement query(db, "PRAGMA table_info(" + table_name + ")");
+    auto query = SQLite::Statement(db, "PRAGMA table_info(" + table_name + ")");
     while (query.executeStep()) {
         if (query.getColumn(1).getString() == column_name) {
             return true;
@@ -233,8 +233,8 @@ void SearchTracer::bootstrap_db() {
                                                                                                "\n");
         } else {
             // Metadata table existed, check for version.
-            SQLite::Column col = m_db.execAndGet("SELECT version_id FROM meta");
-            std::string version_id = col.getText();
+            auto col = m_db.execAndGet("SELECT version_id FROM meta");
+            auto version_id = col.getText();
             if (version_id != TRACER_VERSION) {
                 throw std::runtime_error("Specified trace DB has incompatible version.");
             }
@@ -285,13 +285,13 @@ void SearchTracer::bootstrap_db() {
         std::stringstream ss;
 #define TRACEABLE(name, type) \
     if (!column_exists(m_db, "nodes", lower_case(#name))) { \
-        std::string query = std::string("ALTER TABLE nodes ADD ") + lower_case(#name) + " " + sql_type_map<type>() + ";"; \
+        auto query = std::string("ALTER TABLE nodes ADD ") + lower_case(#name) + " " + sql_type_map<type>() + ";"; \
         m_db.exec(query);\
     }
 
 #include "traceables.def"
 
-        std::string query = ss.str();
+        auto query = ss.str();
         m_db.exec(query);
     }
     catch (const std::exception& e) {
@@ -302,10 +302,10 @@ void SearchTracer::bootstrap_db() {
 
 void SearchTracer::save_tree(const TreeInfo& tree) {
     try {
-        SQLite::Statement statement(m_db, "INSERT INTO trees (id, search, root_depth,"
+        auto statement = SQLite::Statement(m_db, "INSERT INTO trees (id, search, root_depth,"
                                           "asp_alpha, asp_beta, multipv) VALUES"
                                           "(?, ?, ?, ?, ?, ?);");
-        int i = 0;
+            auto i = 0;
         statement.bind(++i, i64(tree.id));
         statement.bind(++i, i64(tree.search));
         statement.bind(++i, i64(tree.root_depth));
@@ -323,12 +323,12 @@ void SearchTracer::save_tree(const TreeInfo& tree) {
 
 void SearchTracer::save_search(const SearchInfo& search) {
     try {
-        SQLite::Statement statement(m_db, "INSERT INTO searches (id,"
+        auto statement = SQLite::Statement(m_db, "INSERT INTO searches (id,"
                                           "limits_depth, limits_nodes, limits_wtime,"
                                           "limits_btime, limits_winc, limits_binc,"
                                           "limits_movetime, hash, root_fen) VALUES"
                                           "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
-        int i = 0;
+            auto i = 0;
         statement.bind(++i, i64(search.id));
         statement.bind(++i, search.limits_depth);
         statement.bind(++i, i64(search.limits_nodes));

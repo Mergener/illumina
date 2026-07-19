@@ -16,7 +16,7 @@ TEST_CASE(HasGoodSee) {
         bool expected_output;
 
         void run() const {
-            Board board(board_fen);
+        auto board = Board(board_fen);
             EXPECT(has_good_see(board, source, dest, threshold)).to_be(expected_output);
         }
     } tests[] = {
@@ -41,9 +41,9 @@ TEST_CASE(RevealedAttacks) {
         Bitboard expected;
 
         void run() const {
-            Board board(board_fen);
+        auto board = Board(board_fen);
 
-            Bitboard revealed_atks = discovered_attacks(board, source, destination);
+        auto revealed_atks = discovered_attacks(board, source, destination);
             EXPECT(revealed_atks).to_be(expected);
         }
     } tests[] = {

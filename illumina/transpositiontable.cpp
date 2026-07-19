@@ -71,7 +71,7 @@ void TranspositionTable::try_store(ui64 key,
                                    Score static_eval,
                                    BoundType bound_type,
                                    bool ttpv) {
-    TranspositionTableEntry& entry = entry_ref(key);
+    auto& entry = entry_ref(key);
 
     // Always add when no existing entry is found.
     if (!entry.valid()) {
@@ -125,7 +125,7 @@ void TranspositionTable::resize(size_t new_size) {
             return;
         }
 
-        size_t new_n_entries = new_size / sizeof(TranspositionTableEntry);
+        auto new_n_entries = new_size / sizeof(TranspositionTableEntry);
         auto new_buf         = std::make_unique<TranspositionTableEntry[]>(new_n_entries);
         m_buf                = std::move(new_buf);
         m_max_entry_count    = new_n_entries;
@@ -136,10 +136,10 @@ void TranspositionTable::resize(size_t new_size) {
 }
 
 int TranspositionTable::hash_full() const {
-    constexpr size_t SAMPLE_SIZE = 1000;
-    int filled = 0;
-    for (size_t i = 0; i < SAMPLE_SIZE; ++i) {
-        TranspositionTableEntry& entry = m_buf[i];
+    constexpr auto SAMPLE_SIZE = size_t(1000);
+    auto filled = 0;
+    for (auto i = size_t(0); i < SAMPLE_SIZE; ++i) {
+        auto& entry = m_buf[i];
         if (entry.valid()) {
             filled += 1000;
         }

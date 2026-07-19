@@ -52,7 +52,7 @@ static std::string score_string(Score score) {
     if (!is_mate_score(score)) {
         return "cp " + std::to_string(score);
     }
-    int n_moves = moves_to_mate(score);
+    auto n_moves = moves_to_mate(score);
     return "mate " + std::to_string(score > 0 ? n_moves : -n_moves);
 }
 
@@ -82,7 +82,7 @@ void State::set_board(const Board& board) {
 
 void State::bench() const {
 #ifndef OPENBENCH_COMPLIANCE
-    BenchSettings settings = default_bench_settings();
+    auto settings = default_bench_settings();
 
     std::cout << "Starting bench...\n" << std::endl;
     std::cout << "Bench hash size is " << settings.hash_size_mb << " MiB (" << settings.hash_size_mb * 1024 * 1024 << " bytes)" << std::endl;
@@ -97,7 +97,7 @@ void State::bench() const {
                   << " score " << score_string(score)
                   << std::endl;
     };
-    BenchResults results = illumina::bench(settings);
+    auto results = illumina::bench(settings);
 
     std::cout << "\nBench finished." << std::endl;
     std::cout << "\tTotal bench time:     "  << results.bench_time_ms << " ms" << std::endl;
@@ -105,8 +105,8 @@ void State::bench() const {
     std::cout << "\tTotal searched nodes: "  << results.total_nodes << std::endl;
     std::cout << "\tNodes/sec:            "  << results.nps << std::endl;
 #else
-    BenchSettings settings = default_bench_settings();
-    BenchResults results = illumina::bench(settings);
+    auto settings = default_bench_settings();
+    auto results = illumina::bench(settings);
     std::cout << results.total_nodes << " nodes " << results.nps << " nps" << std::endl;
 #endif
 }
@@ -160,7 +160,7 @@ void State::evaluate() const {
         return;
     }
 
-    Endgame endgame = identify_endgame(m_board);
+    auto endgame = identify_endgame(m_board);
     if (endgame.type != EG_UNKNOWN) {
         std::cout << "Using endgame evaluation." << std::endl;
         std::cout << "\n\nFinal evaluation ("
@@ -171,9 +171,9 @@ void State::evaluate() const {
     }
 
     Evaluation eval;
-    Board repl = m_board;
+    auto repl = m_board;
     eval.on_new_board(repl);
-    Score score = normalize_score_if_desired(eval.compute(), repl);
+    auto score = normalize_score_if_desired(eval.compute(), repl);
 
     std::cout << "      ";
 
@@ -186,8 +186,8 @@ void State::evaluate() const {
         std::cout << std::endl;
         std::cout << " " << rank_to_char(r) << " |";
         for (BoardFile f: FILES) {
-            Square s = make_square(f, r);
-            Piece p = repl.piece_at(s);
+            auto s = make_square(f, r);
+            auto p = repl.piece_at(s);
             if (p == PIECE_NULL) {
                 std::cout << "      ";
             }
@@ -197,7 +197,7 @@ void State::evaluate() const {
             else {
                 repl.set_piece_at(s, PIECE_NULL);
                 eval.on_new_board(repl);
-                Score score_without_piece = normalize_score_if_desired(eval.compute(), repl);
+                auto score_without_piece = normalize_score_if_desired(eval.compute(), repl);
                 repl.set_piece_at(s, p);
 
                 std::cout << std::setw(6)
@@ -209,8 +209,8 @@ void State::evaluate() const {
 
         std::cout << " |" << std::endl << "   |";
         for (BoardFile f: FILES) {
-            Square s = make_square(f, r);
-            Piece p = repl.piece_at(s);
+            auto s = make_square(f, r);
+            auto p = repl.piece_at(s);
             if (p == PIECE_NULL) {
                 std::cout << "      ";
             }
@@ -237,13 +237,13 @@ static std::string pv_to_string(const std::vector<Move>& line,
         return "";
     }
 
-    Board repl = board;
+    auto repl = board;
 
     std::stringstream stream;
     stream << line[0].to_uci(frc);
     repl.make_move(line[0]);
     for (auto it = line.begin() + 1; it != line.end(); ++it) {
-        Move m = *it;
+        auto m = *it;
         if (!repl.is_move_pseudo_legal(m) || !repl.is_move_legal(m)) {
             break;
         }
@@ -286,9 +286,9 @@ void State::setup_searcher() {
 
     m_searcher.set_pv_finish_listener([this](const PVResults& res) {
         // Check if we need to log multipv.
-        UCIOptionSpin& opt_multi_pv = m_options.option<UCIOptionSpin>("MultiPV");
-        bool show_wdl = m_options.option<UCIOptionCheck>("UCI_ShowWDL").value();
-        bool has_pv_line = res.line.size() >= 1 && res.line[0] != MOVE_NULL;
+        auto& opt_multi_pv = m_options.option<UCIOptionSpin>("MultiPV");
+        auto show_wdl = m_options.option<UCIOptionCheck>("UCI_ShowWDL").value();
+        auto has_pv_line = res.line.size() >= 1 && res.line[0] != MOVE_NULL;
 
         std::cout << "info"
                   << multipv_string(opt_multi_pv.value() > 1, res.pv_idx)
@@ -318,7 +318,7 @@ void State::search(SearchSettings settings, bool trace) {
     // This is useful when performing node-odds testing on a GUI that
     // doesn't support this type of odds. The GUI can send go nodes X
     // and OverrideNodesLimit allows Illumina to bypass this instruction.
-    ui64 node_option = m_options.option<UCIOptionSpin>("OverrideNodesLimit").value();
+    auto node_option = m_options.option<UCIOptionSpin>("OverrideNodesLimit").value();
     if (node_option != 0) {
         settings.max_nodes = node_option;
     }
@@ -330,8 +330,8 @@ void State::search(SearchSettings settings, bool trace) {
         std::cout << "info string Tracing is not enabled in this version -- option skipped." << std::endl;
 #else
         try {
-            std::string trace_path = m_options.option<UCIOptionString>("TraceFile").value();
-            size_t trace_batch_size = m_options.option<UCIOptionSpin>("TraceBatchSize").value();
+            auto trace_path = m_options.option<UCIOptionString>("TraceFile").value();
+            auto trace_batch_size = m_options.option<UCIOptionSpin>("TraceBatchSize").value();
             tracer = std::make_shared<SearchTracer>(trace_path, trace_batch_size);
             settings.tracer = tracer.get();
         }
@@ -351,7 +351,7 @@ void State::search(SearchSettings settings, bool trace) {
     m_search_thread = std::thread([this, settings, tracer]() {
         try {
             m_search_start = Clock::now();
-            SearchResults results = m_searcher.search(m_board, settings);
+            auto results = m_searcher.search(m_board, settings);
 
             std::cout << "bestmove " << results.best_move.to_uci(m_frc);
 

@@ -51,14 +51,14 @@ struct DataPoint {
 };
 
 NormalOptions parse_args(int argc, char* argv[]) {
-    NormalOptions options {};
-    bool include_checks = false;
-    bool include_mate_scores = false;
-    bool include_last_move_captures = false;
+    auto options = NormalOptions{};
+    auto include_checks = false;
+    auto include_mate_scores = false;
+    auto include_last_move_captures = false;
 
-    argparse::ArgumentParser args(argv[0],
-                                  "",
-                                  argparse::default_arguments::none);
+    auto args = argparse::ArgumentParser(argv[0],
+                                         "",
+                                         argparse::default_arguments::none);
 
     args.add_argument("-h", "--help")
         .action([&args](const auto&) {
@@ -172,8 +172,8 @@ std::string output_file_name(const NormalOptions& options, int thread_index) {
         return options.out_file_name;
     }
 
-    std::filesystem::path output_path(options.out_file_name);
-    const std::filesystem::path extension = output_path.extension();
+    auto output_path = std::filesystem::path(options.out_file_name);
+    const auto extension = output_path.extension();
 
     if (extension.empty()) {
         output_path += "_" + std::to_string(thread_index);
@@ -203,16 +203,16 @@ Game simulate_game(Searcher& white_searcher,
     search_settings.max_nodes = options.search_node_limit;
     search_settings.move_time = 10000;
 
-    Board board = Board::standard_startpos();
+    auto board = Board::standard_startpos();
 
-    bool done_creating_startpos = false;
-    int n_random_plies = random(options.min_random_plies, options.max_random_plies + 1);
+    auto done_creating_startpos = false;
+    auto n_random_plies = random(options.min_random_plies, options.max_random_plies + 1);
     while (!done_creating_startpos) {
-        for (int i = 0; i < n_random_plies; ++i) {
+        for (auto i = 0; i < n_random_plies; ++i) {
             Move legal_moves[MAX_GENERATED_MOVES];
-            Move* begin = legal_moves;
-            Move* end = generate_moves(board, begin);
-            size_t n_moves = end - begin;
+            auto* begin = legal_moves;
+            auto* end = generate_moves(board, begin);
+            auto n_moves = size_t(end - begin);
 
             if (n_moves == 0) {
                 board = Board::standard_startpos();
@@ -220,17 +220,17 @@ Game simulate_game(Searcher& white_searcher,
                 continue;
             }
 
-            Move move = legal_moves[random(size_t(0), n_moves)];
+            auto move = legal_moves[random(size_t(0), n_moves)];
             board.make_move(move);
         }
 
         auto& player = players[board.color_to_move()];
 
-        SearchSettings validation_search_settings = search_settings;
+        auto validation_search_settings = search_settings;
         validation_search_settings.max_nodes = UINT64_MAX;
         validation_search_settings.max_depth = 2;
 
-        SearchResults search_results = player.searcher->search(board, validation_search_settings);
+        auto search_results = player.searcher->search(board, validation_search_settings);
 
         if (std::abs(search_results.score) >= 200) {
             board = Board::standard_startpos();
@@ -241,16 +241,16 @@ Game simulate_game(Searcher& white_searcher,
     }
 
     game.start_pos = board;
-    int hi_score_plies = 0;
-    Color hi_score_player = CL_WHITE;
+    auto hi_score_plies = 0;
+    auto hi_score_player = CL_WHITE;
 
-    BoardResult result = board.result();
+    auto result = board.result();
     while (!result.is_finished()) {
-        GamePlyData ply_data {};
+        auto ply_data = GamePlyData{};
         auto& player = players[board.color_to_move()];
 
-        SearchResults search_results = player.searcher->search(board, search_settings);
-        Move best_move = search_results.best_move;
+        auto search_results = player.searcher->search(board, search_settings);
+        auto best_move = search_results.best_move;
 
         ply_data.best_move = best_move;
         ply_data.white_pov_score = board.color_to_move() == CL_WHITE
@@ -287,10 +287,10 @@ Game simulate_game(Searcher& white_searcher,
 
 std::vector<DataPoint> select_data_points(const Game& game,
                                           const NormalOptions& options) {
-    static thread_local std::mt19937 rng(std::random_device{}());
+    static thread_local auto rng = std::mt19937(std::random_device{}());
 
     std::vector<DataPoint> extracted_data;
-    Board board = game.start_pos;
+    auto board = game.start_pos;
 
     for (const GamePlyData& ply_data : game.ply_data) {
         board.make_move(ply_data.best_move);
@@ -310,7 +310,7 @@ std::vector<DataPoint> select_data_points(const Game& game,
 
     std::shuffle(extracted_data.begin(), extracted_data.end(), rng);
 
-    size_t n_data_points = std::min(size_t(options.min_positions_per_game) + game.ply_data.size() / 32,
+    auto n_data_points = std::min(size_t(options.min_positions_per_game) + game.ply_data.size() / 32,
                                     size_t(options.max_positions_per_game));
     n_data_points = std::min(n_data_points, extracted_data.size());
     extracted_data.erase(extracted_data.begin() + n_data_points, extracted_data.end());
@@ -336,7 +336,7 @@ std::string_view wdl_value(const Game& game) {
 ui64 write_marlinflow(std::ostream& stream,
                       const Game& game,
                       const std::vector<DataPoint>& extracted_data) {
-    const std::string_view wdl = wdl_value(game);
+    const auto wdl = wdl_value(game);
 
     for (const DataPoint& data : extracted_data) {
         stream << data.fen << " | "
@@ -348,17 +348,17 @@ ui64 write_marlinflow(std::ostream& stream,
 }
 
 std::string bytes_str(ui64 bytes) {
-    constexpr ui64 KiB = 1024ull;
-    constexpr ui64 MiB = KiB * 1024ull;
-    constexpr ui64 GiB = MiB * 1024ull;
-    constexpr ui64 TiB = GiB * 1024ull;
+    constexpr auto KiB = ui64(1024ull);
+    constexpr auto MiB = KiB * 1024ull;
+    constexpr auto GiB = MiB * 1024ull;
+    constexpr auto TiB = GiB * 1024ull;
 
     if (bytes < KiB) {
         return std::to_string(bytes) + " B";
     }
 
     std::string unit;
-    ui64 divisor = KiB;
+    auto divisor = KiB;
 
     if (bytes < MiB) {
         unit = " KiB";
@@ -383,10 +383,10 @@ std::string bytes_str(ui64 bytes) {
 }
 
 std::string time_str(ui64 elapsed_ms) {
-    constexpr ui64 one_minute = 60;
-    constexpr ui64 one_hour = one_minute * 60;
+    constexpr auto one_minute = ui64(60);
+    constexpr auto one_hour = one_minute * 60;
 
-    ui64 elapsed_seconds = elapsed_ms / 1000;
+    auto elapsed_seconds = elapsed_ms / 1000;
 
     if (elapsed_seconds < one_minute) {
         return std::to_string(elapsed_seconds) + "s";
@@ -421,17 +421,17 @@ void log_configuration(const NormalOptions& options) {
     ThreadContext ctx {};
     ctx.thread_index = thread_index;
 
-    const std::string out_file = output_file_name(options, thread_index);
-    std::ofstream fstream(out_file, std::ios_base::app);
+    const auto out_file = output_file_name(options, thread_index);
+    auto fstream = std::ofstream(out_file, std::ios_base::app);
     if (!fstream) {
         throw std::runtime_error("failed to open output file " + out_file);
     }
 
-    TimePoint start = Clock::now();
-    ui64 total_data_points = 0;
-    ui64 unlogged_data_points = 0;
-    ui64 total_bytes = 0;
-    ui64 total_games = 0;
+    auto start = Clock::now();
+    auto total_data_points = ui64(0);
+    auto unlogged_data_points = ui64(0);
+    auto total_bytes = ui64(0);
+    auto total_games = ui64(0);
 
     Searcher white_searcher {};
     Searcher black_searcher {};
@@ -442,13 +442,13 @@ void log_configuration(const NormalOptions& options) {
         white_searcher.tt().new_search();
         black_searcher.tt().new_search();
 
-        Game game = simulate_game(white_searcher, black_searcher, options);
-        std::vector<DataPoint> data = select_data_points(game, options);
+        auto game = simulate_game(white_searcher, black_searcher, options);
+        auto data = select_data_points(game, options);
 
         std::stringstream sstream;
-        ui64 data_points = write_marlinflow(sstream, game, data);
+        auto data_points = write_marlinflow(sstream, game, data);
 
-        const std::string data_str = sstream.str();
+        const auto data_str = sstream.str();
         fstream << data_str << std::flush;
 
         total_games++;
@@ -459,10 +459,10 @@ void log_configuration(const NormalOptions& options) {
         if (unlogged_data_points >= 1000) {
             unlogged_data_points = 0;
 
-            ui64 elapsed_ms = delta_ms(Clock::now(), start);
-            double bytes_per_data = double(total_bytes) / double(total_data_points);
-            double data_per_sec = double(total_data_points) / (elapsed_ms / 1000.0);
-            double games_per_sec = double(total_games) / (elapsed_ms / 1000.0);
+            auto elapsed_ms = delta_ms(Clock::now(), start);
+            auto bytes_per_data = double(total_bytes) / double(total_data_points);
+            auto data_per_sec = double(total_data_points) / (elapsed_ms / 1000.0);
+            auto games_per_sec = double(total_games) / (elapsed_ms / 1000.0);
 
             sync_cout(ctx) << std::setprecision(2)
                            << total_data_points << " data points generated in "
@@ -480,14 +480,14 @@ void log_configuration(const NormalOptions& options) {
 } // namespace
 
 int run_normal_datagen(int argc, char* argv[]) {
-    NormalOptions options = parse_args(argc, argv);
+    auto options = parse_args(argc, argv);
 
     std::cout << "Starting data generation with " << options.threads << " threads." << std::endl;
     log_configuration(options);
 
     std::vector<std::thread> helper_threads;
     helper_threads.reserve(std::max(0, options.threads - 1));
-    for (int i = 0; i < options.threads - 1; ++i) {
+    for (auto i = 0; i < options.threads - 1; ++i) {
         helper_threads.emplace_back([=]() {
             thread_main(i + 1, options);
         });

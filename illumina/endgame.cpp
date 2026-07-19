@@ -8,7 +8,7 @@ namespace illumina {
 static ui64 create_endgame_key(int our_pawns, int our_knights, int our_bishops, int our_rooks, int our_queens,
                                int their_pawns, int their_knights, int their_bishops, int their_rooks, int their_queens) {
 
-    ui64 key =         (our_pawns     & 0x3F);
+    auto key = ui64(our_pawns & 0x3F);
     key = (key << 6) | (our_knights   & 0x3F);
     key = (key << 6) | (our_bishops   & 0x3F);
     key = (key << 6) | (our_rooks     & 0x3F);
@@ -34,10 +34,10 @@ static std::unordered_map<ui64, EndgameType> s_eg_table = {
 };
 
 static EndgameType identify_endgame_type(const Board& board, Color stronger) {
-    Color us   = stronger;
-    Color them = opposite_color(us);
+    auto us   = stronger;
+    auto them = opposite_color(us);
 
-    ui64 key = create_endgame_key(popcount(board.piece_bb(Piece(us, PT_PAWN))),
+    auto key = create_endgame_key(popcount(board.piece_bb(Piece(us, PT_PAWN))),
                                   popcount(board.piece_bb(Piece(us, PT_KNIGHT))),
                                   popcount(board.piece_bb(Piece(us, PT_BISHOP))),
                                   popcount(board.piece_bb(Piece(us, PT_ROOK))),
@@ -54,11 +54,11 @@ static EndgameType identify_endgame_type(const Board& board, Color stronger) {
 
 static Score corner_king_evaluation(const Board& board,
                                     Color winning_king_color) {
-    Square winning_king_sq = board.king_square(winning_king_color);
-    Square losing_king_sq  = board.king_square(opposite_color(winning_king_color));
+    auto winning_king_sq = board.king_square(winning_king_color);
+    auto losing_king_sq  = board.king_square(opposite_color(winning_king_color));
 
-    int ct_dist_losing = center_manhattan_distance(losing_king_sq);
-    int king_dist      = manhattan_distance(winning_king_sq, losing_king_sq);
+    auto ct_dist_losing = center_manhattan_distance(losing_king_sq);
+    auto king_dist      = manhattan_distance(winning_king_sq, losing_king_sq);
 
     return 8 * ((ct_dist_losing * ct_dist_losing) - (king_dist));
 }
@@ -116,10 +116,10 @@ static Score evaluate_endgame(const Board& board,
                 0, 1, 2, 3, 4, 5, 6, 7,
             };
 
-            i32 base = 600;
+            auto base = i32(600);
 
-            Square our_bishop = lsb(board.piece_bb(Piece(stronger_player, PT_BISHOP)));
-            Square their_king = board.king_square(opposite_color(stronger_player));
+            auto our_bishop = lsb(board.piece_bb(Piece(stronger_player, PT_BISHOP)));
+            auto their_king = board.king_square(opposite_color(stronger_player));
 
             i32 their_king_bonus;
             if (bit_is_set(LIGHT_SQUARES, our_bishop)) {
@@ -134,10 +134,10 @@ static Score evaluate_endgame(const Board& board,
 
         case EG_KR_KB:
         case EG_KR_KN: {
-            Color them = opposite_color(stronger_player);
-            Bitboard their_occ_no_king = board.color_bb(them) & (~board.piece_bb(Piece(them, PT_KING)));
-            Square their_other_piece_sq = lsb(their_occ_no_king);
-            Square their_king_sq = board.king_square(them);
+            auto them = opposite_color(stronger_player);
+            auto their_occ_no_king = board.color_bb(them) & (~board.piece_bb(Piece(them, PT_KING)));
+            auto their_other_piece_sq = lsb(their_occ_no_king);
+            auto their_king_sq = board.king_square(them);
             return corner_king_evaluation(board, stronger_player) / 4 +
                    manhattan_distance(their_king_sq, their_other_piece_sq) * 2;
         }
@@ -157,14 +157,14 @@ Endgame identify_endgame(const Board& board) {
     }
 
     for (Color c: COLORS) {
-        EndgameType type = identify_endgame_type(board, c);
+        auto type = identify_endgame_type(board, c);
         if (type == EG_UNKNOWN) {
             continue;
         }
 
         // Found an endgame, evaluate and return.
         endgame.type = type;
-        Score stronger_player_evaluation = evaluate_endgame(board, type, c);
+        auto stronger_player_evaluation = evaluate_endgame(board, type, c);
         endgame.evaluation = board.color_to_move() == c
                              ? stronger_player_evaluation
                              : -stronger_player_evaluation;

@@ -15,10 +15,10 @@ template <Color C>
 inline Bitboard pawn_pushes(Square s, Bitboard occ = 0) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-    constexpr Direction PUSH_DIR = pawn_push_direction(C);
+    constexpr auto PUSH_DIR = pawn_push_direction(C);
 
-    Bitboard not_occ = ~occ;
-    Bitboard pushes  = shift_bb<PUSH_DIR>(BIT(s)) & not_occ;
+    auto not_occ = ~occ;
+    auto pushes  = shift_bb<PUSH_DIR>(BIT(s)) & not_occ;
     if (pushes && (square_rank(s) == pawn_starting_rank(C))) {
         pushes |= shift_bb<PUSH_DIR>(pushes) & not_occ;
     }
@@ -37,10 +37,10 @@ inline Bitboard pawn_pushes(Square s, Color c, Bitboard occ = 0) {
 template <Color C>
 inline Bitboard reverse_pawn_pushes(Square s, Bitboard occ = 0) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
-    constexpr Direction PUSH_DIR = pawn_push_direction(opposite_color(C));
+    constexpr auto PUSH_DIR = pawn_push_direction(opposite_color(C));
 
-    Bitboard not_occ = ~occ;
-    Bitboard pushes  = shift_bb<PUSH_DIR>(BIT(s)) & not_occ;
+    auto not_occ = ~occ;
+    auto pushes  = shift_bb<PUSH_DIR>(BIT(s)) & not_occ;
     if (   pushes
         && ((C == CL_WHITE && square_rank(s) == RNK_4) || (C == CL_BLACK && square_rank(s) == RNK_5))) {
         pushes |= shift_bb<PUSH_DIR>(pushes) & not_occ;
@@ -61,7 +61,7 @@ template <Color C>
 inline Bitboard pawn_attacks(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-    Bitboard s_bb = BIT(s);
+    auto s_bb = BIT(s);
     if constexpr (C == CL_WHITE) {
         return shift_bb<DIR_NORTHEAST>(s_bb) | shift_bb<DIR_NORTHWEST>(s_bb);
     }
@@ -99,7 +99,7 @@ inline Bitboard bishop_attacks(Square s, Bitboard occ) {
     extern const Bitboard g_bishop_magics[64];
     extern const int g_bishop_shifts[64];
     occ &= g_bishop_masks[s];
-    ui64 key = (occ * g_bishop_magics[s]) >> (g_bishop_shifts[s]);
+    auto key = (occ * g_bishop_magics[s]) >> (g_bishop_shifts[s]);
     return g_bishop_attacks[s][key];
 #endif
 }
@@ -117,7 +117,7 @@ inline Bitboard rook_attacks(Square s, Bitboard occ) {
     extern const Bitboard g_rook_magics[64];
     extern const int g_rook_shifts[64];
     occ &= g_rook_masks[s];
-    ui64 key = (occ * g_rook_magics[s]) >> (g_rook_shifts[s]);
+    auto key = (occ * g_rook_magics[s]) >> (g_rook_shifts[s]);
     return g_rook_attacks[s][key];
 #endif
 }

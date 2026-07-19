@@ -10,7 +10,7 @@ TEST_SUITE(MovePicker);
 
 template <bool QUIESCE>
 static void score_move(MovePicker<QUIESCE>& mp, SearchMove& move, bool check) {
-    ui64 mask = !check
+    auto mask = !check
         ? BIT(MPS_GOOD_CAPTURES) | BIT(MPS_BAD_CAPTURES) | BIT(MPS_QUIET)
         : BIT(MPS_QUIET_EVASIONS) | BIT(MPS_NOISY_EVASIONS);
 
@@ -86,7 +86,7 @@ static MovePickingStage classify_move_stage(Move move,
 
 template <bool QUIESCE, bool METAMORPHIC>
 void test_move_picker() {
-    constexpr ui64 MOVE_TYPE_MASK = QUIESCE
+    constexpr auto MOVE_TYPE_MASK = QUIESCE
                                     ? ui64(BIT(MT_SIMPLE_CAPTURE) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION) | BIT(MT_EN_PASSANT))
                                     : UINT64_MAX;
     struct {
@@ -97,14 +97,14 @@ void test_move_picker() {
         std::vector<std::tuple<Depth, Square, Square>> history {};
 
         void run() {
-            Board board(fen);
+            auto board = Board(fen);
 
             // Generate all moves without the move picker. Use the number of generated
             // moves to afterwards validate if the move picker generated the exact number
             // of moves too expected for the position.
             Move validation_moves[MAX_GENERATED_MOVES];
-            Move* validation_moves_end = generate_moves<MOVE_TYPE_MASK>(board, validation_moves);
-            size_t n_expected_moves = validation_moves_end - validation_moves;
+            auto* validation_moves_end = generate_moves<MOVE_TYPE_MASK>(board, validation_moves);
+            auto n_expected_moves = size_t(validation_moves_end - validation_moves);
 
             Move hash_move;
             MoveHistory mv_hist;
@@ -115,7 +115,7 @@ void test_move_picker() {
 
                     // Save killer moves.
                     for (auto& k: all_killer_moves) {
-                        Move move = Move::parse_uci(board, k.second);
+                        auto move = Move::parse_uci(board, k.second);
                         if (move != MOVE_NULL) {
                             mv_hist.set_killer(k.first, move);
                         }
@@ -139,8 +139,8 @@ void test_move_picker() {
                     // another with completely random ones.
                     if (random_bool()) {
                         // Valid and legal killer moves.
-                        for (int i = 0; i < 2; ++i) {
-                            Move move = validation_moves[random(size_t(0), n_expected_moves)];
+                        for (auto i = 0; i < 2; ++i) {
+                            auto move = validation_moves[random(size_t(0), n_expected_moves)];
                             if (move.is_quiet()) {
                                 mv_hist.set_killer(ply, move);
                             }
@@ -148,9 +148,9 @@ void test_move_picker() {
                     }
                     else {
                         // Completely random moves.
-                        Square src = random_square();
-                        Square dst = random_square();
-                        Move move = Move(board, src, dst);
+                        auto src = random_square();
+                        auto dst = random_square();
+                        auto move = Move(board, src, dst);
                         if (move.is_quiet()) {
                             mv_hist.set_killer(ply, move);
                         }
@@ -158,9 +158,9 @@ void test_move_picker() {
 
                     // Fill history values with random depths [1,15) (arbitrary range) for each move.
                     // Arbitrarily do 100 random steps.
-                    for (int i = 0; i < 100; ++i) {
+                    for (auto i = 0; i < 100; ++i) {
                         // Pick a move.
-                        Move move = validation_moves[random(size_t(0), n_expected_moves)];
+                        auto move = validation_moves[random(size_t(0), n_expected_moves)];
                         mv_hist.update_quiet_history(move, MOVE_NULL, random(1, 15), true);
                     }
                 }
@@ -169,15 +169,15 @@ void test_move_picker() {
                 }
             }
 
-            MovePicker<QUIESCE> move_picker(board, ply, mv_hist, hash_move);
-            SearchMove move {};
+            auto move_picker = MovePicker<QUIESCE>(board, ply, mv_hist, hash_move);
+            auto move = SearchMove{};
             std::vector<SearchMove> mp_moves;
-            MovePickingStage highest_stage = MPS_NOT_STARTED;
-            int prev_score = INT32_MAX;
-            bool check = board.in_check();
+            auto highest_stage = MovePickingStage(MPS_NOT_STARTED);
+            auto prev_score = INT32_MAX;
+            auto check = board.in_check();
             while ((move = move_picker.next()) != MOVE_NULL) {
                 mp_moves.push_back(move);
-                MovePickingStage move_stage = classify_move_stage(move, board, hash_move, mv_hist, ply, QUIESCE);
+                auto move_stage = classify_move_stage(move, board, hash_move, mv_hist, ply, QUIESCE);
                 EXPECT(move_stage).to_be_greater_than_or_equal_to(highest_stage);
 
                 if (move_stage > highest_stage) {
@@ -200,9 +200,9 @@ void test_move_picker() {
             for (SearchMove mp_move: mp_moves) {
                 EXPECT(mp_move).to_not_be(MOVE_NULL);
 
-                bool exists_in_legal_moves = false;
+                auto exists_in_legal_moves = false;
                 for (Move* legal_it = &validation_moves[0]; legal_it != validation_moves_end; ++legal_it) {
-                    Move lg_move = *legal_it;
+                    auto lg_move = *legal_it;
                     if (lg_move == mp_move) {
                         exists_in_legal_moves = true;
                         *legal_it = MOVE_NULL; // Prevent same move from being counted twice.

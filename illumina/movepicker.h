@@ -91,9 +91,9 @@ void insertion_sort(TIter begin, TIter end, TCompar comp) {
         return;
     }
 
-    for (TIter i = begin + 1; i != end; ++i) {
+    for (auto i = begin + 1; i != end; ++i) {
         typename std::iterator_traits<TIter>::value_type key = *i;
-        TIter j = i - 1;
+        auto j = i - 1;
 
         while (j >= begin && comp(key, *j)) {
             *(j + 1) = std::move(*j);
@@ -106,26 +106,26 @@ void insertion_sort(TIter begin, TIter end, TCompar comp) {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_promotion_captures() {
-    constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE);
-    SearchMove* begin = m_moves_end;
+    constexpr auto MASK = BIT(MT_PROMOTION_CAPTURE);
+    auto* begin = m_moves_end;
     m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_simple_promotions() {
-    constexpr ui64 MASK = BIT(MT_SIMPLE_PROMOTION);
-    SearchMove* begin = m_moves_end;
+    constexpr auto MASK = BIT(MT_SIMPLE_PROMOTION);
+    auto* begin = m_moves_end;
     m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_simple_captures() {
-    constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE);
+    constexpr auto MASK = BIT(MT_SIMPLE_CAPTURE);
 
-    SearchMove* begin = m_moves_end;
-    SearchMove* bad_captures_begin = begin;
+    auto* begin = m_moves_end;
+    auto* bad_captures_begin = begin;
     m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
 
     // For simple captures, we need to classify them as good or bad.
@@ -133,9 +133,9 @@ void MovePicker<QUIESCE>::generate_simple_captures() {
     // superior or equal to zero.
     bool see_table[SQ_COUNT][SQ_COUNT];
     for (auto it = begin; it != m_moves_end; ++it) {
-        SearchMove& m = *it;
+        auto& m = *it;
 
-        bool good_see = has_good_see(*m_board, m.source(), m.destination(), m_good_capture_see_threshold);
+        auto good_see = has_good_see(*m_board, m.source(), m.destination(), m_good_capture_see_threshold);
         see_table[m.source()][m.destination()] = good_see;
         score_move(m);
 
@@ -145,8 +145,8 @@ void MovePicker<QUIESCE>::generate_simple_captures() {
     }
 
     insertion_sort(begin, m_moves_end, [&see_table](SearchMove& a, SearchMove& b) {
-        bool a_good_see = see_table[a.source()][a.destination()];
-        bool b_good_see = see_table[b.source()][b.destination()];
+        auto a_good_see = see_table[a.source()][a.destination()];
+        auto b_good_see = see_table[b.source()][b.destination()];
         if (a_good_see && !b_good_see) {
             return true;
         }
@@ -163,20 +163,20 @@ void MovePicker<QUIESCE>::generate_simple_captures() {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_en_passants() {
-    constexpr ui64 MASK = BIT(MT_EN_PASSANT);
-    SearchMove* begin = m_moves_end;
+    constexpr auto MASK = BIT(MT_EN_PASSANT);
+    auto* begin = m_moves_end;
     m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_quiet_evasions() {
-    constexpr ui64 MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH);
-    SearchMove* begin = m_moves_end;
+    constexpr auto MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH);
+    auto* begin = m_moves_end;
     m_moves_end = generate_evasions<MASK>(*m_board, m_moves_end);
 
     for (auto it = begin; it != m_moves_end; ++it) {
-        SearchMove& m = *it;
+        auto& m = *it;
         score_move(m);
     }
 
@@ -189,22 +189,22 @@ void MovePicker<QUIESCE>::generate_quiet_evasions() {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_noisy_evasions() {
-    constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_SIMPLE_PROMOTION) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_EN_PASSANT);
-    SearchMove* begin = m_moves_end;
+    constexpr auto MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_SIMPLE_PROMOTION) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_EN_PASSANT);
+    auto* begin = m_moves_end;
     m_moves_end = generate_evasions<MASK>(*m_board, m_moves_end);
 
     bool see_table[SQ_COUNT][SQ_COUNT];
     for (auto it = begin; it != m_moves_end; ++it) {
-        SearchMove& m = *it;
+        auto& m = *it;
 
-        bool good_see = has_good_see(*m_board, m.source(), m.destination());
+        auto good_see = has_good_see(*m_board, m.source(), m.destination());
         see_table[m.source()][m.destination()] = good_see;
         score_move(m);
     }
 
     insertion_sort(begin, m_moves_end, [&see_table](SearchMove& a, SearchMove& b) {
-        bool a_is_prom = a.is_promotion();
-        bool b_is_prom = b.is_promotion();
+        auto a_is_prom = a.is_promotion();
+        auto b_is_prom = b.is_promotion();
         if (a_is_prom && !b_is_prom) {
             return true;
         }
@@ -212,8 +212,8 @@ void MovePicker<QUIESCE>::generate_noisy_evasions() {
             return false;
         }
 
-        bool a_good_see = see_table[a.source()][a.destination()];
-        bool b_good_see = see_table[b.source()][b.destination()];
+        auto a_good_see = see_table[a.source()][a.destination()];
+        auto b_good_see = see_table[b.source()][b.destination()];
         if (a_good_see && !b_good_see) {
             return true;
         }
@@ -228,12 +228,12 @@ void MovePicker<QUIESCE>::generate_noisy_evasions() {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_killer_moves() {
-    SearchMove* begin = m_moves_end;
+    auto* begin = m_moves_end;
 
     auto& killers = m_mv_hist->killers(m_ply);
-    size_t n_killers = 0;
-    for (size_t i = 0; i < 2; ++i) {
-        Move killer = killers[i];
+    auto n_killers = size_t(0);
+    for (auto i = size_t(0); i < 2; ++i) {
+        auto killer = killers[i];
         if (!m_board->is_move_pseudo_legal(killer)
             || (m_board->in_check() && !m_board->is_move_legal(killer))) {
             continue;
@@ -247,8 +247,8 @@ void MovePicker<QUIESCE>::generate_killer_moves() {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_quiets() {
-    constexpr ui64 MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH) | BIT(MT_CASTLES);
-    SearchMove* begin = m_moves_end;
+    constexpr auto MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH) | BIT(MT_CASTLES);
+    auto* begin = m_moves_end;
     m_moves_end = generate_moves<MASK, false>(*m_board, begin);
 
     for (auto it = begin; it != m_moves_end; ++it) {
@@ -263,7 +263,7 @@ void MovePicker<QUIESCE>::generate_quiets() {
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::generate_hash_move() {
-    SearchMove* begin = m_moves_end;
+    auto* begin = m_moves_end;
     if (m_hash_move != MOVE_NULL) {
         *m_moves_end++ = m_hash_move;
     }
@@ -411,7 +411,7 @@ inline SearchMove MovePicker<QUIESCE>::next() {
         return next();
     }
 
-    SearchMove move = *m_moves_it++;
+    auto move = *m_moves_it++;
 
     // Prevent hash move revisits.
     if (move == m_hash_move) {
@@ -428,7 +428,7 @@ inline SearchMove MovePicker<QUIESCE>::next() {
         return next();
     }
 
-    bool legal = m_board->in_check() // We only generate legal evasions during checks.
+    auto legal = m_board->in_check() // We only generate legal evasions during checks.
               || m_board->is_move_legal(move);
     if (!legal || move == MOVE_NULL) {
         // Move isn't legal, try getting the next one.

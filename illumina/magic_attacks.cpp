@@ -106,16 +106,16 @@ const Bitboard g_bishop_magics[] {
 };
 
 static Bitboard generate_slider_attacks(Square s, Direction dir, Bitboard occ) {
-    Bitboard ret = 0;
+    auto ret = Bitboard(0);
 
     while (true) {
-        BoardFile prev_file = square_file(s);
-        BoardRank prev_rank = square_rank(s);
+        auto prev_file = square_file(s);
+        auto prev_rank = square_rank(s);
 
         s += dir;
 
-        int file_delta = std::abs(square_file(s) - prev_file);
-        int rank_delta = std::abs(square_rank(s) - prev_rank);
+        auto file_delta = std::abs(square_file(s) - prev_file);
+        auto rank_delta = std::abs(square_rank(s) - prev_rank);
 
         if (   (dir == DIR_EAST || dir == DIR_WEST)
             && rank_delta != 0) {
@@ -146,7 +146,7 @@ static Bitboard generate_slider_attacks(Square s, Direction dir, Bitboard occ) {
 }
 
 static Bitboard generate_bishop_attacks(Square s, Bitboard occ) {
-    Bitboard ret = 0;
+    auto ret = Bitboard(0);
 
     ret |= generate_slider_attacks(s, DIR_NORTHEAST, occ);
     ret |= generate_slider_attacks(s, DIR_SOUTHEAST, occ);
@@ -157,7 +157,7 @@ static Bitboard generate_bishop_attacks(Square s, Bitboard occ) {
 }
 
 static Bitboard generate_rook_attacks(Square s, Bitboard occ) {
-    Bitboard ret = 0;
+    auto ret = Bitboard(0);
 
     ret |= generate_slider_attacks(s, DIR_NORTH, occ);
     ret |= generate_slider_attacks(s, DIR_SOUTH, occ);
@@ -169,12 +169,12 @@ static Bitboard generate_rook_attacks(Square s, Bitboard occ) {
 
 
 static Bitboard generate_occupancy(Bitboard mask, ui64 index) {
-    Bitboard ret = 0;
-    Square it = 0;
-    Bitboard idx_bb = index;
+    auto ret = Bitboard(0);
+    auto it = Square(0);
+    auto idx_bb = index;
 
     while (mask != 0) {
-        Square s = lsb(mask);
+        auto s = lsb(mask);
 
         if (bit_is_set(idx_bb, it)) {
             ret = set_bit(ret, s);
@@ -188,24 +188,24 @@ static Bitboard generate_occupancy(Bitboard mask, ui64 index) {
 }
 
 static void generate_slider_bitboards() {
-    for (Square s = 0; s < 64; ++s) {
+    for (auto s = Square(0); s < 64; ++s) {
         // Generate bishop attacks.
-        int bishop_shift = g_bishop_shifts[s];
-        ui64 bishop_entries = ((1ULL) << (64 - bishop_shift));
+        auto bishop_shift = g_bishop_shifts[s];
+        auto bishop_entries = ((1ULL) << (64 - bishop_shift));
 
-        for (ui64 i = 0; i < bishop_entries; ++i) {
-            Bitboard occ = generate_occupancy(g_bishop_masks[s], i);
-            ui64 key = (occ * g_bishop_magics[s]) >> bishop_shift;
+        for (auto i = ui64(0); i < bishop_entries; ++i) {
+            auto occ = generate_occupancy(g_bishop_masks[s], i);
+            auto key = (occ * g_bishop_magics[s]) >> bishop_shift;
             g_bishop_attacks[s][key] = generate_bishop_attacks(s, occ);
         }
 
         // Generate rook attacks.
-        int rook_shift = g_rook_shifts[s];
-        ui64 rook_entries = ((1ULL) << (64 - rook_shift));
+        auto rook_shift = g_rook_shifts[s];
+        auto rook_entries = ((1ULL) << (64 - rook_shift));
 
-        for (ui64 i = 0; i < rook_entries; ++i) {
-            Bitboard occ = generate_occupancy(g_rook_masks[s], i);
-            ui64 key = (occ * g_rook_magics[s]) >> rook_shift;
+        for (auto i = ui64(0); i < rook_entries; ++i) {
+            auto occ = generate_occupancy(g_rook_masks[s], i);
+            auto key = (occ * g_rook_magics[s]) >> rook_shift;
             g_rook_attacks[s][key] = generate_rook_attacks(s, occ);
         }
     }

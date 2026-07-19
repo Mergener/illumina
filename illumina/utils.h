@@ -20,7 +20,7 @@ bool try_parse_int(std::string_view sv, T& ret, T_BASE base = 10) {
 
     ret           = 0;
     T sign_factor = 1;
-    size_t i      = 0;
+    auto i      = size_t(0);
 
     // We need to check for negative sign.
     if (sv[0] == '-') {
@@ -35,7 +35,7 @@ bool try_parse_int(std::string_view sv, T& ret, T_BASE base = 10) {
 
         ret *= base;
 
-        char c = sv[i];
+        auto c = sv[i];
         T add;
         if (c >= '0' && c <= '9') {
             add = c - '0';

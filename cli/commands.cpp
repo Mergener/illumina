@@ -13,14 +13,14 @@ void register_commands(CLIApplication& server) {
     });
 
     server.register_command("setoption", [](const CommandContext& ctx) {
-        std::string opt_name  = ctx.word_after("name");
-        std::string value_str = ctx.word_after("value");
+        auto opt_name  = ctx.word_after("name");
+        auto value_str = ctx.word_after("value");
 
         global_state().set_option(opt_name, value_str);
     });
 
     server.register_command("option", [](const CommandContext& ctx) {
-        std::string opt_name  = ctx.word_after("");
+        auto opt_name  = ctx.word_after("");
 
         global_state().display_option_value(opt_name);
     });
@@ -30,7 +30,7 @@ void register_commands(CLIApplication& server) {
     });
 
     server.register_command("position", [](const CommandContext& ctx) {
-        bool read_only = true;
+        auto read_only = true;
         Board board;
         if (ctx.has_arg("startpos")) {
             // Get a starting position board.
@@ -64,12 +64,12 @@ void register_commands(CLIApplication& server) {
         if (ctx.has_arg("moves")) {
             // Parse every move contained in the command string.
             std::vector<Move> moves;
-            std::string move_list_str = ctx.all_after("moves");
+            auto move_list_str = ctx.all_after("moves");
 
-            ParseHelper parser(move_list_str);
+            auto parser = ParseHelper(move_list_str);
             while (!parser.finished()) {
-                std::string_view chunk = parser.read_chunk();
-                Move move = Move::parse_uci(board, chunk);
+                auto chunk = parser.read_chunk();
+                auto move = Move::parse_uci(board, chunk);
                 if (move != MOVE_NULL) {
                     board.make_move(move);
                 }
@@ -80,13 +80,13 @@ void register_commands(CLIApplication& server) {
     });
 
     server.register_command("domoves", [](const CommandContext& ctx) {
-        Board board = global_state().board();
+        auto board = global_state().board();
         std::vector<Move> moves;
-        std::string move_list_str = ctx.all_after("");
+        auto move_list_str = ctx.all_after("");
 
-        ParseHelper parser(move_list_str);
+        auto parser = ParseHelper(move_list_str);
         while (!parser.finished()) {
-            Move move = Move::parse_uci(board, parser.read_chunk());
+            auto move = Move::parse_uci(board, parser.read_chunk());
             if (move != MOVE_NULL) {
                 board.make_move(move);
             }
@@ -147,7 +147,7 @@ void register_commands(CLIApplication& server) {
             settings.max_nodes = ctx.int_after("nodes");
         }
 
-        bool trace = false;
+        auto trace = false;
         if (ctx.has_arg("trace")) {
             trace = true;
         }
@@ -155,11 +155,11 @@ void register_commands(CLIApplication& server) {
         if (ctx.has_arg("searchmoves")) {
             // Parse all searchmoves.
             std::vector<Move> search_moves;
-            std::string search_moves_str = ctx.all_after("searchmoves");
-            ParseHelper parser(search_moves_str);
-            const Board& board = global_state().board();
+        auto search_moves_str = ctx.all_after("searchmoves");
+            auto parser = ParseHelper(search_moves_str);
+            const auto& board = global_state().board();
             while (!parser.finished()) {
-                Move move = Move::parse_uci(board, parser.read_chunk());
+                auto move = Move::parse_uci(board, parser.read_chunk());
                 if (move == MOVE_NULL) {
                     break;
                 }

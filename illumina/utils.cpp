@@ -14,7 +14,7 @@ template <typename TInt>
 TInt random_integer(TInt min_inclusive, TInt max_exclusive) {
     static_assert(std::is_integral_v<TInt>);
 
-    std::uniform_int_distribution<TInt> gen(min_inclusive, std::max(max_exclusive - 1, min_inclusive));
+    auto gen = std::uniform_int_distribution<TInt>(min_inclusive, std::max(max_exclusive - 1, min_inclusive));
 
     return gen(s_random);
 }
@@ -23,7 +23,7 @@ template <typename TFloat>
 TFloat random_fp(TFloat min, TFloat max) {
     static_assert(std::is_floating_point_v<TFloat>);
 
-    std::uniform_real_distribution<TFloat> gen(min, max);
+    auto gen = std::uniform_real_distribution<TFloat>(min, max);
 
     return gen(s_random);
 }
@@ -53,13 +53,13 @@ ui32 random(ui32 min_inclusive, ui32 max_exclusive) {
 }
 
 Square random_square(Bitboard allowed_squares) {
-    int n_allowed = popcount(allowed_squares);
-    int rnd = random(0, n_allowed);
-    int idx = 0;
-    Square ret = SQ_NULL;
+    auto n_allowed = int(popcount(allowed_squares));
+    auto rnd = random(0, n_allowed);
+    auto idx = 0;
+    auto ret = Square(SQ_NULL);
 
     while (allowed_squares) {
-        Square s = lsb(allowed_squares);
+        auto s = lsb(allowed_squares);
         if (idx == rnd) {
             ret = s;
             break;

@@ -17,7 +17,7 @@ TEST_CASE(TryParseInt) {
 
         void run() {
             i64 result;
-            bool success = try_parse_int(str, result, base);
+            auto success = try_parse_int(str, result, base);
             EXPECT(success).to_be(expect_success);
             if (expect_success) {
                 EXPECT(result).to_be(expected_value);

@@ -99,8 +99,8 @@ constexpr ui8 lrot(ui8 val, ui8 rot) {
  * Taken from https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipVertically
  */
 constexpr ui64 flip_bits_vert(ui64 x) {
-    const ui64 k1 = 0x00FF00FF00FF00FFULL;
-    const ui64 k2 = 0x0000FFFF0000FFFFULL;
+    const auto k1 = 0x00FF00FF00FF00FFULL;
+    const auto k2 = 0x0000FFFF0000FFFFULL;
     x = ((x >>  8) & k1) | ((x & k1) <<  8);
     x = ((x >> 16) & k2) | ((x & k2) << 16);
     x = ( x >> 32)       | ( x       << 32);
@@ -508,12 +508,12 @@ constexpr Square double_push_destination(Square src, Color color) {
 }
 
 inline Square parse_square(std::string_view square_str) {
-    BoardFile file = file_from_char(square_str[0]);
+    auto file = file_from_char(square_str[0]);
     if (file == FL_NULL) {
         return SQ_NULL;
     }
 
-    BoardRank rank = square_str[1] - '1';
+    auto rank = square_str[1] - '1';
     if (rank == RNK_NULL) {
         return SQ_NULL;
     }
@@ -826,7 +826,7 @@ constexpr Move Move::base(Square src, Square dst, Piece src_piece, MoveType type
     ILLUMINA_ASSERT_VALID_SQUARE(dst);
     ILLUMINA_ASSERT_VALID_MOVE_TYPE(type);
 
-    Move move(0);
+    auto move = Move(0);
 
     move.m_data |= (src & BITMASK(6))             << 0;
     move.m_data |= (dst & BITMASK(6))             << 6;
@@ -846,7 +846,7 @@ constexpr Move Move::new_simple_capture(Square src,
                                         Square dst,
                                         Piece src_piece,
                                         Piece capt_piece) {
-    Move move = base(src, dst, src_piece, MT_SIMPLE_CAPTURE);
+    auto move = base(src, dst, src_piece, MT_SIMPLE_CAPTURE);
     move.m_data |= (capt_piece.raw() & BITMASK(4)) << 16;
     return move;
 }
@@ -858,7 +858,7 @@ constexpr Move Move::new_promotion_capture(Square src,
                                            PieceType prom_piece_type) {
     ILLUMINA_ASSERT_VALID_PIECE_TYPE(prom_piece_type);
 
-    Move move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_PROMOTION_CAPTURE);
+    auto move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_PROMOTION_CAPTURE);
     move.m_data |= (capt_piece.raw() & BITMASK(4)) << 16;
     move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
     return move;
@@ -867,18 +867,18 @@ constexpr Move Move::new_promotion_capture(Square src,
 constexpr Move Move::new_en_passant_capture(Square src,
                                             Square dst,
                                             Color pawn_color) {
-    Move move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_EN_PASSANT);
+    auto move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_EN_PASSANT);
     move.m_data |= (Piece(opposite_color(pawn_color), PT_PAWN).raw() & BITMASK(4)) << 16;
     return move;
 }
 
 constexpr Move Move::new_double_push(Square src, Color pawn_color) {
-    Move move = base(src, double_push_destination(src, pawn_color), Piece(pawn_color, PT_PAWN), MT_DOUBLE_PUSH);
+    auto move = base(src, double_push_destination(src, pawn_color), Piece(pawn_color, PT_PAWN), MT_DOUBLE_PUSH);
     return move;
 }
 
 constexpr Move Move::new_double_push_from_dest(Square dst, Color pawn_color) {
-    Move move = base(double_push_source(dst, pawn_color), dst, Piece(pawn_color, PT_PAWN), MT_DOUBLE_PUSH);
+    auto move = base(double_push_source(dst, pawn_color), dst, Piece(pawn_color, PT_PAWN), MT_DOUBLE_PUSH);
     return move;
 }
 
@@ -894,7 +894,7 @@ constexpr Move Move::new_castles(Square src,
                                  Side side, Square rook_square) {
     ILLUMINA_ASSERT_VALID_SQUARE(rook_square);
 
-    Move move = base(src, castled_king_square(king_color, side), Piece(king_color, PT_KING), MT_CASTLES);
+    auto move = base(src, castled_king_square(king_color, side), Piece(king_color, PT_KING), MT_CASTLES);
     move.m_data |= (square_file(rook_square) & BITMASK(3)) << 26;
     move.m_data |= (side & BITMASK(1)) << 29;
     return move;
@@ -906,23 +906,23 @@ constexpr Move Move::new_simple_promotion(Square src,
                                           PieceType prom_piece_type) {
     ILLUMINA_ASSERT_VALID_PIECE_TYPE(prom_piece_type);
 
-    Move move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_SIMPLE_PROMOTION);
+    auto move = base(src, dst, Piece(pawn_color, PT_PAWN), MT_SIMPLE_PROMOTION);
     move.m_data |= (prom_piece_type & BITMASK(3)) << 23;
     return move;
 }
 
 constexpr bool Move::is_capture() const {
-    constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_EN_PASSANT) | BIT(MT_PROMOTION_CAPTURE);
+    constexpr auto MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_EN_PASSANT) | BIT(MT_PROMOTION_CAPTURE);
     return (BIT(type()) & MASK) != 0;
 }
 
 constexpr bool Move::is_promotion() const {
-    constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
+    constexpr auto MASK = BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
     return (BIT(type()) & MASK) != 0;
 }
 
 constexpr bool Move::is_quiet() const {
-    constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_EN_PASSANT) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
+    constexpr auto MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_EN_PASSANT) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_SIMPLE_PROMOTION);
     return (BIT(type()) & MASK) == 0;
 }
 

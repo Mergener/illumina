@@ -18,7 +18,7 @@ static const auto s_default_mode = run_normal_datagen;
 
 void run_bench() {
     std::cout << "Running bench..." << std::endl;
-    BenchResults res = bench();
+    auto res = bench();
     std::cout << "Finished bench."
               << "\n\tNodes: " << res.total_nodes
               << "\n\tNPS:   " << res.nps
@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
             return s_default_mode(argc, argv);
         }
 
-        const std::string_view first_arg = argv[1];
+        const auto first_arg = std::string_view(argv[1]);
         if (is_help_token(first_arg)) {
             print_usage(argv[0]);
             return EXIT_SUCCESS;

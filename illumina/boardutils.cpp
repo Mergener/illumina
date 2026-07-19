@@ -6,45 +6,45 @@ static Square least_valuable_attacker_of(const Board& board,
                                          Color c,
                                          Square s,
                                          Bitboard occ) {
-    Bitboard their_pawns = board.piece_bb(Piece(c, PT_PAWN)) & occ;
+    auto their_pawns = board.piece_bb(Piece(c, PT_PAWN)) & occ;
     Bitboard pawn_targets;
     pawn_targets = pawn_attacks(s, opposite_color(c));
-    Bitboard pawn_attacker = pawn_targets & their_pawns;
+    auto pawn_attacker = pawn_targets & their_pawns;
     if (pawn_attacker) {
         return lsb(pawn_attacker);
     }
 
-    Bitboard their_knights   = board.piece_bb(Piece(c, PT_KNIGHT)) & occ;
-    Bitboard knight_atks     = knight_attacks(s);
-    Bitboard knight_attacker = knight_atks & their_knights;
+    auto their_knights   = board.piece_bb(Piece(c, PT_KNIGHT)) & occ;
+    auto knight_atks     = knight_attacks(s);
+    auto knight_attacker = knight_atks & their_knights;
     if (knight_attacker) {
         return lsb(knight_attacker);
     }
 
-    Bitboard their_bishops   = board.piece_bb(Piece(c, PT_BISHOP)) & occ;
-    Bitboard bishop_atks     = bishop_attacks(s, occ);
-    Bitboard bishop_attacker = bishop_atks & their_bishops;
+    auto their_bishops   = board.piece_bb(Piece(c, PT_BISHOP)) & occ;
+    auto bishop_atks     = bishop_attacks(s, occ);
+    auto bishop_attacker = bishop_atks & their_bishops;
     if (bishop_attacker) {
         return lsb(bishop_attacker);
     }
 
-    Bitboard their_rooks   = board.piece_bb(Piece(c, PT_ROOK)) & occ;
-    Bitboard rook_atks     = rook_attacks(s, occ);
-    Bitboard rook_attacker = rook_atks & their_rooks;
+    auto their_rooks   = board.piece_bb(Piece(c, PT_ROOK)) & occ;
+    auto rook_atks     = rook_attacks(s, occ);
+    auto rook_attacker = rook_atks & their_rooks;
     if (rook_attacker) {
         return lsb(rook_attacker);
     }
 
-    Bitboard their_queens   = board.piece_bb(Piece(c, PT_QUEEN)) & occ;
-    Bitboard queen_atks     = rook_atks | bishop_atks;
-    Bitboard queen_attacker = queen_atks & their_queens;
+    auto their_queens   = board.piece_bb(Piece(c, PT_QUEEN)) & occ;
+    auto queen_atks     = rook_atks | bishop_atks;
+    auto queen_attacker = queen_atks & their_queens;
     if (queen_attacker) {
         return lsb(queen_attacker);
     }
 
-    Bitboard their_king_bb  = board.piece_bb(Piece(c, PT_KING)) & occ;
-    Bitboard king_atks      = king_attacks(s);
-    Bitboard king_attacker  = king_atks & their_king_bb;
+    auto their_king_bb  = board.piece_bb(Piece(c, PT_KING)) & occ;
+    auto king_atks      = king_attacks(s);
+    auto king_attacker  = king_atks & their_king_bb;
     if (king_attacker) {
         return lsb(king_attacker);
     }
@@ -58,14 +58,14 @@ bool has_good_see(const Board& board,
                   int threshold) {
     constexpr int PIECE_VALUES[] = { 0, 1, 4, 4, 6, 12, 999 };
 
-    int gain = 0; // End gained value, at the first source piece color perspective.
-    int sign = 1;
+    auto gain = 0; // End gained value, at the first source piece color perspective.
+    auto sign = 1;
 
     // Setup variables.
-    Piece src_piece = board.piece_at(source);
-    Piece dst_piece = board.piece_at(dest);
-    Color color  = src_piece.color();
-    Bitboard occ = board.occupancy();
+    auto src_piece = board.piece_at(source);
+    auto dst_piece = board.piece_at(dest);
+    auto color  = src_piece.color();
+    auto occ = board.occupancy();
 
     // Simulate our first capture.
     gain += PIECE_VALUES[dst_piece.type()];
@@ -75,7 +75,7 @@ bool has_good_see(const Board& board,
     sign  = -1;
 
     while (true) {
-        Square attacker_sq = least_valuable_attacker_of(board, color, dest, occ);
+        auto attacker_sq = least_valuable_attacker_of(board, color, dest, occ);
         if (attacker_sq == SQ_NULL) {
             break;
         }
@@ -119,21 +119,21 @@ static Bitboard get_defenders(const Board& board,
 bool has_good_see_simple(const Board& board,
                          Square source,
                          Square destination) {
-    Piece source_piece = board.piece_at(source);
+    auto source_piece = board.piece_at(source);
 
-    Bitboard occ = unset_bit(board.occupancy(), source);
-    Color us     = source_piece.color();
-    Color them   = opposite_color(us);
+    auto occ = unset_bit(board.occupancy(), source);
+    auto us     = source_piece.color();
+    auto them   = opposite_color(us);
 
     // Get all opponent potential attackers.
-    Bitboard opponent_attackers = get_defenders(board, destination, them, occ);
+    auto opponent_attackers = get_defenders(board, destination, them, occ);
 
-    bool defenders_computed = false;
+    auto defenders_computed = false;
     bool has_defenders; // Will be calculated lazily.
 
     while (opponent_attackers) {
-        Square attacker_sq   = lsb(opponent_attackers);
-        Piece attacker_piece = board.piece_at(attacker_sq);
+        auto attacker_sq   = lsb(opponent_attackers);
+        auto attacker_piece = board.piece_at(attacker_sq);
 
         if (attacker_piece.type() < source_piece.type()) {
             // Attacker is of lesser value. Bad SEE.
@@ -145,7 +145,7 @@ bool has_good_see_simple(const Board& board,
         if (!defenders_computed) {
             defenders_computed = true;
 
-            Bitboard our_defenders = get_defenders(board, destination, us, occ);
+            auto our_defenders = get_defenders(board, destination, us, occ);
 
             // Remove moving piece from defenders.
             our_defenders = unset_bit(our_defenders, source);
@@ -166,13 +166,13 @@ bool has_good_see_simple(const Board& board,
 bool attacks_vulnerable_pieces(const Board& board,
                                Square source,
                                Square dest) {
-    Piece source_piece = board.piece_at(source);
-    Bitboard occ       = unset_bit(board.occupancy(), source);
-    Color us     = source_piece.color();
-    Color them   = opposite_color(us);
-    Bitboard their_pieces = board.color_bb(them);
+    auto source_piece = board.piece_at(source);
+    auto occ       = unset_bit(board.occupancy(), source);
+    auto us     = source_piece.color();
+    auto them   = opposite_color(us);
+    auto their_pieces = board.color_bb(them);
 
-    Bitboard targets = their_pieces;
+    auto targets = their_pieces;
     targets &= piece_attacks(source_piece, dest, occ);
 
     // Ignore kings.
@@ -182,7 +182,7 @@ bool attacks_vulnerable_pieces(const Board& board,
     targets &= ~board.piece_bb(Piece(them, source_piece.type()));
 
     while (targets) {
-        Square target = lsb(targets);
+        auto target = lsb(targets);
 
         if (  board.piece_at(target).type() > source_piece.type()
             || get_defenders(board, target, them, occ) == 0) {
@@ -198,8 +198,8 @@ static Bitboard line_attackers(const Board& board,
                                Square s,
                                Bitboard occ,
                                Color c) {
-    Bitboard queens = board.piece_bb(Piece(c, PT_QUEEN));
-    Bitboard rooks  = board.piece_bb(Piece(c, PT_ROOK));
+    auto queens = board.piece_bb(Piece(c, PT_QUEEN));
+    auto rooks  = board.piece_bb(Piece(c, PT_ROOK));
     return rook_attacks(s, occ) & (queens | rooks);
 }
 
@@ -207,25 +207,25 @@ static Bitboard diagonal_attackers(const Board& board,
                                    Square s,
                                    Bitboard occ,
                                    Color c) {
-    Bitboard queens  = board.piece_bb(Piece(c, PT_QUEEN));
-    Bitboard bishops = board.piece_bb(Piece(c, PT_BISHOP));
+    auto queens  = board.piece_bb(Piece(c, PT_QUEEN));
+    auto bishops = board.piece_bb(Piece(c, PT_BISHOP));
     return bishop_attacks(s, occ) & (queens | bishops);
 }
 
 Bitboard discovered_attacks(const Board& board,
                             Square source,
                             Square destination) {
-    Color us   = board.color_to_move();
-    Color them = opposite_color(us);
-    Bitboard their_pieces = board.color_bb(them);
-    Bitboard occ_before = board.occupancy();
-    Bitboard occ_after  = set_bit(unset_bit(occ_before, source), destination);
+    auto us   = board.color_to_move();
+    auto them = opposite_color(us);
+    auto their_pieces = board.color_bb(them);
+    auto occ_before = board.occupancy();
+    auto occ_after  = set_bit(unset_bit(occ_before, source), destination);
 
     // Check all pieces this piece was blocking.
-    Bitboard diagonal_atks = diagonal_attackers(board, source, occ_before, us);
-    Bitboard line_atks     = line_attackers(board, source, occ_before, us);
+    auto diagonal_atks = diagonal_attackers(board, source, occ_before, us);
+    auto line_atks     = line_attackers(board, source, occ_before, us);
 
-    Bitboard released = 0;
+    auto released = Bitboard(0);
 
     if (square_file(source) != square_file(destination)) {
         released |= line_atks;
@@ -234,10 +234,10 @@ Bitboard discovered_attacks(const Board& board,
         released |= diagonal_atks;
     }
 
-    Bitboard revealed = 0;
+    auto revealed = Bitboard(0);
     while (released != 0) {
-        Square s = lsb(released);
-        Piece  p = board.piece_at(s);
+        auto s = lsb(released);
+        auto p = board.piece_at(s);
 
         revealed |= piece_attacks(p, s, occ_after) & their_pieces;
 
@@ -248,9 +248,9 @@ Bitboard discovered_attacks(const Board& board,
 }
 
 Bitboard non_pawn_bb(const Board& board) {
-    Bitboard occupancy = board.occupancy();
-    Bitboard kings     = board.piece_type_bb(PT_KING);
-    Bitboard pawns     = board.piece_type_bb(PT_PAWN);
+    auto occupancy = board.occupancy();
+    auto kings     = board.piece_type_bb(PT_KING);
+    auto pawns     = board.piece_type_bb(PT_PAWN);
     return occupancy & (~kings) & (~pawns);
 }
 

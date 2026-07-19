@@ -550,7 +550,7 @@ TEST_CASE(SquareName) {
 
 TEST_CASE(MoveConstruction) {
     // Test constructing a normal move
-    Move normal_move = Move::new_normal(SQ_E2, SQ_E4, Piece(CL_WHITE, PT_PAWN));
+    auto normal_move = Move::new_normal(SQ_E2, SQ_E4, Piece(CL_WHITE, PT_PAWN));
     EXPECT(normal_move.source()).to_be(SQ_E2);
     EXPECT(normal_move.destination()).to_be(SQ_E4);
     EXPECT(normal_move.source_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
@@ -558,7 +558,7 @@ TEST_CASE(MoveConstruction) {
     EXPECT(normal_move.to_uci()).to_be("e2e4");
 
     // Test constructing a simple capture move
-    Move capture = Move::new_simple_capture(SQ_D4, SQ_E5, Piece(CL_WHITE, PT_PAWN), Piece(CL_BLACK, PT_KNIGHT));
+    auto capture = Move::new_simple_capture(SQ_D4, SQ_E5, Piece(CL_WHITE, PT_PAWN), Piece(CL_BLACK, PT_KNIGHT));
     EXPECT(capture.source()).to_be(SQ_D4);
     EXPECT(capture.destination()).to_be(SQ_E5);
     EXPECT(capture.source_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
@@ -567,7 +567,7 @@ TEST_CASE(MoveConstruction) {
     EXPECT(capture.to_uci()).to_be("d4e5");
 
     // Test constructing a promotion cap ture move
-    Move promotion_capture = Move::new_promotion_capture(SQ_G7, SQ_H8, CL_BLACK, Piece(CL_WHITE, PT_PAWN), PT_QUEEN);
+    auto promotion_capture = Move::new_promotion_capture(SQ_G7, SQ_H8, CL_BLACK, Piece(CL_WHITE, PT_PAWN), PT_QUEEN);
     EXPECT(promotion_capture.source()).to_be(SQ_G7);
     EXPECT(promotion_capture.destination()).to_be(SQ_H8);
     EXPECT(promotion_capture.source_piece()).to_be(Piece(CL_BLACK, PT_PAWN));
@@ -577,7 +577,7 @@ TEST_CASE(MoveConstruction) {
     EXPECT(promotion_capture.to_uci()).to_be("g7h8q");
 
     // Test constructing an en passant capture move
-    Move en_passant = Move::new_en_passant_capture(SQ_D5, SQ_E6, CL_WHITE);
+    auto en_passant = Move::new_en_passant_capture(SQ_D5, SQ_E6, CL_WHITE);
     EXPECT(en_passant.source()).to_be(SQ_D5);
     EXPECT(en_passant.destination()).to_be(SQ_E6);
     EXPECT(en_passant.source_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
@@ -586,7 +586,7 @@ TEST_CASE(MoveConstruction) {
     EXPECT(en_passant.to_uci()).to_be("d5e6");
 
     // Test constructing a double push move
-    Move double_push = Move::new_double_push(SQ_G2, CL_WHITE);
+    auto double_push = Move::new_double_push(SQ_G2, CL_WHITE);
     EXPECT(double_push.source()).to_be(SQ_G2);
     EXPECT(double_push.destination()).to_be(SQ_G4);
     EXPECT(double_push.source_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
@@ -594,7 +594,7 @@ TEST_CASE(MoveConstruction) {
     EXPECT(double_push.to_uci()).to_be("g2g4");
 
     // Test constructing a castling move
-    Move castles = Move::new_castles(SQ_E1, CL_WHITE, SIDE_KING, SQ_H1);
+    auto castles = Move::new_castles(SQ_E1, CL_WHITE, SIDE_KING, SQ_H1);
     EXPECT(castles.source()).to_be(SQ_E1);
     EXPECT(castles.destination()).to_be(SQ_G1);
     EXPECT(castles.source_piece()).to_be(Piece(CL_WHITE, PT_KING));
@@ -603,7 +603,7 @@ TEST_CASE(MoveConstruction) {
     EXPECT(castles.to_uci()).to_be("e1g1");
 
     // Test constructing a simple promotion move
-    Move promotion = Move::new_simple_promotion(SQ_H7, SQ_H8, CL_BLACK, PT_QUEEN);
+    auto promotion = Move::new_simple_promotion(SQ_H7, SQ_H8, CL_BLACK, PT_QUEEN);
     EXPECT(promotion.source()).to_be(SQ_H7);
     EXPECT(promotion.destination()).to_be(SQ_H8);
     EXPECT(promotion.source_piece()).to_be(Piece(CL_BLACK, PT_PAWN));
@@ -614,31 +614,31 @@ TEST_CASE(MoveConstruction) {
 
 TEST_CASE(ToUCI) {
     // Test normal move
-    Move normal_move = Move::new_normal(SQ_E2, SQ_E4, Piece(CL_WHITE, PT_PAWN));
+    auto normal_move = Move::new_normal(SQ_E2, SQ_E4, Piece(CL_WHITE, PT_PAWN));
     EXPECT(normal_move.to_uci()).to_be("e2e4");
 
     // Test simple capture move
-    Move capture = Move::new_simple_capture(SQ_D4, SQ_E5, Piece(CL_WHITE, PT_PAWN), Piece(CL_BLACK, PT_KNIGHT));
+    auto capture = Move::new_simple_capture(SQ_D4, SQ_E5, Piece(CL_WHITE, PT_PAWN), Piece(CL_BLACK, PT_KNIGHT));
     EXPECT(capture.to_uci()).to_be("d4e5");
 
     // Test promotion capture move
-    Move promotion_capture = Move::new_promotion_capture(SQ_G7, SQ_H8, CL_BLACK, Piece(CL_WHITE, PT_PAWN), PT_QUEEN);
+    auto promotion_capture = Move::new_promotion_capture(SQ_G7, SQ_H8, CL_BLACK, Piece(CL_WHITE, PT_PAWN), PT_QUEEN);
     EXPECT(promotion_capture.to_uci()).to_be("g7h8q");
 
     // Test en passant capture move
-    Move en_passant = Move::new_en_passant_capture(SQ_D5, SQ_E6, CL_WHITE);
+    auto en_passant = Move::new_en_passant_capture(SQ_D5, SQ_E6, CL_WHITE);
     EXPECT(en_passant.to_uci()).to_be("d5e6");
 
     // Test double push move
-    Move double_push = Move::new_double_push(SQ_G2, CL_WHITE);
+    auto double_push = Move::new_double_push(SQ_G2, CL_WHITE);
     EXPECT(double_push.to_uci()).to_be("g2g4");
 
     // Test castling move
-    Move castles = Move::new_castles(CL_WHITE, SIDE_KING);
+    auto castles = Move::new_castles(CL_WHITE, SIDE_KING);
     EXPECT(castles.to_uci()).to_be("e1g1");
 
     // Test simple promotion move
-    Move promotion = Move::new_simple_promotion(SQ_H7, SQ_H8, CL_BLACK, PT_QUEEN);
+    auto promotion = Move::new_simple_promotion(SQ_H7, SQ_H8, CL_BLACK, PT_QUEEN);
     EXPECT(promotion.to_uci()).to_be("h7h8q");
 }
 

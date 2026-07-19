@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
         // If command line arguments were specified, execute them.
         if (argc > 1) {
-            for (int i = 1; i < argc; ++i) {
+            for (auto i = 1; i < argc; ++i) {
                 app.handle(argv[i]);
                 while (global_state().searching());
             }

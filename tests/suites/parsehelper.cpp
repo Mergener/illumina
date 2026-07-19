@@ -8,10 +8,10 @@ using namespace illumina;
 TEST_SUITE(ParseHelper);
 
 TEST_CASE(ReadChunk) {
-    std::string text1 = "   rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b\tKQkq e3       0 1";
-    ParseHelper parse_helper(text1);
+    auto text1 = std::string("   rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b\tKQkq e3       0 1");
+    auto parse_helper = ParseHelper(text1);
 
-    for (int i = 0; i < 2; ++i) {
+    for (auto i = 0; i < 2; ++i) {
         EXPECT(parse_helper.finished()).to_be(false);
         EXPECT(parse_helper.read_chunk()).to_be("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR");
         EXPECT(parse_helper.read_chunk()).to_be("b");

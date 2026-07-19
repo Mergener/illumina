@@ -49,7 +49,7 @@ static bool goto_arg(ParseHelper& parser, std::string_view arg_name) {
     }
 
     while (!parser.finished()) {
-        std::string_view chunk = parser.read_chunk();
+        auto chunk = parser.read_chunk();
         if (chunk == arg_name) {
             return true;
         }
@@ -58,13 +58,13 @@ static bool goto_arg(ParseHelper& parser, std::string_view arg_name) {
 }
 
 bool CommandContext::has_arg(std::string_view arg_name) const {
-    ParseHelper parser(m_arg);
+    auto parser = ParseHelper(m_arg);
     return goto_arg(parser, arg_name);
 }
 
 std::string CommandContext::word_after(std::string_view arg_name,
                                        std::optional<std::string> default_val) const {
-    ParseHelper parser(m_arg);
+    auto parser = ParseHelper(m_arg);
     if (!goto_arg(parser, arg_name)) {
         // Argument not found, try to use default value.
         if (default_val.has_value()) {
@@ -80,7 +80,7 @@ std::string CommandContext::word_after(std::string_view arg_name,
 
 i64 CommandContext::int_after(std::string_view arg_name,
                               std::optional<i64> default_val) const {
-    ParseHelper parser(m_arg);
+    auto parser = ParseHelper(m_arg);
     if (!goto_arg(parser, arg_name)) {
         // Argument not found, try to use default value.
         if (default_val.has_value()) {
@@ -91,7 +91,7 @@ i64 CommandContext::int_after(std::string_view arg_name,
         throw BadCommandArgument(m_cmd_name, arg_name, "integer");
     }
     // Argument found, try to parse it.
-    std::string_view arg_word = parser.read_chunk();
+    auto arg_word = parser.read_chunk();
 
     i64 value;
     if (try_parse_int(arg_word, value)) {
@@ -104,7 +104,7 @@ i64 CommandContext::int_after(std::string_view arg_name,
 
 std::string CommandContext::all_after(std::string_view arg_name,
                                       std::optional<std::string> default_val) const {
-    ParseHelper parser(m_arg);
+    auto parser = ParseHelper(m_arg);
     if (!goto_arg(parser, arg_name)) {
         // Argument not found, try to use default value.
         if (default_val.has_value()) {
@@ -131,8 +131,8 @@ CommandContext::CommandContext(CLIApplication* server,
 void CLIApplication::handle(std::string_view command) {
     try {
         // Try to find command handler.
-        ParseHelper parser(command);
-        std::string command_name = std::string(parser.read_chunk());
+        auto parser = ParseHelper(command);
+        auto command_name = std::string(parser.read_chunk());
 
         auto command_handler_it = m_cmd_handlers.find(command_name);
         if (command_handler_it == m_cmd_handlers.end()) {
@@ -141,8 +141,8 @@ void CLIApplication::handle(std::string_view command) {
         }
 
         // Command handler found, try to handle the command.
-        CommandHandler& handler = command_handler_it->second;
-        CommandContext context(this, command_name, parser.remainder());
+        auto& handler = command_handler_it->second;
+        auto context = CommandContext(this, command_name, parser.remainder());
         handler(context);
     }
     catch (const BadCommandArgument& bad_arg) {

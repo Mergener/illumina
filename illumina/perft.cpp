@@ -29,13 +29,13 @@ template <bool BULK, bool ROOT = false, bool LOG = false>
 static ui64 perft(Board& board, int depth) {
     Move moves[MAX_GENERATED_MOVES];
 
-    Move* end = generate_moves(board, moves);
+    auto* end = generate_moves(board, moves);
 
     if constexpr (BULK) {
         if (depth <= 1) {
             if constexpr (ROOT && LOG) {
                 for (Move* it = moves; it != end; ++it) {
-                    Move move = *it;
+                    auto move = *it;
                     log_move(move, 1);
                 }
             }
@@ -49,12 +49,12 @@ static ui64 perft(Board& board, int depth) {
         }
     }
 
-    ui64 n = 0;
+    auto n = ui64(0);
     for (Move* it = moves; it != end; ++it) {
-        Move move = *it;
+        auto move = *it;
 
         board.make_move(move);
-        ui64 it_leaves = perft<BULK, false, false>(board, depth - 1);
+        auto it_leaves = perft<BULK, false, false>(board, depth - 1);
         board.undo_move();
 
         if constexpr (ROOT && LOG) {
@@ -68,11 +68,11 @@ static ui64 perft(Board& board, int depth) {
 }
 
 ui64 perft(const Board& board, int depth, PerftArgs args) {
-    Board replica = board;
+    auto replica = board;
     if (args.log) {
         log_init();
 
-        TimePoint before = now();
+        auto before = now();
         ui64 res;
         if (args.bulk) {
             res = perft<true, true, true>(replica, depth);
@@ -80,8 +80,8 @@ ui64 perft(const Board& board, int depth, PerftArgs args) {
         else {
             res = perft<false, true, true>(replica, depth);
         }
-        TimePoint after  = now();
-        ui64 time_delta  = delta_ms(after, before);
+        auto after  = now();
+        auto time_delta  = delta_ms(after, before);
 
         flush_logs(args.sort_output);
         std::cout << "\nResult: " << res << std::endl;
@@ -101,12 +101,12 @@ static ui64 move_picker_perft_internal(MoveHistory& mv_hist, Board& board, int d
         return 1;
     }
 
-    Move move {};
-    MovePicker<false> move_picker(board, 0, mv_hist);
-    ui64 n = 0;
+    auto move = Move{};
+    auto move_picker = MovePicker<false>(board, 0, mv_hist);
+    auto n = ui64(0);
     while ((move = move_picker.next()) != MOVE_NULL) {
         board.make_move(move);
-        ui64 it_leaves = move_picker_perft_internal<false, false>(mv_hist, board, depth - 1);
+        auto it_leaves = move_picker_perft_internal<false, false>(mv_hist, board, depth - 1);
         board.undo_move();
 
         if constexpr (ROOT && LOG) {
@@ -121,14 +121,14 @@ static ui64 move_picker_perft_internal(MoveHistory& mv_hist, Board& board, int d
 }
 
 ui64 move_picker_perft(const Board& board, int depth, PerftArgs args) {
-    Board replica = board;
+    auto replica = board;
     MoveHistory mv_hist;
     if (args.log) {
         log_init();
-        TimePoint before = now();
-        ui64 res = move_picker_perft_internal<true, true>(mv_hist, replica, depth);
-        TimePoint after = now();
-        ui64 time_delta = delta_ms(after, before);
+        auto before = now();
+        auto res = move_picker_perft_internal<true, true>(mv_hist, replica, depth);
+        auto after = now();
+        auto time_delta = delta_ms(after, before);
         flush_logs(args.sort_output);
 
         std::cout << "\nResult: " << res << std::endl;
