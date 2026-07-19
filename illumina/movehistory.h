@@ -132,7 +132,7 @@ inline void MoveHistory::reset() {
 }
 
 inline int MoveHistory::quiet_history(Move move, const Board& board, Depth ply) const {
-#ifndef TUNING
+#ifndef TUNING_BUILD
     constexpr
 #endif
     int CONTHIST_SCORES[CONTHIST_N_PLIES] = {
