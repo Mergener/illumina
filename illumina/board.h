@@ -65,7 +65,7 @@ public:
     int            ply_count() const;
     CastlingRights castling_rights() const;
     bool           has_castling_rights(Color color, Side side) const;
-    Move           last_move() const;
+    Move           last_move(int n = 0) const;
     Bitboard       pinned_bb() const;
     bool           is_pinned(Square s) const;
     Square         pinner_square(Square pinned_sq) const;
@@ -269,8 +269,18 @@ inline void Board::set_piece_at(Square s, Piece p) {
     set_piece_at_internal<true, true>(s, p);
 }
 
-inline Move Board::last_move() const {
-    return m_state.last_move;
+inline Move Board::last_move(int n) const {
+    if (n == 0) {
+        return m_state.last_move;
+    }
+    auto it = m_prev_states.rbegin();
+    while (--n && it != m_prev_states.rend()) {
+        ++it;
+    }
+    if (it == m_prev_states.rend()) {
+        return MOVE_NULL;
+    }
+    return it->last_move;
 }
 
 inline Bitboard Board::pinned_bb() const {
