@@ -132,12 +132,17 @@ inline void MoveHistory::reset() {
 }
 
 inline int MoveHistory::quiet_history(Move move, const Board& board, Depth ply) const {
+    constexpr int CONTHIST_SCORES[CONTHIST_N_PLIES] = {
+        MV_HIST_CONTHIST_1PLY_WEIGHT,
+        MV_HIST_CONTHIST_2PLY_WEIGHT
+    };
+
     auto hist = i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move));
 
     for (auto i = 0; i < CONTHIST_N_PLIES && i < ply; ++i) {
         Move previous_move = board.last_move(i);
         if (previous_move != MOVE_NULL) {
-            hist += MV_HIST_COUNTER_MOVE_WEIGHT * m_data->cont_hist[i].get(previous_move).get(move);
+            hist += CONTHIST_SCORES[0] * m_data->cont_hist[i].get(previous_move).get(move);
         }
     }
 
