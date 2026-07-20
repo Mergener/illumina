@@ -366,10 +366,10 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_added(Square s, Piece p) {
-    compute_pins();
     if (m_listener.on_add_piece) {
         m_listener.on_add_piece(*this, p, s);
     }
+    m_pins_up_to_date = false;
 
     Color piece_color = p.color();
 
@@ -394,12 +394,11 @@ inline void Board::piece_added(Square s, Piece p) {
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_removed(Square s) {
-    compute_pins();
-
     Piece prev_piece = piece_at(s);
     if (m_listener.on_remove_piece) {
         m_listener.on_remove_piece(*this, prev_piece, s);
     }
+    m_pins_up_to_date = false;
 
     Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
     Bitboard& prev_color_bb = color_bb_ref(prev_piece.color());

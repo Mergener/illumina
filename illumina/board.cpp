@@ -1098,6 +1098,7 @@ Board& Board::operator=(const illumina::Board &rhs) {
         m_castle_rook_squares = rhs.m_castle_rook_squares;
         m_state               = rhs.m_state;
         m_prev_states         = rhs.m_prev_states;
+        m_pins_up_to_date     = rhs.m_pins_up_to_date;
 
         m_listener = {};
     }
