@@ -309,6 +309,11 @@ inline void MovePicker::advance_stage() {
             }
 
             case MPS_KILLER_MOVES: {
+                if (!m_do_quiets) {
+                    advance_stage();
+                    return;
+                }
+
                 generate_killer_moves();
                 break;
             }
