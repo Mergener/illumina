@@ -733,7 +733,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             pc_hash_move = hash_move;
         }
 
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist, pc_hash_move, pc_see);
+        MovePicker pc_move_picker(m_board, ply, m_hist, pc_hash_move, pc_see);
+        pc_move_picker.skip_quiets();
 
         int pc_searched_moves = 0;
         SearchMove move;
@@ -1170,8 +1171,15 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         return alpha;
     }
 
-    // Finally, start looping over available noisy moves.
-    MovePicker<true> move_picker(m_board, ply, m_hist, tt_move);
+    MovePicker move_picker(m_board, ply, m_hist, tt_move);
+    if (PV_NODE
+        || !found_in_tt
+        || tt_entry.move() == MOVE_NULL
+        || tt_entry.bound_type() == BT_UPPERBOUND
+        || tt_entry.move().is_capture()) {
+        move_picker.skip_quiets();
+    }
+
     SearchMove move;
     SearchMove best_move;
     bool searched_a_move = false;

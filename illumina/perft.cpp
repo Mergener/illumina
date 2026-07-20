@@ -102,7 +102,7 @@ static ui64 move_picker_perft_internal(MoveHistory& mv_hist, Board& board, int d
     }
 
     Move move {};
-    MovePicker<false> move_picker(board, 0, mv_hist);
+    MovePicker move_picker(board, 0, mv_hist);
     ui64 n = 0;
     while ((move = move_picker.next()) != MOVE_NULL) {
         board.make_move(move);

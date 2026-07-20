@@ -34,7 +34,6 @@ enum {
 };
 using MovePickingStage = int;
 
-template <bool QUIESCE = false>
 class MovePicker {
 public:
     MovePickingStage stage() const;
@@ -104,24 +103,21 @@ void insertion_sort(TIter begin, TIter end, TCompar comp) {
     }
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_promotion_captures() {
+inline void MovePicker::generate_promotion_captures() {
     constexpr ui64 MASK = BIT(MT_PROMOTION_CAPTURE);
     SearchMove* begin = m_moves_end;
     m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_simple_promotions() {
+inline void MovePicker::generate_simple_promotions() {
     constexpr ui64 MASK = BIT(MT_SIMPLE_PROMOTION);
     SearchMove* begin = m_moves_end;
     m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_simple_captures() {
+inline void MovePicker::generate_simple_captures() {
     constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE);
 
     SearchMove* begin = m_moves_end;
@@ -161,16 +157,14 @@ void MovePicker<QUIESCE>::generate_simple_captures() {
     m_curr_move_range = { begin, bad_captures_begin };
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_en_passants() {
+inline void MovePicker::generate_en_passants() {
     constexpr ui64 MASK = BIT(MT_EN_PASSANT);
     SearchMove* begin = m_moves_end;
     m_moves_end = generate_moves<MASK, false>(*m_board, m_moves_end);
     m_curr_move_range = { begin, m_moves_end };
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_quiet_evasions() {
+inline void MovePicker::generate_quiet_evasions() {
     constexpr ui64 MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH);
     SearchMove* begin = m_moves_end;
     m_moves_end = generate_evasions<MASK>(*m_board, m_moves_end);
@@ -187,8 +181,7 @@ void MovePicker<QUIESCE>::generate_quiet_evasions() {
     m_curr_move_range = { begin, m_moves_end };
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_noisy_evasions() {
+inline void MovePicker::generate_noisy_evasions() {
     constexpr ui64 MASK = BIT(MT_SIMPLE_CAPTURE) | BIT(MT_SIMPLE_PROMOTION) | BIT(MT_PROMOTION_CAPTURE) | BIT(MT_EN_PASSANT);
     SearchMove* begin = m_moves_end;
     m_moves_end = generate_evasions<MASK>(*m_board, m_moves_end);
@@ -226,8 +219,7 @@ void MovePicker<QUIESCE>::generate_noisy_evasions() {
     m_curr_move_range = { begin, m_moves_end };
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_killer_moves() {
+inline void MovePicker::generate_killer_moves() {
     SearchMove* begin = m_moves_end;
 
     auto& killers = m_mv_hist->killers(m_ply);
@@ -245,8 +237,7 @@ void MovePicker<QUIESCE>::generate_killer_moves() {
     m_curr_move_range = { begin, m_moves_end };
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_quiets() {
+inline void MovePicker::generate_quiets() {
     constexpr ui64 MASK = BIT(MT_NORMAL) | BIT(MT_DOUBLE_PUSH) | BIT(MT_CASTLES);
     SearchMove* begin = m_moves_end;
     m_moves_end = generate_moves<MASK, false>(*m_board, begin);
@@ -261,8 +252,7 @@ void MovePicker<QUIESCE>::generate_quiets() {
     m_curr_move_range = { begin, m_moves_end };
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::generate_hash_move() {
+inline void MovePicker::generate_hash_move() {
     SearchMove* begin = m_moves_end;
     if (m_hash_move != MOVE_NULL) {
         *m_moves_end++ = m_hash_move;
@@ -270,12 +260,11 @@ void MovePicker<QUIESCE>::generate_hash_move() {
     m_curr_move_range = { begin, m_moves_end };
 }
 
-template <bool QUIESCE>
-inline MovePicker<QUIESCE>::MovePicker(const Board& board,
-                                       Depth ply,
-                                       const MoveHistory& move_hist,
-                                       Move hash_move,
-                                       int good_capt_see_threshold)
+inline MovePicker::MovePicker(const Board& board,
+                              Depth ply,
+                              const MoveHistory& move_hist,
+                              Move hash_move,
+                              int good_capt_see_threshold)
     : m_curr_move_range({ &m_moves[0], &m_moves[0] }),
       m_moves_it(&m_moves[0]),
       m_moves_end(&m_moves[0]),
@@ -285,8 +274,7 @@ inline MovePicker<QUIESCE>::MovePicker(const Board& board,
       m_good_capture_see_threshold(good_capt_see_threshold) {
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::advance_stage() {
+inline void MovePicker::advance_stage() {
     m_stage += 1;
 
     if (!m_board->in_check()) {
@@ -321,23 +309,11 @@ void MovePicker<QUIESCE>::advance_stage() {
             }
 
             case MPS_KILLER_MOVES: {
-                if (QUIESCE) {
-                    // Skip this stage on quiescence search.
-                    advance_stage();
-                    return;
-                }
-
                 generate_killer_moves();
                 break;
             }
 
             case MPS_QUIET: {
-                if constexpr (QUIESCE) {
-                    // Always skip this stage on quiescence search.
-                    advance_stage();
-                    return;
-                }
-
                 if (!m_do_quiets) {
                     advance_stage();
                     return;
@@ -363,11 +339,21 @@ void MovePicker<QUIESCE>::advance_stage() {
             }
 
             case MPS_KILLER_EVASIONS: {
+                if (!m_do_quiets) {
+                    advance_stage();
+                    return;
+                }
+
                 generate_killer_moves();
                 break;
             }
 
             case MPS_QUIET_EVASIONS: {
+                if (!m_do_quiets) {
+                    advance_stage();
+                    return;
+                }
+
                 generate_quiet_evasions();
                 break;
             }
@@ -380,8 +366,7 @@ void MovePicker<QUIESCE>::advance_stage() {
     m_moves_it = m_curr_move_range.begin;
 }
 
-template <bool QUIESCE>
-inline SearchMove MovePicker<QUIESCE>::next() {
+inline SearchMove MovePicker::next() {
     if (finished()) {
         // We've finished generating moves.
         return MOVE_NULL;
@@ -409,7 +394,7 @@ inline SearchMove MovePicker<QUIESCE>::next() {
         return next();
     }
     // Prevent killer move revisits.
-    if (!QUIESCE
+    if (m_do_quiets
          &&  m_mv_hist->is_killer(m_ply, move)
          && (m_stage != MPS_KILLER_MOVES
          &&  m_stage != MPS_KILLER_EVASIONS)) {
@@ -427,8 +412,7 @@ inline SearchMove MovePicker<QUIESCE>::next() {
     return move;
 }
 
-template<bool QUIESCE>
-void MovePicker<QUIESCE>::score_move(SearchMove& move) {
+inline void MovePicker::score_move(SearchMove& move) {
     move.set_value(0);
     if (move.is_capture()) {
         // Perform MMV-LVA: Most valuable victims -> Least valuable attackers
@@ -451,18 +435,15 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     }
 }
 
-template <bool QUIESCE>
-inline bool MovePicker<QUIESCE>::finished() const {
+inline bool MovePicker::finished() const {
     return m_stage >= m_end_stage;
 }
 
-template <bool QUIESCE>
-inline MovePickingStage MovePicker<QUIESCE>::stage() const {
+inline MovePickingStage MovePicker::stage() const {
     return m_stage;
 }
 
-template <bool QUIESCE>
-inline void MovePicker<QUIESCE>::skip_quiets() {
+inline void MovePicker::skip_quiets() {
     m_do_quiets = false;
 }
 
