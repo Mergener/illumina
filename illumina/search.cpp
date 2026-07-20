@@ -1124,12 +1124,11 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         // running SMP.
         if (   m_settings->n_threads > 1
             && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                      || !m_board.is_move_legal(tt_entry.move()))) {
+                || !m_board.is_move_legal(tt_entry.move()))) {
             found_in_tt = false;
         }
         else {
-            // We're in qsearch, never search non capture moves.
-            tt_move = tt_entry.move().is_capture()
+            tt_move = (m_board.in_check() || tt_entry.move().is_capture())
                       ? tt_entry.move()
                       : MOVE_NULL;
         }
@@ -1138,7 +1137,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     if (   found_in_tt
         && tt_entry.move() != MOVE_NULL
         && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                  || !m_board.is_move_legal(tt_entry.move()))) {
+            || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
     else {
@@ -1180,6 +1179,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         searched_a_move = true;
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
+            && !m_board.in_check()
             && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
             continue;
         }
