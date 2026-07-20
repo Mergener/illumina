@@ -1175,7 +1175,9 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     MovePicker<true> move_picker(m_board, ply, m_hist, tt_move);
     SearchMove move;
     SearchMove best_move;
+    bool searched_a_move = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
+        searched_a_move = true;
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
             && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
@@ -1205,6 +1207,10 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
             alpha = score;
         }
+    }
+
+    if (!searched_a_move && m_board.in_check()) {
+        return -MATE_SCORE + ply;
     }
 
     if (best_score <= original_alpha) {
