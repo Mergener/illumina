@@ -363,23 +363,11 @@ void MovePicker<QUIESCE>::advance_stage() {
             }
 
             case MPS_KILLER_EVASIONS: {
-                if (QUIESCE) {
-                    // Skip this stage on quiescence search.
-                    advance_stage();
-                    return;
-                }
-
                 generate_killer_moves();
                 break;
             }
 
             case MPS_QUIET_EVASIONS: {
-                if (QUIESCE) {
-                    // Skip this stage on quiescence search.
-                    advance_stage();
-                    return;
-                }
-
                 generate_quiet_evasions();
                 break;
             }

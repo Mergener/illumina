@@ -1149,21 +1149,24 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
     m_sel_depth = std::max(m_sel_depth, ply);
 
-    Score raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
-    Score stand_pat = raw_eval;
+    Score best_score = -MAX_SCORE;
+    Score raw_eval = 0;
     if (!m_board.in_check()) {
+        raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
+        Score stand_pat = raw_eval;
         stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
-    }
-    TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
-
-    if (stand_pat >= beta) {
-        return stand_pat;
-    }
-    if (stand_pat > alpha) {
-        alpha = stand_pat;
+        best_score = stand_pat;
+        if (stand_pat >= beta) {
+            return stand_pat;
+        }
+        if (stand_pat > alpha) {
+            alpha = stand_pat;
+        }
+        TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
     }
 
     check_limits();
+
     if (should_stop()) {
         return alpha;
     }
@@ -1172,7 +1175,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     MovePicker<true> move_picker(m_board, ply, m_hist, tt_move);
     SearchMove move;
     SearchMove best_move;
-    Score best_score = stand_pat;
     while ((move = move_picker.next()) != MOVE_NULL) {
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
