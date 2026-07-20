@@ -116,7 +116,7 @@ void TranspositionTable::clear() {
 }
 
 inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
-    return m_buf[key % m_max_entry_count];
+    return m_buf[static_cast<ui64>((static_cast<ui128>(key) * static_cast<ui128>(m_max_entry_count)) >> 64)];
 }
 
 void TranspositionTable::resize(size_t new_size) {
