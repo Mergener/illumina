@@ -408,7 +408,6 @@ void Board::make_move(Move move) {
 
     set_color_to_move(opposite_color(moving_color));
 
-    compute_pins();
     compute_checkers();
 }
 
