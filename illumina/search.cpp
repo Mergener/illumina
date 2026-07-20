@@ -733,7 +733,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             pc_hash_move = hash_move;
         }
 
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist, pc_hash_move, pc_see);
+        MovePicker pc_move_picker(m_board, ply, m_hist, pc_hash_move, pc_see);
+        pc_move_picker.skip_quiets();
 
         int pc_searched_moves = 0;
         SearchMove move;
@@ -1110,6 +1111,14 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
 
+    if (ply >= MAX_DEPTH) {
+        return m_board.in_check() ? 0 : m_hist.correct_eval_with_corrhist(m_board, evaluate());
+    }
+
+    if (m_board.is_repetition_draw() || m_board.is_50_move_rule_draw()) {
+        return draw_score();
+    }
+
     Score original_alpha = alpha;
 
     TranspositionTable& tt = m_context->tt();
@@ -1124,12 +1133,11 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         // running SMP.
         if (   m_settings->n_threads > 1
             && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                      || !m_board.is_move_legal(tt_entry.move()))) {
+                || !m_board.is_move_legal(tt_entry.move()))) {
             found_in_tt = false;
         }
         else {
-            // We're in qsearch, never search non capture moves.
-            tt_move = tt_entry.move().is_capture()
+            tt_move = (m_board.in_check() || tt_entry.move().is_capture())
                       ? tt_entry.move()
                       : MOVE_NULL;
         }
@@ -1138,7 +1146,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     if (   found_in_tt
         && tt_entry.move() != MOVE_NULL
         && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                  || !m_board.is_move_legal(tt_entry.move()))) {
+            || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
     else {
@@ -1149,33 +1157,45 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
     m_sel_depth = std::max(m_sel_depth, ply);
 
-    Score raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
-    Score stand_pat = raw_eval;
+    Score best_score = -MAX_SCORE;
+    Score raw_eval = 0;
     if (!m_board.in_check()) {
+        raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
+        Score stand_pat = raw_eval;
         stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
-    }
-    TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
-
-    if (stand_pat >= beta) {
-        return stand_pat;
-    }
-    if (stand_pat > alpha) {
-        alpha = stand_pat;
+        best_score = stand_pat;
+        if (stand_pat >= beta) {
+            return stand_pat;
+        }
+        if (stand_pat > alpha) {
+            alpha = stand_pat;
+        }
+        TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
     }
 
     check_limits();
+
     if (should_stop()) {
         return alpha;
     }
 
-    // Finally, start looping over available noisy moves.
-    MovePicker<true> move_picker(m_board, ply, m_hist, tt_move);
+    MovePicker move_picker(m_board, ply, m_hist, tt_move);
+    if (PV_NODE
+        || !found_in_tt
+        || tt_entry.move() == MOVE_NULL
+        || tt_entry.bound_type() == BT_UPPERBOUND
+        || tt_entry.move().is_capture()) {
+        move_picker.skip_quiets();
+    }
+
     SearchMove move;
     SearchMove best_move;
-    Score best_score = stand_pat;
+    bool searched_a_move = false;
     while ((move = move_picker.next()) != MOVE_NULL) {
+        searched_a_move = true;
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
+            && !m_board.in_check()
             && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
             continue;
         }
@@ -1203,6 +1223,10 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             TRACE_SET(Traceable::BEST_MOVE_RAW, move.raw());
             alpha = score;
         }
+    }
+
+    if (!searched_a_move && m_board.in_check()) {
+        return -MATE_SCORE + ply;
     }
 
     if (best_score <= original_alpha) {
