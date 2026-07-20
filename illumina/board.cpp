@@ -466,8 +466,6 @@ void Board::undo_move() {
 
     m_state = m_prev_states.back();
     m_prev_states.pop_back();
-
-    compute_pins();
 }
 
 bool Board::is_attacked_by(Color c, Square s) const {
@@ -532,7 +530,6 @@ void Board::make_null_move() {
     set_ep_square(SQ_NULL);
 
     compute_checkers();
-    compute_pins();
 }
 
 void Board::undo_null_move() {
@@ -544,11 +541,14 @@ void Board::undo_null_move() {
 
     m_state = m_prev_states.back();
     m_prev_states.pop_back();
-
-    compute_pins();
 }
 
-void Board::compute_pins() {
+void Board::compute_pins() const {
+    if (m_pins_up_to_date) {
+        return;
+    }
+    m_pins_up_to_date = true;
+
     m_pinned_bb = 0;
 
     for (Color c: COLORS) {
@@ -570,7 +570,7 @@ void Board::compute_pins() {
     }
 }
 
-void Board::scan_pins(Bitboard attackers, Square king_square, Color pinned_color) {
+void Board::scan_pins(Bitboard attackers, Square king_square, Color pinned_color) const {
     Bitboard occ = occupancy();
 
     while (attackers) {

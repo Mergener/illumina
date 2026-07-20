@@ -137,8 +137,9 @@ private:
     Color m_ctm = CL_WHITE;
     Bitboard m_occ = 0;
 
-    std::array<Square, SQ_COUNT> m_pinners;
-    Bitboard m_pinned_bb = 0;
+    mutable std::array<Square, SQ_COUNT> m_pinners;
+    mutable Bitboard m_pinned_bb = 0;
+    mutable bool m_pins_up_to_date = false;
 
     int m_base_ply_count = 0; // Gets added by m_prev_states.size()
 
@@ -188,8 +189,8 @@ private:
     bool is_castles_pseudo_legal(Square king_square, Color c, Side castling_side) const;
 
     void compute_checkers();
-    void compute_pins();
-    void scan_pins(Bitboard attackers, Square king_square, Color pinned_color);
+    void compute_pins() const;
+    void scan_pins(Bitboard attackers, Square king_square, Color pinned_color) const;
 };
 
 inline Color Board::color_to_move() const {
@@ -274,14 +275,17 @@ inline Move Board::last_move() const {
 }
 
 inline Bitboard Board::pinned_bb() const {
+    compute_pins();
     return m_pinned_bb;
 }
 
 inline bool Board::is_pinned(Square s) const {
+    compute_pins();
     return bit_is_set(pinned_bb(), s);
 }
 
 inline Square Board::pinner_square(Square pinned_sq) const {
+    compute_pins();
     return m_pinners[pinned_sq];
 }
 
@@ -358,14 +362,11 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
         }
         piece_added<DO_ZOB, false>(s, p);
     }
-
-    if constexpr (DO_PINS_AND_CHECKS) {
-        compute_pins();
-    }
 }
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_added(Square s, Piece p) {
+    compute_pins();
     if (m_listener.on_add_piece) {
         m_listener.on_add_piece(*this, p, s);
     }
@@ -387,13 +388,14 @@ inline void Board::piece_added(Square s, Piece p) {
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
-        compute_pins();
         compute_checkers();
     }
 }
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_removed(Square s) {
+    compute_pins();
+
     Piece prev_piece = piece_at(s);
     if (m_listener.on_remove_piece) {
         m_listener.on_remove_piece(*this, prev_piece, s);
@@ -414,7 +416,6 @@ inline void Board::piece_removed(Square s) {
     }
 
     if constexpr (DO_PINS_AND_CHECKS) {
-        compute_pins();
         compute_checkers();
     }
 }
