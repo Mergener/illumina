@@ -1111,6 +1111,14 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TRACE_SET(Traceable::DEPTH, 0);
     TRACE_SET(Traceable::IN_CHECK, m_board.in_check());
 
+    if (ply >= MAX_DEPTH) {
+        return m_board.in_check() ? 0 : m_hist.correct_eval_with_corrhist(m_board, evaluate());
+    }
+
+    if (m_board.is_repetition_draw() || m_board.is_50_move_rule_draw()) {
+        return draw_score();
+    }
+
     Score original_alpha = alpha;
 
     TranspositionTable& tt = m_context->tt();
