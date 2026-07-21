@@ -52,11 +52,11 @@ public:
     int correct_eval_with_corrhist(const Board& board,
                                    int static_eval) const;
 
-    int  quiet_history(Move move, Move last_move) const;
+    int  quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const;
     void update_quiet_history(Move move,
                               Move last_move,
                               Depth depth,
-                              bool good);
+                              bool good, bool threatened_from, bool threatened_to);
 
     MoveHistory();
 
@@ -68,7 +68,8 @@ private:
         CorrhistTable pawn_corrhist;
         CorrhistTable non_pawn_corrhist;
         std::array<std::array<Move, 2>, MAX_DEPTH> killers {};
-        ButterflyArray<int> main_history {};
+        ButterflyArray<int> butterfly {};
+        std::array<std::array<PieceToArray<int>, 2>, 2> threat_history {};
         PieceToArray<PieceToArray<int>> counter_move_history {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
@@ -129,17 +130,21 @@ inline void MoveHistory::reset() {
     std::memset(m_data.get(), 0, sizeof(Data));
 }
 
-inline int MoveHistory::quiet_history(Move move, Move last_move) const {
+inline int MoveHistory::quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const {
     return int(
-               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->main_history.get(move))
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->counter_move_history.get(last_move).get(move)));
+               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->butterfly.get(move))
+             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->counter_move_history.get(last_move).get(move))
+             + i64(MV_HIST_THREAT_QHIST_WEIGHT) * m_data->threat_history[threatened_from][threatened_to].get(move));
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
                                               Move last_move,
                                               Depth depth,
-                                              bool good) {
-    update_history_by_depth(m_data->main_history.get(move), depth, good);
+                                              bool good,
+                                              bool threatened_from,
+                                              bool threatened_to) {
+    update_history_by_depth(m_data->butterfly.get(move), depth, good);
+    update_history_by_depth(m_data->threat_history[threatened_from][threatened_to].get(move), depth, good);
     if (last_move != MOVE_NULL) {
         update_history_by_depth(m_data->counter_move_history.get(last_move).get(move), depth, good);
     }
