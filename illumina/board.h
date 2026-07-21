@@ -130,15 +130,25 @@ private:
     // the copy, assignment and move constructors -- these were manually written
     // to prevent copying m_listeners to board copies.
 
-    std::array<Piece, SQ_COUNT> m_pieces {};
     std::array<std::array<Bitboard, PT_COUNT>, CL_COUNT> m_bbs {};
+    std::array<Piece, SQ_COUNT> m_pieces {};
     Color m_ctm = CL_WHITE;
     Bitboard m_occ = 0;
 
     std::array<ui8, SQ_COUNT> m_pinners;
     Bitboard m_pinned_bb = 0;
 
-    int m_base_ply_count = 0; // Gets added by m_prev_states.size()
+    struct State {
+        ui64 hash_key    = EMPTY_BOARD_HASH_KEY;
+        ui64 pawn_key    = EMPTY_BOARD_HASH_KEY;
+        ui64 non_pawn_key = EMPTY_BOARD_HASH_KEY;
+        Move last_move   = MOVE_NULL;
+        ui16 rule50      = 0;
+        ui8 n_checkers   = 0;
+        Square ep_square = SQ_NULL;
+        CastlingRights castle_rights = CR_NONE;
+    };
+    State m_state {};
 
     std::array<std::array<Square, SIDE_COUNT>, CL_COUNT> m_castle_rook_squares = {
         std::array<Square, SIDE_COUNT> {
@@ -151,21 +161,10 @@ private:
         },
     };
 
-    struct State {
-        Move last_move   = MOVE_NULL;
-        Square ep_square = SQ_NULL;
-        ui64 hash_key    = EMPTY_BOARD_HASH_KEY;
-        ui64 pawn_key    = EMPTY_BOARD_HASH_KEY;
-        ui64 non_pawn_key = EMPTY_BOARD_HASH_KEY;
-        ui16 rule50      = 0;
-        ui8 n_checkers   = 0;
-        CastlingRights castle_rights = CR_NONE;
-    };
-
     std::vector<State> m_prev_states;
-    State m_state {};
-
     BoardListener m_listener {};
+
+    int m_base_ply_count = 0; // Gets added by m_prev_states.size()
 
     Bitboard& piece_bb_ref(Piece piece);
     Bitboard& color_bb_ref(Color color);
