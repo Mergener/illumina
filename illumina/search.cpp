@@ -1372,16 +1372,6 @@ void SearchWorker::on_undo_null_move(const illumina::Board& board) {
     m_eval.on_undo_null_move(board);
 }
 
-template <bool TRACING>
-void SearchWorker::on_piece_added(const Board& board, Piece p, Square s) {
-    m_eval.on_piece_added(board, p , s);
-}
-
-template <bool TRACING>
-void SearchWorker::on_piece_removed(const Board& board, Piece p, Square s) {
-    m_eval.on_piece_removed(board, p , s);
-}
-
 bool SearchWorker::should_stop() const {
     return m_context->should_stop();
 }
@@ -1421,16 +1411,12 @@ SearchWorker::SearchWorker(bool main,
         board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move<false>(b); };
         board_listener.on_make_move = [this](const Board& b, Move m) { on_make_move<false>(b, m); };
         board_listener.on_undo_move = [this](const Board& b, Move m) { on_undo_move<false>(b, m); };
-        board_listener.on_add_piece = [this](const Board& b, Piece p, Square s) { on_piece_added<false>(b, p, s); };
-        board_listener.on_remove_piece = [this](const Board& b, Piece p, Square s) { on_piece_removed<false>(b, p, s); };
     }
     else {
         board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move<true>(b); };
         board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move<true>(b); };
         board_listener.on_make_move = [this](const Board& b, Move m) { on_make_move<true>(b, m); };
         board_listener.on_undo_move = [this](const Board& b, Move m) { on_undo_move<true>(b, m); };
-        board_listener.on_add_piece = [this](const Board& b, Piece p, Square s) { on_piece_added<true>(b, p, s); };
-        board_listener.on_remove_piece = [this](const Board& b, Piece p, Square s) { on_piece_removed<true>(b, p, s); };
     }
     m_board.set_listener(board_listener);
 }
