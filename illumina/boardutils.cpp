@@ -254,4 +254,38 @@ Bitboard non_pawn_bb(const Board& board) {
     return occupancy & (~kings) & (~pawns);
 }
 
+Bitboard all_attacked_squares(const Board& board, Color c) {
+    auto pawns = board.piece_bb(Piece(c, PT_PAWN));
+    auto knights = board.piece_bb(Piece(c, PT_KNIGHT));
+    auto bishops = board.piece_bb(Piece(c, PT_BISHOP));
+    auto rooks = board.piece_bb(Piece(c, PT_ROOK));
+    auto queens = board.piece_bb(Piece(c, PT_QUEEN));
+    const auto occ = board.occupancy();
+
+    Bitboard bb {};
+    while (pawns != 0) {
+        bb |= pawn_attacks(lsb(pawns), c);
+        pawns = unset_lsb(pawns);
+    }
+    while (knights != 0) {
+        bb |= knight_attacks(lsb(knights));
+        knights = unset_lsb(knights);
+    }
+    while (bishops != 0) {
+        bb |= bishop_attacks(lsb(bishops), occ);
+        bishops = unset_lsb(bishops);
+    }
+    while (rooks != 0) {
+        bb |= rook_attacks(lsb(rooks), occ);
+        rooks = unset_lsb(rooks);
+    }
+    while (queens != 0) {
+        bb |= queen_attacks(lsb(queens), occ);
+        queens = unset_lsb(queens);
+    }
+    bb |= king_attacks(board.king_square(c));
+
+    return bb;
+}
+
 } // illumina

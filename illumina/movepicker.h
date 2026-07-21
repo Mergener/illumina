@@ -46,6 +46,7 @@ public:
     explicit MovePicker(const Board& board,
                         Depth ply,
                         const MoveHistory& move_hist,
+                        Bitboard threats,
                         Move hash_move = MOVE_NULL,
                         int good_capt_see_threshold = 0);
 
@@ -62,6 +63,7 @@ private:
     SearchMove*      m_moves_it;
     SearchMove*      m_moves_end;
     MoveRange        m_bad_captures_range;
+    Bitboard         m_threats;
     bool             m_do_quiets = true;
     int              m_good_capture_see_threshold = 0;
 
@@ -274,6 +276,7 @@ template <bool QUIESCE>
 inline MovePicker<QUIESCE>::MovePicker(const Board& board,
                                        Depth ply,
                                        const MoveHistory& move_hist,
+                                       Bitboard threats,
                                        Move hash_move,
                                        int good_capt_see_threshold)
     : m_curr_move_range({ &m_moves[0], &m_moves[0] }),
@@ -282,8 +285,8 @@ inline MovePicker<QUIESCE>::MovePicker(const Board& board,
       m_board(&board), m_mv_hist(&move_hist),
       m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
       m_hash_move(hash_move), m_ply(ply),
-      m_good_capture_see_threshold(good_capt_see_threshold) {
-}
+      m_good_capture_see_threshold(good_capt_see_threshold),
+      m_threats(threats) { }
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::advance_stage() {
@@ -459,7 +462,14 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     }
     else {
         // Adjust score based on move history.
-        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move()));
+        move.add_value(
+            m_mv_hist->quiet_history(
+                move,
+                m_board->last_move(),
+                bit_is_set(m_threats, move.source()),
+                bit_is_set(m_threats, move.destination())
+            )
+        );
     }
 }
 
