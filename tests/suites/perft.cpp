@@ -1,16 +1,15 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
 #include <iostream>
 
 #include "movepicker.h"
 #include "perft.h"
 
-using namespace litetest;
 using namespace illumina;
 
-TEST_SUITE(Perft);
+TEST_SUITE_BEGIN("Perft");
 
-TEST_CASE(Perft) {
+TEST_CASE("Perft") {
     struct {
         const char* fen;
         std::vector<size_t> expected_result;
@@ -20,10 +19,10 @@ TEST_CASE(Perft) {
 
             for (int depth = 1; depth <= std::min(expected_result.size(), size_t(5)); ++depth) {
                 ui64 res = perft(board, depth, { false });
-                EXPECT(int(res)).to_be(int(expected_result[depth - 1]));
+                REQUIRE_EQ(int(res), int(expected_result[depth - 1]));
 
                 if (depth <= 4) {
-                    EXPECT(int(move_picker_perft(board, depth))).to_be(expected_result[depth - 1]);
+                    REQUIRE_EQ(int(move_picker_perft(board, depth)), expected_result[depth - 1]);
                 }
             }
         }
@@ -1123,3 +1122,5 @@ TEST_CASE(Perft) {
         test.run();
     }
 }
+
+TEST_SUITE_END;
