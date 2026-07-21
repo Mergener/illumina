@@ -1,24 +1,23 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
 #include <iostream>
 
 #include "board.h"
 #include "types.h"
 
-using namespace litetest;
 using namespace illumina;
 
-TEST_SUITE(Types);
+TEST_SUITE_BEGIN("Types");
 
-TEST_CASE(MsbLsb) {
+TEST_CASE("MsbLsb") {
     struct {
         ui64 n;
         ui8  expected_lsb;
         ui8  expected_msb;
 
         void run() {
-            EXPECT(lsb(n)).to_be(expected_lsb);
-            EXPECT(msb(n)).to_be(expected_msb);
+            REQUIRE_EQ(lsb(n), expected_lsb);
+            REQUIRE_EQ(msb(n), expected_msb);
         }
     } tests[] = {
         { 0x124a79acULL, 2, 28 },
@@ -420,76 +419,76 @@ TEST_CASE(MsbLsb) {
     }
 }
 
-TEST_CASE(OppositeColor) {
-    EXPECT(opposite_color(CL_WHITE)).to_be(CL_BLACK);
-    EXPECT(opposite_color(CL_BLACK)).to_be(CL_WHITE);
+TEST_CASE("OppositeColor") {
+    REQUIRE_EQ(opposite_color(CL_WHITE), CL_BLACK);
+    REQUIRE_EQ(opposite_color(CL_BLACK), CL_WHITE);
 }
 
-TEST_CASE(SquaresAndDirections) {
-    EXPECT(SQ_F3 + DIR_NORTH).to_be(SQ_F4);
-    EXPECT(SQ_F3 + DIR_SOUTH).to_be(SQ_F2);
-    EXPECT(SQ_F3 + DIR_EAST).to_be(SQ_G3);
-    EXPECT(SQ_F3 + DIR_WEST).to_be(SQ_E3);
-    EXPECT(SQ_F3 + DIR_NORTHEAST).to_be(SQ_G4);
-    EXPECT(SQ_F3 + DIR_NORTHWEST).to_be(SQ_E4);
-    EXPECT(SQ_F3 + DIR_SOUTHEAST).to_be(SQ_G2);
-    EXPECT(SQ_F3 + DIR_SOUTHWEST).to_be(SQ_E2);
+TEST_CASE("SquaresAndDirections") {
+    REQUIRE_EQ(SQ_F3 + DIR_NORTH, SQ_F4);
+    REQUIRE_EQ(SQ_F3 + DIR_SOUTH, SQ_F2);
+    REQUIRE_EQ(SQ_F3 + DIR_EAST, SQ_G3);
+    REQUIRE_EQ(SQ_F3 + DIR_WEST, SQ_E3);
+    REQUIRE_EQ(SQ_F3 + DIR_NORTHEAST, SQ_G4);
+    REQUIRE_EQ(SQ_F3 + DIR_NORTHWEST, SQ_E4);
+    REQUIRE_EQ(SQ_F3 + DIR_SOUTHEAST, SQ_G2);
+    REQUIRE_EQ(SQ_F3 + DIR_SOUTHWEST, SQ_E2);
 
-    EXPECT(SQ_F3 - DIR_NORTH).to_be(SQ_F2);
-    EXPECT(SQ_F3 - DIR_SOUTH).to_be(SQ_F4);
-    EXPECT(SQ_F3 - DIR_EAST).to_be(SQ_E3);
-    EXPECT(SQ_F3 - DIR_WEST).to_be(SQ_G3);
-    EXPECT(SQ_F3 - DIR_NORTHEAST).to_be(SQ_E2);
-    EXPECT(SQ_F3 - DIR_NORTHWEST).to_be(SQ_G2);
-    EXPECT(SQ_F3 - DIR_SOUTHEAST).to_be(SQ_E4);
-    EXPECT(SQ_F3 - DIR_SOUTHWEST).to_be(SQ_G4);
+    REQUIRE_EQ(SQ_F3 - DIR_NORTH, SQ_F2);
+    REQUIRE_EQ(SQ_F3 - DIR_SOUTH, SQ_F4);
+    REQUIRE_EQ(SQ_F3 - DIR_EAST, SQ_E3);
+    REQUIRE_EQ(SQ_F3 - DIR_WEST, SQ_G3);
+    REQUIRE_EQ(SQ_F3 - DIR_NORTHEAST, SQ_E2);
+    REQUIRE_EQ(SQ_F3 - DIR_NORTHWEST, SQ_G2);
+    REQUIRE_EQ(SQ_F3 - DIR_SOUTHEAST, SQ_E4);
+    REQUIRE_EQ(SQ_F3 - DIR_SOUTHWEST, SQ_G4);
 }
 
-TEST_CASE(MirrorHorizontal) {
-    EXPECT(mirror_horizontal(SQ_H1)).to_be(SQ_A1);
-    EXPECT(mirror_horizontal(SQ_E5)).to_be(SQ_D5);
+TEST_CASE("MirrorHorizontal") {
+    REQUIRE_EQ(mirror_horizontal(SQ_H1), SQ_A1);
+    REQUIRE_EQ(mirror_horizontal(SQ_E5), SQ_D5);
 }
 
-TEST_CASE(MirrorVertical) {
-    EXPECT(mirror_vertical(SQ_H1)).to_be(SQ_H8);
-    EXPECT(mirror_vertical(SQ_E5)).to_be(SQ_E4);
+TEST_CASE("MirrorVertical") {
+    REQUIRE_EQ(mirror_vertical(SQ_H1), SQ_H8);
+    REQUIRE_EQ(mirror_vertical(SQ_E5), SQ_E4);
 }
 
-TEST_CASE(ChebyshevDistance) {
+TEST_CASE("ChebyshevDistance") {
     // Adjacent squares
-    EXPECT(chebyshev_distance(SQ_F3, SQ_F4)).to_be(1);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_F2)).to_be(1);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_G3)).to_be(1);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_E3)).to_be(1);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_G4)).to_be(1);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_E4)).to_be(1);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_G2)).to_be(1);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_E2)).to_be(1);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_F4), 1);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_F2), 1);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_G3), 1);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_E3), 1);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_G4), 1);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_E4), 1);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_G2), 1);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_E2), 1);
 
     // Non-adjacent squares
-    EXPECT(chebyshev_distance(SQ_F3, SQ_F7)).to_be(4);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_B3)).to_be(4);
-    EXPECT(chebyshev_distance(SQ_F3, SQ_B7)).to_be(4);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_F7), 4);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_B3), 4);
+    REQUIRE_EQ(chebyshev_distance(SQ_F3, SQ_B7), 4);
 }
 
-TEST_CASE(ManhattanDistance) {
+TEST_CASE("ManhattanDistance") {
     // Adjacent squares
-    EXPECT(manhattan_distance(SQ_F3, SQ_F4)).to_be(1);
-    EXPECT(manhattan_distance(SQ_F3, SQ_F2)).to_be(1);
-    EXPECT(manhattan_distance(SQ_F3, SQ_G3)).to_be(1);
-    EXPECT(manhattan_distance(SQ_F3, SQ_E3)).to_be(1);
-    EXPECT(manhattan_distance(SQ_F3, SQ_G4)).to_be(2);
-    EXPECT(manhattan_distance(SQ_F3, SQ_E4)).to_be(2);
-    EXPECT(manhattan_distance(SQ_F3, SQ_G2)).to_be(2);
-    EXPECT(manhattan_distance(SQ_F3, SQ_E2)).to_be(2);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_F4), 1);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_F2), 1);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_G3), 1);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_E3), 1);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_G4), 2);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_E4), 2);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_G2), 2);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_E2), 2);
 
     // Non-adjacent squares
-    EXPECT(manhattan_distance(SQ_F3, SQ_F7)).to_be(4);
-    EXPECT(manhattan_distance(SQ_F3, SQ_B3)).to_be(4);
-    EXPECT(manhattan_distance(SQ_F3, SQ_B7)).to_be(8);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_F7), 4);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_B3), 4);
+    REQUIRE_EQ(manhattan_distance(SQ_F3, SQ_B7), 8);
 }
 
-TEST_CASE(Piece) {
+TEST_CASE("Piece") {
     struct {
         Piece piece;
         PieceType type;
@@ -497,11 +496,11 @@ TEST_CASE(Piece) {
         char identifier;
 
         void test() const {
-            EXPECT(ui32(piece.type())).to_be(ui32(type));
-            EXPECT(ui32(piece.color())).to_be(ui32(color));
-            EXPECT(piece.to_char()).to_be(identifier);
-            EXPECT(Piece::from_char(identifier)).to_be(piece);
-            EXPECT(Piece(piece.raw())).to_be(piece);
+            REQUIRE_EQ(ui32(piece.type()), ui32(type));
+            REQUIRE_EQ(ui32(piece.color()), ui32(color));
+            REQUIRE_EQ(piece.to_char(), identifier);
+            REQUIRE_EQ(Piece::from_char(identifier), piece);
+            REQUIRE_EQ(Piece(piece.raw()), piece);
         }
 
     } cases[] = {
@@ -524,127 +523,129 @@ TEST_CASE(Piece) {
     }
 }
 
-TEST_CASE(ParseSquare) {
+TEST_CASE("ParseSquare") {
     // Test valid square strings
-    EXPECT(parse_square("a1")).to_be(SQ_A1);
-    EXPECT(parse_square("h8")).to_be(SQ_H8);
-    EXPECT(parse_square("d4")).to_be(SQ_D4);
-    EXPECT(parse_square("f6")).to_be(SQ_F6);
-    EXPECT(parse_square("c3")).to_be(SQ_C3);
+    REQUIRE_EQ(parse_square("a1"), SQ_A1);
+    REQUIRE_EQ(parse_square("h8"), SQ_H8);
+    REQUIRE_EQ(parse_square("d4"), SQ_D4);
+    REQUIRE_EQ(parse_square("f6"), SQ_F6);
+    REQUIRE_EQ(parse_square("c3"), SQ_C3);
 
-    EXPECT(parse_square("A1")).to_be(SQ_A1);
-    EXPECT(parse_square("H8")).to_be(SQ_H8);
-    EXPECT(parse_square("D4")).to_be(SQ_D4);
-    EXPECT(parse_square("F6")).to_be(SQ_F6);
-    EXPECT(parse_square("C3")).to_be(SQ_C3);
+    REQUIRE_EQ(parse_square("A1"), SQ_A1);
+    REQUIRE_EQ(parse_square("H8"), SQ_H8);
+    REQUIRE_EQ(parse_square("D4"), SQ_D4);
+    REQUIRE_EQ(parse_square("F6"), SQ_F6);
+    REQUIRE_EQ(parse_square("C3"), SQ_C3);
 }
 
-TEST_CASE(SquareName) {
+TEST_CASE("SquareName") {
     // Test square names
-    EXPECT(square_name(SQ_A1)).to_be("a1");
-    EXPECT(square_name(SQ_H8)).to_be("h8");
-    EXPECT(square_name(SQ_D4)).to_be("d4");
-    EXPECT(square_name(SQ_F6)).to_be("f6");
-    EXPECT(square_name(SQ_C3)).to_be("c3");
+    REQUIRE_EQ(square_name(SQ_A1), "a1");
+    REQUIRE_EQ(square_name(SQ_H8), "h8");
+    REQUIRE_EQ(square_name(SQ_D4), "d4");
+    REQUIRE_EQ(square_name(SQ_F6), "f6");
+    REQUIRE_EQ(square_name(SQ_C3), "c3");
 }
 
-TEST_CASE(MoveConstruction) {
+TEST_CASE("MoveConstruction") {
     // Test constructing a normal move
     Move normal_move = Move::new_normal(SQ_E2, SQ_E4, Piece(CL_WHITE, PT_PAWN));
-    EXPECT(normal_move.source()).to_be(SQ_E2);
-    EXPECT(normal_move.destination()).to_be(SQ_E4);
-    EXPECT(normal_move.source_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
-    EXPECT(normal_move.type()).to_be(MT_NORMAL);
-    EXPECT(normal_move.to_uci()).to_be("e2e4");
+    REQUIRE_EQ(normal_move.source(), SQ_E2);
+    REQUIRE_EQ(normal_move.destination(), SQ_E4);
+    REQUIRE_EQ(normal_move.source_piece(), Piece(CL_WHITE, PT_PAWN));
+    REQUIRE_EQ(normal_move.type(), MT_NORMAL);
+    REQUIRE_EQ(normal_move.to_uci(), "e2e4");
 
     // Test constructing a simple capture move
     Move capture = Move::new_simple_capture(SQ_D4, SQ_E5, Piece(CL_WHITE, PT_PAWN), Piece(CL_BLACK, PT_KNIGHT));
-    EXPECT(capture.source()).to_be(SQ_D4);
-    EXPECT(capture.destination()).to_be(SQ_E5);
-    EXPECT(capture.source_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
-    EXPECT(capture.captured_piece()).to_be(Piece(CL_BLACK, PT_KNIGHT));
-    EXPECT(capture.type()).to_be(MT_SIMPLE_CAPTURE);
-    EXPECT(capture.to_uci()).to_be("d4e5");
+    REQUIRE_EQ(capture.source(), SQ_D4);
+    REQUIRE_EQ(capture.destination(), SQ_E5);
+    REQUIRE_EQ(capture.source_piece(), Piece(CL_WHITE, PT_PAWN));
+    REQUIRE_EQ(capture.captured_piece(), Piece(CL_BLACK, PT_KNIGHT));
+    REQUIRE_EQ(capture.type(), MT_SIMPLE_CAPTURE);
+    REQUIRE_EQ(capture.to_uci(), "d4e5");
 
     // Test constructing a promotion cap ture move
     Move promotion_capture = Move::new_promotion_capture(SQ_G7, SQ_H8, CL_BLACK, Piece(CL_WHITE, PT_PAWN), PT_QUEEN);
-    EXPECT(promotion_capture.source()).to_be(SQ_G7);
-    EXPECT(promotion_capture.destination()).to_be(SQ_H8);
-    EXPECT(promotion_capture.source_piece()).to_be(Piece(CL_BLACK, PT_PAWN));
-    EXPECT(promotion_capture.captured_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
-    EXPECT(promotion_capture.promotion_piece_type()).to_be(PT_QUEEN);
-    EXPECT(promotion_capture.type()).to_be(MT_PROMOTION_CAPTURE);
-    EXPECT(promotion_capture.to_uci()).to_be("g7h8q");
+    REQUIRE_EQ(promotion_capture.source(), SQ_G7);
+    REQUIRE_EQ(promotion_capture.destination(), SQ_H8);
+    REQUIRE_EQ(promotion_capture.source_piece(), Piece(CL_BLACK, PT_PAWN));
+    REQUIRE_EQ(promotion_capture.captured_piece(), Piece(CL_WHITE, PT_PAWN));
+    REQUIRE_EQ(promotion_capture.promotion_piece_type(), PT_QUEEN);
+    REQUIRE_EQ(promotion_capture.type(), MT_PROMOTION_CAPTURE);
+    REQUIRE_EQ(promotion_capture.to_uci(), "g7h8q");
 
     // Test constructing an en passant capture move
     Move en_passant = Move::new_en_passant_capture(SQ_D5, SQ_E6, CL_WHITE);
-    EXPECT(en_passant.source()).to_be(SQ_D5);
-    EXPECT(en_passant.destination()).to_be(SQ_E6);
-    EXPECT(en_passant.source_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
-    EXPECT(en_passant.captured_piece()).to_be(Piece(CL_BLACK, PT_PAWN));
-    EXPECT(en_passant.type()).to_be(MT_EN_PASSANT);
-    EXPECT(en_passant.to_uci()).to_be("d5e6");
+    REQUIRE_EQ(en_passant.source(), SQ_D5);
+    REQUIRE_EQ(en_passant.destination(), SQ_E6);
+    REQUIRE_EQ(en_passant.source_piece(), Piece(CL_WHITE, PT_PAWN));
+    REQUIRE_EQ(en_passant.captured_piece(), Piece(CL_BLACK, PT_PAWN));
+    REQUIRE_EQ(en_passant.type(), MT_EN_PASSANT);
+    REQUIRE_EQ(en_passant.to_uci(), "d5e6");
 
     // Test constructing a double push move
     Move double_push = Move::new_double_push(SQ_G2, CL_WHITE);
-    EXPECT(double_push.source()).to_be(SQ_G2);
-    EXPECT(double_push.destination()).to_be(SQ_G4);
-    EXPECT(double_push.source_piece()).to_be(Piece(CL_WHITE, PT_PAWN));
-    EXPECT(double_push.type()).to_be(MT_DOUBLE_PUSH);
-    EXPECT(double_push.to_uci()).to_be("g2g4");
+    REQUIRE_EQ(double_push.source(), SQ_G2);
+    REQUIRE_EQ(double_push.destination(), SQ_G4);
+    REQUIRE_EQ(double_push.source_piece(), Piece(CL_WHITE, PT_PAWN));
+    REQUIRE_EQ(double_push.type(), MT_DOUBLE_PUSH);
+    REQUIRE_EQ(double_push.to_uci(), "g2g4");
 
     // Test constructing a castling move
     Move castles = Move::new_castles(SQ_E1, CL_WHITE, SIDE_KING, SQ_H1);
-    EXPECT(castles.source()).to_be(SQ_E1);
-    EXPECT(castles.destination()).to_be(SQ_G1);
-    EXPECT(castles.source_piece()).to_be(Piece(CL_WHITE, PT_KING));
-    EXPECT(castles.castles_rook_src_square()).to_be(SQ_H1);
-    EXPECT(castles.type()).to_be(MT_CASTLES);
-    EXPECT(castles.to_uci()).to_be("e1g1");
+    REQUIRE_EQ(castles.source(), SQ_E1);
+    REQUIRE_EQ(castles.destination(), SQ_G1);
+    REQUIRE_EQ(castles.source_piece(), Piece(CL_WHITE, PT_KING));
+    REQUIRE_EQ(castles.castles_rook_src_square(), SQ_H1);
+    REQUIRE_EQ(castles.type(), MT_CASTLES);
+    REQUIRE_EQ(castles.to_uci(), "e1g1");
 
     // Test constructing a simple promotion move
     Move promotion = Move::new_simple_promotion(SQ_H7, SQ_H8, CL_BLACK, PT_QUEEN);
-    EXPECT(promotion.source()).to_be(SQ_H7);
-    EXPECT(promotion.destination()).to_be(SQ_H8);
-    EXPECT(promotion.source_piece()).to_be(Piece(CL_BLACK, PT_PAWN));
-    EXPECT(promotion.promotion_piece_type()).to_be(PT_QUEEN);
-    EXPECT(promotion.type()).to_be(MT_SIMPLE_PROMOTION);
-    EXPECT(promotion.to_uci()).to_be("h7h8q");
+    REQUIRE_EQ(promotion.source(), SQ_H7);
+    REQUIRE_EQ(promotion.destination(), SQ_H8);
+    REQUIRE_EQ(promotion.source_piece(), Piece(CL_BLACK, PT_PAWN));
+    REQUIRE_EQ(promotion.promotion_piece_type(), PT_QUEEN);
+    REQUIRE_EQ(promotion.type(), MT_SIMPLE_PROMOTION);
+    REQUIRE_EQ(promotion.to_uci(), "h7h8q");
 }
 
-TEST_CASE(ToUCI) {
+TEST_CASE("ToUCI") {
     // Test normal move
     Move normal_move = Move::new_normal(SQ_E2, SQ_E4, Piece(CL_WHITE, PT_PAWN));
-    EXPECT(normal_move.to_uci()).to_be("e2e4");
+    REQUIRE_EQ(normal_move.to_uci(), "e2e4");
 
     // Test simple capture move
     Move capture = Move::new_simple_capture(SQ_D4, SQ_E5, Piece(CL_WHITE, PT_PAWN), Piece(CL_BLACK, PT_KNIGHT));
-    EXPECT(capture.to_uci()).to_be("d4e5");
+    REQUIRE_EQ(capture.to_uci(), "d4e5");
 
     // Test promotion capture move
     Move promotion_capture = Move::new_promotion_capture(SQ_G7, SQ_H8, CL_BLACK, Piece(CL_WHITE, PT_PAWN), PT_QUEEN);
-    EXPECT(promotion_capture.to_uci()).to_be("g7h8q");
+    REQUIRE_EQ(promotion_capture.to_uci(), "g7h8q");
 
     // Test en passant capture move
     Move en_passant = Move::new_en_passant_capture(SQ_D5, SQ_E6, CL_WHITE);
-    EXPECT(en_passant.to_uci()).to_be("d5e6");
+    REQUIRE_EQ(en_passant.to_uci(), "d5e6");
 
     // Test double push move
     Move double_push = Move::new_double_push(SQ_G2, CL_WHITE);
-    EXPECT(double_push.to_uci()).to_be("g2g4");
+    REQUIRE_EQ(double_push.to_uci(), "g2g4");
 
     // Test castling move
     Move castles = Move::new_castles(CL_WHITE, SIDE_KING);
-    EXPECT(castles.to_uci()).to_be("e1g1");
+    REQUIRE_EQ(castles.to_uci(), "e1g1");
 
     // Test simple promotion move
     Move promotion = Move::new_simple_promotion(SQ_H7, SQ_H8, CL_BLACK, PT_QUEEN);
-    EXPECT(promotion.to_uci()).to_be("h7h8q");
+    REQUIRE_EQ(promotion.to_uci(), "h7h8q");
 }
 
-TEST_CASE(FromUCI) {
-//    EXPECT(Move::new_castles(SQ_E8, CL_BLACK, SIDE_KING, SQ_H8))
-//        .to_be(Move::new_castles(CL_BLACK, SIDE_KING));
-    EXPECT(Move::parse_uci(Board("rnbqk2r/pppp1ppp/4pn2/8/1bP5/2N2N2/PPQPPPPP/R1B1KB1R b KQkq - 3 4"), "e8g8"))
-        .to_be(Move::new_castles(CL_BLACK, SIDE_KING));
+TEST_CASE("FromUCI") {
+//    REQUIRE_EQ(Move::new_castles(SQ_E8, CL_BLACK, SIDE_KING, SQ_H8),
+//               Move::new_castles(CL_BLACK, SIDE_KING));
+    REQUIRE_EQ(Move::parse_uci(Board("rnbqk2r/pppp1ppp/4pn2/8/1bP5/2N2N2/PPQPPPPP/R1B1KB1R b KQkq - 3 4"), "e8g8"),
+               Move::new_castles(CL_BLACK, SIDE_KING));
 }
+
+TEST_SUITE_END;
