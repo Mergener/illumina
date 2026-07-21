@@ -135,7 +135,7 @@ private:
     Color m_ctm = CL_WHITE;
     Bitboard m_occ = 0;
 
-    std::array<Square, SQ_COUNT> m_pinners;
+    std::array<ui8, SQ_COUNT> m_pinners;
     Bitboard m_pinned_bb = 0;
 
     int m_base_ply_count = 0; // Gets added by m_prev_states.size()
