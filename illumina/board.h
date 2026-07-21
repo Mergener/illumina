@@ -17,8 +17,6 @@ namespace illumina {
  * Listens to changes made to a board object.
  */
 struct BoardListener {
-    std::function<void(const Board& board, Piece p, Square s)> on_add_piece = nullptr;
-    std::function<void(const Board& board, Piece p, Square s)> on_remove_piece = nullptr;
     std::function<void(const Board& board, Move move)> on_make_move = nullptr;
     std::function<void(const Board& board, Move move)> on_undo_move = nullptr;
     std::function<void(const Board& board)> on_make_null_move = nullptr;
@@ -366,10 +364,6 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_added(Square s, Piece p) {
-    if (m_listener.on_add_piece) {
-        m_listener.on_add_piece(*this, p, s);
-    }
-
     Color piece_color = p.color();
 
     Bitboard& new_color_bb  = color_bb_ref(piece_color);
@@ -395,9 +389,6 @@ inline void Board::piece_added(Square s, Piece p) {
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_removed(Square s) {
     Piece prev_piece = piece_at(s);
-    if (m_listener.on_remove_piece) {
-        m_listener.on_remove_piece(*this, prev_piece, s);
-    }
 
     Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
     Bitboard& prev_color_bb = color_bb_ref(prev_piece.color());

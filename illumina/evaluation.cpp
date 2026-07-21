@@ -123,12 +123,6 @@ void Evaluation::apply_undo_null_move() {
     m_ctm = opposite_color(m_ctm);
 }
 
-void Evaluation::on_piece_added(const Board &board, Piece p, Square s) {
-}
-
-void Evaluation::on_piece_removed(const Board &board, Piece p, Square s) {
-}
-
 Score Evaluation::compute() {
     apply_lazy_updates();
     return std::clamp(m_nnue.forward(m_ctm), -KNOWN_WIN + 1, KNOWN_WIN - 1);
