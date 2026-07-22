@@ -226,9 +226,9 @@ constexpr Side SIDES[] = { SIDE_KING, SIDE_QUEEN };
 //
 
 constexpr CastlingRights make_castling_rights(bool white_king_side,
-                                                     bool white_queen_side,
-                                                     bool black_king_side,
-                                                     bool black_queen_side) {
+                                              bool white_queen_side,
+                                              bool black_king_side,
+                                              bool black_queen_side) {
     return (white_king_side) | (white_queen_side << 1)
          | (black_king_side) | (black_queen_side);
 }
@@ -282,18 +282,15 @@ constexpr Bitboard rank_bb(BoardRank rank) {
 }
 
 constexpr BoardRank pawn_starting_rank(Color color) {
-    constexpr BoardRank START_RANK[] = { RNK_2, RNK_7 };
-    return START_RANK[color];
+    return color == CL_WHITE ? RNK_2 : RNK_7;
 }
 
 constexpr BoardRank promotion_rank(Color color) {
-    constexpr BoardRank PROM_RANKS[] = { RNK_8, RNK_1 };
-    return PROM_RANKS[color];
+    return color == CL_WHITE ? RNK_8 : RNK_1;
 }
 
 constexpr BoardRank double_push_dest_rank(Color color) {
-    constexpr BoardRank DP_DST_RANKS[] = { RNK_4, RNK_5 };
-    return DP_DST_RANKS[color];
+    return color == CL_WHITE ? RNK_4 : RNK_5;
 }
 
 enum {
@@ -369,18 +366,15 @@ constexpr Direction DIRECTIONS[] = {
 };
 
 constexpr Direction pawn_push_direction(Color color) {
-    constexpr Direction PUSH_DIRS[] = { DIR_NORTH, DIR_SOUTH };
-    return PUSH_DIRS[color];
+    return color == CL_WHITE ? DIR_NORTH : DIR_SOUTH;
 }
 
 constexpr Direction pawn_left_capture_direction(Color color) {
-    constexpr Direction LEFT_CAPT_DIRS[] = { DIR_NORTHWEST, DIR_SOUTHWEST };
-    return LEFT_CAPT_DIRS[color];
+    return color == CL_WHITE ? DIR_NORTHWEST : DIR_SOUTHWEST;
 }
 
 constexpr Direction pawn_right_capture_direction(Color color) {
-    constexpr Direction RIGHT_CAPT_DIRS[] = { DIR_NORTHEAST, DIR_SOUTHEAST };
-    return RIGHT_CAPT_DIRS[color];
+    return color == CL_WHITE ? DIR_NORTHEAST : DIR_SOUTHEAST;
 }
 
 /**
@@ -427,49 +421,35 @@ enum {
 #define ILLUMINA_ASSERT_VALID_SQUARE(s) ILLUMINA_ASSERT((s) >= 0 && (s) <= 63)
 
 constexpr BoardFile square_file(Square s) {
-    return (s % 8);
+    return static_cast<BoardFile>(static_cast<unsigned int>(s) & 7);
 }
 
 constexpr BoardRank square_rank(Square s) {
-    return (s / 8);
+    return static_cast<BoardRank>(static_cast<unsigned int>(s) >> 3);
 }
 
 constexpr Square make_square(BoardFile file, BoardRank rank) {
-    return rank * 8 + file;
+    return static_cast<Square>(static_cast<unsigned int>(rank) * 8 + static_cast<unsigned int>(file));
 }
 
 constexpr Square mirror_horizontal(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-    constexpr Square MIRRORS[] {
-        SQ_H1, SQ_G1, SQ_F1, SQ_E1, SQ_D1, SQ_C1, SQ_B1, SQ_A1,
-        SQ_H2, SQ_G2, SQ_F2, SQ_E2, SQ_D2, SQ_C2, SQ_B2, SQ_A2,
-        SQ_H3, SQ_G3, SQ_F3, SQ_E3, SQ_D3, SQ_C3, SQ_B3, SQ_A3,
-        SQ_H4, SQ_G4, SQ_F4, SQ_E4, SQ_D4, SQ_C4, SQ_B4, SQ_A4,
-        SQ_H5, SQ_G5, SQ_F5, SQ_E5, SQ_D5, SQ_C5, SQ_B5, SQ_A5,
-        SQ_H6, SQ_G6, SQ_F6, SQ_E6, SQ_D6, SQ_C6, SQ_B6, SQ_A6,
-        SQ_H7, SQ_G7, SQ_F7, SQ_E7, SQ_D7, SQ_C7, SQ_B7, SQ_A7,
-        SQ_H8, SQ_G8, SQ_F8, SQ_E8, SQ_D8, SQ_C8, SQ_B8, SQ_A8,
-    };
+    const auto prev_rank = s >> 3;
+    const auto new_rank = 7 - prev_rank;
+    const auto file = s & 7;
 
-    return MIRRORS[s];
+    return (new_rank << 3) + file;
 }
 
 constexpr Square mirror_vertical(Square s) {
     ILLUMINA_ASSERT_VALID_SQUARE(s);
 
-    constexpr Square MIRRORS[] {
-        SQ_A8, SQ_B8, SQ_C8, SQ_D8, SQ_E8, SQ_F8, SQ_G8, SQ_H8,
-        SQ_A7, SQ_B7, SQ_C7, SQ_D7, SQ_E7, SQ_F7, SQ_G7, SQ_H7,
-        SQ_A6, SQ_B6, SQ_C6, SQ_D6, SQ_E6, SQ_F6, SQ_G6, SQ_H6,
-        SQ_A5, SQ_B5, SQ_C5, SQ_D5, SQ_E5, SQ_F5, SQ_G5, SQ_H5,
-        SQ_A4, SQ_B4, SQ_C4, SQ_D4, SQ_E4, SQ_F4, SQ_G4, SQ_H4,
-        SQ_A3, SQ_B3, SQ_C3, SQ_D3, SQ_E3, SQ_F3, SQ_G3, SQ_H3,
-        SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2, SQ_H2,
-        SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
-    };
+    const auto prev_rank = s >> 3;
+    const auto new_rank = 7 - prev_rank;
+    const auto file = s & 7;
 
-    return MIRRORS[s];
+    return (new_rank << 3) + file;
 }
 
 inline int chebyshev_distance(Square a, Square b) {
