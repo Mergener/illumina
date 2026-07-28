@@ -817,7 +817,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             // Late move pruning.
             if (!ROOT_NODE
              && alpha > -MATE_THRESHOLD
-             && depth <= (LMP_BASE_MAX_DEPTH + m_board.gives_check(move))
              && move_idx >= s_lmp_count_table[improving][depth]
              && move_picker.stage() > MPS_KILLER_MOVES
              && !in_check) {
