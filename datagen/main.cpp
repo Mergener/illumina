@@ -8,9 +8,11 @@
 namespace illumina {
 
 int run_normal_datagen(int argc, char* argv[]);
+int run_relabel_datagen(int argc, char* argv[]);
 
 static std::unordered_map<std::string, std::function<int(int, char**)>> s_modes = {
     { "normal", run_normal_datagen },
+    { "relabel", run_relabel_datagen },
 };
 
 static const auto s_default_mode = run_normal_datagen;
@@ -35,7 +37,8 @@ static void print_usage(const char* program_name) {
     std::cout << "  " << program_name << " [options]\n"
               << "\n"
               << "Scripts:\n"
-              << "  normal    Main eval-net datagen.\n";
+              << "  normal    Main eval-net datagen.\n"
+              << "  relabel   Re-search Marlinflow data with the current engine.\n";
 }
 
 static bool is_help_token(std::string_view token) {
