@@ -609,14 +609,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     TranspositionTableEntry tt_entry {};
     bool found_in_tt = tt.probe(board_key, tt_entry, stack_node->ply);
 
-    // On multithreaded searches, race conditions might make it so
-    // that the TT move is invalid. The following check loses elo
-    // on single threaded searches (~-2), so we only do it if we're
-    // running SMP.
-    if (   found_in_tt
-        && m_settings->n_threads > 1
+    if (found_in_tt
         && tt_entry.move() != MOVE_NULL
-     && (   !m_board.is_move_pseudo_legal(tt_entry.move())
+        && (!m_board.is_move_pseudo_legal(tt_entry.move())
             || !m_board.is_move_legal(tt_entry.move()))) {
         found_in_tt = false;
     }
@@ -1115,36 +1110,16 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     TranspositionTableEntry tt_entry;
     Move tt_move = MOVE_NULL;
     bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
-    if (   found_in_tt
-        && tt_entry.move() != MOVE_NULL) {
-        // On multithreaded searches, race conditions might make it so
-        // that the TT move is invalid. The following check loses elo
-        // on single threaded searches (~-2), so we only do it if we're
-        // running SMP.
-        if (   m_settings->n_threads > 1
-            && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                      || !m_board.is_move_legal(tt_entry.move()))) {
-            found_in_tt = false;
-        }
-        else {
-            // We're in qsearch, never search non capture moves.
-            tt_move = tt_entry.move().is_capture()
-                      ? tt_entry.move()
-                      : MOVE_NULL;
-        }
-    }
-
-    if (   found_in_tt
-        && tt_entry.move() != MOVE_NULL
-        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                  || !m_board.is_move_legal(tt_entry.move()))) {
+    if (found_in_tt &&
+        (tt_entry.move() == MOVE_NULL
+        || (!m_board.is_move_pseudo_legal(tt_entry.move())
+        || !m_board.is_move_legal(tt_entry.move())))) {
         found_in_tt = false;
     }
-    else {
-        tt_move = found_in_tt && tt_entry.move().is_capture()
-                  ? tt_entry.move()
-                  : MOVE_NULL;
-    }
+
+    tt_move = found_in_tt && tt_entry.move().is_capture()
+            ? tt_entry.move()
+            : MOVE_NULL;
 
     m_sel_depth = std::max(m_sel_depth, ply);
 
