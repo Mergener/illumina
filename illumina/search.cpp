@@ -895,7 +895,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
         }
 
-        auto move_history = m_hist.quiet_history(move, m_board.last_move());
+        int move_history = 0;
+        if (move.is_quiet()) {
+            move_history = m_hist.quiet_history(move, m_board.last_move());
+        }
 
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
