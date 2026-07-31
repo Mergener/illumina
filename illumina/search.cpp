@@ -897,9 +897,12 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
         }
 
-        auto source_is_threatened = bit_is_set(threats, move.source());
-        auto dest_is_threatened = bit_is_set(threats, move.destination());
-        auto move_history = m_hist.quiet_history(move, m_board.last_move(), source_is_threatened, dest_is_threatened);
+        int move_history = 0;
+        if (move.is_quiet()) {
+            auto source_is_threatened = bit_is_set(threats, move.source());
+            auto dest_is_threatened = bit_is_set(threats, move.destination());
+            move_history = m_hist.quiet_history(move, m_board.last_move(), source_is_threatened, dest_is_threatened);
+        }
 
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
@@ -987,7 +990,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                     m_hist.update_quiet_history(quiet,
                                                 m_board.last_move(),
                                                 depth,
-                                                quiet == best_move, source_is_threatened, dest_is_threatened);
+                                                quiet == best_move,
+                                                bit_is_set(threats, quiet.source()),
+                                                bit_is_set(threats, quiet.destination()));
                 }
             }
 
