@@ -5,6 +5,11 @@
 #include <string>
 #include <string_view>
 #include <iostream>
+#include <cstdlib>
+
+#ifdef _WIN32
+#include <malloc.h>
+#endif
 
 #include "debug.h"
 
@@ -158,6 +163,33 @@ inline ui8 msb(ui64 n) {
     return 63 ^ __builtin_clzll(n);
 #else
 #error No bitscan function found.
+#endif
+}
+
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__)
+    inline constexpr size_t CACHE_LINE_SIZE = 64;
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    inline constexpr size_t CACHE_LINE_SIZE = 64;  // Apple Silicon, AWS Graviton
+#elif defined(__powerpc64__)
+    inline constexpr size_t CACHE_LINE_SIZE = 128;
+#else
+    inline constexpr size_t CACHE_LINE_SIZE = 64;
+#endif
+
+inline void* aligned_alloc(size_t alignment, size_t size) {
+#ifdef _WIN32
+    void* raw = _aligned_malloc(size, alignment);
+#else
+    void* raw = std::aligned_alloc(alignment, size);
+#endif
+    return raw;
+}
+
+inline void aligned_free(void* ptr) {
+#ifdef _WIN32
+    _aligned_free(ptr);
+#else
+    std::free(ptr);
 #endif
 }
 

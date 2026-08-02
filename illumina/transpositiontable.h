@@ -64,13 +64,13 @@ public:
     void prefetch(ui64 zob) const;
 
     explicit TranspositionTable(size_t size_bytes = TT_DEFAULT_SIZE_MB * 1024 * 1024);
-    ~TranspositionTable() = default;
-    TranspositionTable(TranspositionTable&& rhs) = default;
+    ~TranspositionTable();
+    TranspositionTable(TranspositionTable&& rhs) noexcept;
     TranspositionTable(const TranspositionTable& rhs) = delete;
     TranspositionTable& operator=(const TranspositionTable& rhs) = delete;
 
 private:
-    std::unique_ptr<TranspositionTableEntry[]> m_buf = nullptr;
+    TranspositionTableEntry* m_buf = nullptr;
     size_t m_size_in_bytes;
     size_t m_max_entry_count;
     ui8 m_gen = 0;

@@ -111,27 +111,39 @@ void TranspositionTable::try_store(ui64 key,
 }
 
 void TranspositionTable::clear() {
-    std::memset(m_buf.get(), 0, m_max_entry_count * sizeof(TranspositionTableEntry));
+    if (m_buf == nullptr) {
+        return;
+    }
+    std::memset(m_buf, 0, m_max_entry_count * sizeof(TranspositionTableEntry));
 }
 
 inline TranspositionTableEntry& TranspositionTable::entry_ref(ui64 key) {
     return m_buf[key % m_max_entry_count];
 }
 
-void TranspositionTable::resize(size_t new_size) {
-    try {
-        if (new_size == m_size_in_bytes && m_buf != nullptr) {
-            return;
-        }
+void TranspositionTable::resize(size_t requested_size) {
+    size_t new_n_entries = requested_size / sizeof(TranspositionTableEntry);
+    size_t new_size = new_n_entries * sizeof(TranspositionTableEntry);
+    if (new_size == m_size_in_bytes && m_buf != nullptr) {
+        return;
+    }
 
-        size_t new_n_entries = new_size / sizeof(TranspositionTableEntry);
-        auto new_buf         = std::make_unique<TranspositionTableEntry[]>(new_n_entries);
-        m_buf                = std::move(new_buf);
-        m_max_entry_count    = new_n_entries;
-    }
-    catch (const std::bad_alloc& bad_alloc) {
+    auto new_buf = static_cast<TranspositionTableEntry*>(aligned_alloc(CACHE_LINE_SIZE, new_size));
+    if (new_buf == nullptr) {
         std::cerr << "Failed to resize transposition table, not enough memory." << std::endl;
+        return;
     }
+    if (m_buf != nullptr) {
+        size_t smaller_size = std::min(m_size_in_bytes, new_size);
+        std::memcpy(new_buf, m_buf, smaller_size);
+        if (smaller_size < new_size) {
+            std::memset(&new_buf[m_max_entry_count], 0, new_size - m_size_in_bytes);
+        }
+        aligned_free(m_buf);
+    }
+    m_buf = new_buf;
+    m_max_entry_count = new_n_entries;
+    m_size_in_bytes = new_size;
 }
 
 int TranspositionTable::hash_full() const {
@@ -152,4 +164,17 @@ TranspositionTable::TranspositionTable(size_t size)
     clear();
 }
 
+TranspositionTable::~TranspositionTable() {
+    if (m_buf != nullptr) {
+        aligned_free(m_buf);
+    }
+}
+
+TranspositionTable::TranspositionTable(TranspositionTable &&rhs) noexcept
+    : m_buf(rhs. m_buf),
+    m_size_in_bytes(rhs.m_size_in_bytes),
+    m_max_entry_count(rhs.m_max_entry_count),
+    m_gen(rhs.m_gen) {
+    rhs.m_buf = nullptr;
+}
 } // illumina
