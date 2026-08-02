@@ -223,7 +223,7 @@ private:
     template <bool TRACE>
     void on_piece_removed(const Board& board, Piece p, Square s);
 
-    void check_limits();
+    void check_limits() const;
     bool tracing() const;
 };
 
@@ -1318,7 +1318,7 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
     m_context->listeners().pv_finish(pv_results);
 }
 
-void SearchWorker::check_limits() {
+void SearchWorker::check_limits() const {
     if (!m_main) {
         return;
     }
@@ -1329,7 +1329,7 @@ void SearchWorker::check_limits() {
         return;
     }
 
-    if (nodes % 1024 != 0) {
+    if ((nodes & 2047) != 0) {
         return;
     }
 
