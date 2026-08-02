@@ -4,7 +4,8 @@ set(lib_src types.h types.h debug.h illumina.h types.cpp illumina.cpp board.cpp 
         tunablevalues.cpp endgame.cpp endgame.h nnue.cpp nnue.h
         bench.cpp
         bench.h
-        tracing.h)
+        tracing.h
+        ringbuffer.h)
 
 foreach(ARCH ${ARCHS})
     set(TARGET illumina_lib_${ARCH})

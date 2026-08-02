@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "attacks.h"
+#include "ringbuffer.h"
 #include "types.h"
 #include "zobrist.h"
 
@@ -161,7 +162,7 @@ private:
         },
     };
 
-    std::vector<State> m_prev_states;
+    RingBuffer<State, 64> m_prev_states;
     BoardListener m_listener {};
 
     int m_base_ply_count = 0; // Gets added by m_prev_states.size()
