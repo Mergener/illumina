@@ -1119,6 +1119,7 @@ TEST_CASE("Perft") {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.fen);
         test.run();
     }
 }

@@ -360,6 +360,9 @@ void test_move_picker() {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.fen);
+        CAPTURE(test.hash_move_str);
+        CAPTURE(test.ply);
         test.run();
     }
 }

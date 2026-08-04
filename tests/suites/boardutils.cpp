@@ -28,6 +28,11 @@ TEST_CASE("HasGoodSee") {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.board_fen);
+        CAPTURE(test.source);
+        CAPTURE(test.dest);
+        CAPTURE(test.threshold);
+        CAPTURE(test.expected_output);
         test.run();
     }
 }
@@ -51,6 +56,10 @@ TEST_CASE("RevealedAttacks") {
     };
 
     for (const auto& test: tests) {
+        CAPTURE(test.board_fen);
+        CAPTURE(test.source);
+        CAPTURE(test.destination);
+        CAPTURE(test.expected);
         test.run();
     }
 }

@@ -530,6 +530,13 @@ TEST_CASE("NonPawnPieceAttacks") {
     };
 
     for (auto& t: tests) {
+        CAPTURE(t.square);
+        CAPTURE(t.occ);
+        CAPTURE(t.expected_knight_attacks);
+        CAPTURE(t.expected_bishop_attacks);
+        CAPTURE(t.expected_rook_attacks);
+        CAPTURE(t.expected_queen_attacks);
+        CAPTURE(t.expected_king_attacks);
         t.run();
     }
 }
@@ -1050,6 +1057,10 @@ TEST_CASE("PawnPushes") {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.s);
+        CAPTURE(test.occ);
+        CAPTURE(test.expected_white_pushes);
+        CAPTURE(test.expected_black_pushes);
         test.run();
     }
 }
