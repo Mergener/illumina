@@ -843,7 +843,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 && depth <= SEE_PRUNING_MAX_DEPTH
                 && !m_board.in_check()
                 && move_picker.stage() > MPS_GOOD_CAPTURES
-                && !no_discovered_attacks()
+                && no_discovered_attacks()
                 && !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
                 continue;
             }
