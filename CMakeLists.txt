@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.15)
 project(illumina)
 set(CMAKE_CXX_STANDARD 17)
 
+option(BUILD_TESTING "Build Illumina's test suite." ON)
+
 # Set illumina version.
 set(ILLUMINA_VERSION_MAJOR 3)
 set(ILLUMINA_VERSION_MINOR 0)
@@ -102,7 +104,6 @@ endif()
 set(ARCHS bmi2 avx2 base)
 
 # General setup.
-enable_testing()
 include_directories(${CMAKE_SOURCE_DIR}/ext/include)
 
 # Define architecture specific options here.
@@ -144,7 +145,6 @@ add_definitions(-DILLUMINA_VERSION_MINOR=${ILLUMINA_VERSION_MINOR})
 add_definitions(-DILLUMINA_VERSION_NAME=\"${ILLUMINA_VERSION_NAME}\")
 
 # Check for available modules
-set(HAS_LITETEST false)
 set(HAS_SQLITE   false)
 
 # Add external dependencies.
@@ -155,10 +155,19 @@ add_subdirectory(illumina)
 add_subdirectory(cli)
 add_subdirectory(datagen)
 
-if (HAS_LITETEST)
+if (BUILD_TESTING)
+    enable_testing()
+
+    include(FetchContent)
+    FetchContent_Declare(
+        doctest
+        GIT_REPOSITORY https://github.com/doctest/doctest.git
+        GIT_TAG v2.5.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(doctest)
+
     add_subdirectory(tests)
-else()
-    message("Litetest submodule not found; tests won't be compiled")
 endif()
 
 if (INCLUDE_TRACING_MODULE AND NOT HAS_SQLITE)

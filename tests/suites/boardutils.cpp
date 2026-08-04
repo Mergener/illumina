@@ -1,13 +1,12 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
 #include "boardutils.h"
 
-using namespace litetest;
 using namespace illumina;
 
-TEST_SUITE(BoardUtils);
+TEST_SUITE_BEGIN("BoardUtils");
 
-TEST_CASE(HasGoodSee) {
+TEST_CASE("HasGoodSee") {
     struct {
         std::string board_fen;
         Square source;
@@ -17,7 +16,7 @@ TEST_CASE(HasGoodSee) {
 
         void run() const {
             Board board(board_fen);
-            EXPECT(has_good_see(board, source, dest, threshold)).to_be(expected_output);
+            REQUIRE_EQ(has_good_see(board, source, dest, threshold), expected_output);
         }
     } tests[] = {
             { "rnbqk1nr/pppp1ppp/3b4/4p3/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 1", SQ_D4, SQ_E5, 0, true },
@@ -29,11 +28,16 @@ TEST_CASE(HasGoodSee) {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.board_fen);
+        CAPTURE(test.source);
+        CAPTURE(test.dest);
+        CAPTURE(test.threshold);
+        CAPTURE(test.expected_output);
         test.run();
     }
 }
 
-TEST_CASE(RevealedAttacks) {
+TEST_CASE("RevealedAttacks") {
     struct {
         std::string board_fen;
         Square source;
@@ -44,7 +48,7 @@ TEST_CASE(RevealedAttacks) {
             Board board(board_fen);
 
             Bitboard revealed_atks = discovered_attacks(board, source, destination);
-            EXPECT(revealed_atks).to_be(expected);
+            REQUIRE_EQ(revealed_atks, expected);
         }
     } tests[] = {
             {"1k6/8/8/1q2n3/2n5/8/1P2P3/1K2RB2 w - - 0 1", SQ_E2, SQ_E4, 0x4000000ULL },
@@ -52,6 +56,12 @@ TEST_CASE(RevealedAttacks) {
     };
 
     for (const auto& test: tests) {
+        CAPTURE(test.board_fen);
+        CAPTURE(test.source);
+        CAPTURE(test.destination);
+        CAPTURE(test.expected);
         test.run();
     }
 }
+
+TEST_SUITE_END;

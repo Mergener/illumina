@@ -1,14 +1,13 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
 #include "utils.h"
 #include "types.h"
 
-using namespace litetest;
 using namespace illumina;
 
-TEST_SUITE(Utils);
+TEST_SUITE_BEGIN("Utils");
 
-TEST_CASE(TryParseInt) {
+TEST_CASE("TryParseInt") {
     struct {
         std::string str;
         int base;
@@ -18,9 +17,9 @@ TEST_CASE(TryParseInt) {
         void run() {
             i64 result;
             bool success = try_parse_int(str, result, base);
-            EXPECT(success).to_be(expect_success);
+            REQUIRE_EQ(success, expect_success);
             if (expect_success) {
-                EXPECT(result).to_be(expected_value);
+                REQUIRE_EQ(result, expected_value);
             }
         }
     } tests[] = {
@@ -37,6 +36,12 @@ TEST_CASE(TryParseInt) {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.str);
+        CAPTURE(test.base);
+        CAPTURE(test.expect_success);
+        CAPTURE(test.expected_value);
         test.run();
     }
 }
+
+TEST_SUITE_END;

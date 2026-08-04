@@ -1,12 +1,11 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
 #include "movepicker.h"
 #include "utils.h"
 
-using namespace litetest;
 using namespace illumina;
 
-TEST_SUITE(MovePicker);
+TEST_SUITE_BEGIN("MovePicker");
 
 template <bool QUIESCE>
 static void score_move(MovePicker<QUIESCE>& mp, SearchMove& move, bool check) {
@@ -178,7 +177,7 @@ void test_move_picker() {
             while ((move = move_picker.next()) != MOVE_NULL) {
                 mp_moves.push_back(move);
                 MovePickingStage move_stage = classify_move_stage(move, board, hash_move, mv_hist, ply, QUIESCE);
-                EXPECT(move_stage).to_be_greater_than_or_equal_to(highest_stage);
+                REQUIRE_GE(move_stage, highest_stage);
 
                 if (move_stage > highest_stage) {
                     highest_stage = move_stage;
@@ -190,15 +189,15 @@ void test_move_picker() {
                 // Make sure that every new move on a stage has a lower value than
                 // the previous one (in other words: are being selected in a sorted
                 // fashion).
-                EXPECT(move.value()).to_be_less_than_or_equal_to(prev_score);
+                REQUIRE_LE(move.value(), prev_score);
                 prev_score = move.value();
             }
 
             // We validated whether the moves are being generated in order or not. Now, we need to validate whether
             // all moves have been generated correctly and no illegal moves have been generated.
-            EXPECT(int(mp_moves.size())).to_be(int(n_expected_moves));
+            REQUIRE_EQ(int(mp_moves.size()), int(n_expected_moves));
             for (SearchMove mp_move: mp_moves) {
-                EXPECT(mp_move).to_not_be(MOVE_NULL);
+                REQUIRE_NE(mp_move, MOVE_NULL);
 
                 bool exists_in_legal_moves = false;
                 for (Move* legal_it = &validation_moves[0]; legal_it != validation_moves_end; ++legal_it) {
@@ -210,7 +209,7 @@ void test_move_picker() {
                     }
                 }
 
-                EXPECT(exists_in_legal_moves).to_be(true);
+                REQUIRE_EQ(exists_in_legal_moves, true);
             }
         }
     } tests[] = {
@@ -361,22 +360,27 @@ void test_move_picker() {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.fen);
+        CAPTURE(test.hash_move_str);
+        CAPTURE(test.ply);
         test.run();
     }
 }
 
-TEST_CASE(MovePickerTests) {
+TEST_CASE("MovePickerTests") {
     test_move_picker<false, false>();
 }
 
-TEST_CASE(MovePickerQuiesceTests) {
+TEST_CASE("MovePickerQuiesceTests") {
     test_move_picker<true, false>();
 }
 
-TEST_CASE(MovePickerTestsMetamorphic) {
+TEST_CASE("MovePickerTestsMetamorphic") {
     test_move_picker<false, true>();
 }
 
-TEST_CASE(MovePickerQuiesceTestsMetamorphic) {
+TEST_CASE("MovePickerQuiesceTestsMetamorphic") {
     test_move_picker<true, true>();
 }
+
+TEST_SUITE_END;

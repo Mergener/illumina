@@ -1,29 +1,47 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
+#include <charconv>
+#include <cstdlib>
 #include <iostream>
+#include <string_view>
 
 #include "movepicker.h"
 #include "perft.h"
 
-using namespace litetest;
 using namespace illumina;
 
-TEST_SUITE(Perft);
+TEST_SUITE_BEGIN("Perft");
 
-TEST_CASE(Perft) {
+TEST_CASE("Perft") {
+    constexpr size_t full_perft_depth = 5;
+    size_t max_depth                 = full_perft_depth;
+
+    if (const char* configured_depth = std::getenv("ILLUMINA_TEST_PERFT_MAX_DEPTH")) {
+        const std::string_view value(configured_depth);
+        int requested_depth = 0;
+        const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), requested_depth);
+        const bool valid_depth = error == std::errc {} && end == value.data() + value.size() && requested_depth >= 1
+                                 && requested_depth <= int(full_perft_depth);
+
+        REQUIRE_MESSAGE(valid_depth,
+                        "ILLUMINA_TEST_PERFT_MAX_DEPTH must be an integer from 1 to ", full_perft_depth,
+                        "; received \"", value, "\".");
+        max_depth = size_t(requested_depth);
+    }
+
     struct {
         const char* fen;
         std::vector<size_t> expected_result;
 
-        void run() {
+        void run(size_t max_depth) {
             Board board(fen);
 
-            for (int depth = 1; depth <= std::min(expected_result.size(), size_t(5)); ++depth) {
+            for (int depth = 1; depth <= std::min(expected_result.size(), max_depth); ++depth) {
                 ui64 res = perft(board, depth, { false });
-                EXPECT(int(res)).to_be(int(expected_result[depth - 1]));
+                REQUIRE_EQ(int(res), int(expected_result[depth - 1]));
 
                 if (depth <= 4) {
-                    EXPECT(int(move_picker_perft(board, depth))).to_be(expected_result[depth - 1]);
+                    REQUIRE_EQ(int(move_picker_perft(board, depth)), expected_result[depth - 1]);
                 }
             }
         }
@@ -1120,6 +1138,9 @@ TEST_CASE(Perft) {
     };
 
     for (auto& test: tests) {
-        test.run();
+        CAPTURE(test.fen);
+        test.run(max_depth);
     }
 }
+
+TEST_SUITE_END;

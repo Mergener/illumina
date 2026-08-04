@@ -1,16 +1,15 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
 #include "attacks.h"
 #include "types.h"
 
-using namespace litetest;
 using namespace illumina;
 
 // TODO: Many more test cases.
 
-TEST_SUITE(Attacks);
+TEST_SUITE_BEGIN("Attacks");
 
-TEST_CASE(NonPawnPieceAttacks) {
+TEST_CASE("NonPawnPieceAttacks") {
     struct {
         Square   square;
         Bitboard occ;
@@ -21,11 +20,11 @@ TEST_CASE(NonPawnPieceAttacks) {
         Bitboard expected_king_attacks;
 
         void run() {
-            EXPECT(knight_attacks(square)).to_be(expected_knight_attacks);
-            EXPECT(bishop_attacks(square, occ)).to_be(expected_bishop_attacks);
-            EXPECT(rook_attacks(square, occ)).to_be(expected_rook_attacks);
-            EXPECT(queen_attacks(square, occ)).to_be(expected_queen_attacks);
-            EXPECT(king_attacks(square)).to_be(expected_king_attacks);
+            REQUIRE_EQ(knight_attacks(square), expected_knight_attacks);
+            REQUIRE_EQ(bishop_attacks(square, occ), expected_bishop_attacks);
+            REQUIRE_EQ(rook_attacks(square, occ), expected_rook_attacks);
+            REQUIRE_EQ(queen_attacks(square, occ), expected_queen_attacks);
+            REQUIRE_EQ(king_attacks(square), expected_king_attacks);
         }
     } tests[] = {
         { SQ_H8, 0x96a2905a87a38090ULL, 0x20400000000000ULL, 0x40201000000000ULL, 0x7080000000000000ULL, 0x70c0201000000000ULL, 0x40c0000000000000ULL,  },
@@ -531,11 +530,18 @@ TEST_CASE(NonPawnPieceAttacks) {
     };
 
     for (auto& t: tests) {
+        CAPTURE(t.square);
+        CAPTURE(t.occ);
+        CAPTURE(t.expected_knight_attacks);
+        CAPTURE(t.expected_bishop_attacks);
+        CAPTURE(t.expected_rook_attacks);
+        CAPTURE(t.expected_queen_attacks);
+        CAPTURE(t.expected_king_attacks);
         t.run();
     }
 }
 
-TEST_CASE(PawnPushes) {
+TEST_CASE("PawnPushes") {
     struct {
         Square s;
         Bitboard occ;
@@ -543,8 +549,8 @@ TEST_CASE(PawnPushes) {
         Bitboard expected_black_pushes;
 
         void run() {
-            EXPECT(pawn_pushes<CL_WHITE>(s, occ)).to_be(expected_white_pushes);
-            EXPECT(pawn_pushes<CL_BLACK>(s, occ)).to_be(expected_black_pushes);
+            REQUIRE_EQ(pawn_pushes<CL_WHITE>(s, occ), expected_white_pushes);
+            REQUIRE_EQ(pawn_pushes<CL_BLACK>(s, occ), expected_black_pushes);
         }
     } tests[] = {
         { SQ_D7, 0x181ff1d24a9560e9ULL, 0x0ULL, 0x80800000000ULL,  },
@@ -1051,6 +1057,12 @@ TEST_CASE(PawnPushes) {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.s);
+        CAPTURE(test.occ);
+        CAPTURE(test.expected_white_pushes);
+        CAPTURE(test.expected_black_pushes);
         test.run();
     }
 }
+
+TEST_SUITE_END;
