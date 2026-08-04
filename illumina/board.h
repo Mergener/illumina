@@ -81,6 +81,11 @@ public:
     bool           detect_frc() const;
 
     /**
+     * Returns all squares currently attacked by a piece of the given color.
+     */
+    Bitboard threats(Color c) const;
+
+    /**
      * Tries to compute the hash key after a move.
      * The computed hash key is always valid for
      * non-king non-rook moves of type NORMAL or
@@ -142,11 +147,13 @@ private:
         ui64 hash_key    = EMPTY_BOARD_HASH_KEY;
         ui64 pawn_key    = EMPTY_BOARD_HASH_KEY;
         ui64 non_pawn_key = EMPTY_BOARD_HASH_KEY;
+        mutable std::array<Bitboard, CL_COUNT> threats;
         Move last_move   = MOVE_NULL;
         ui16 rule50      = 0;
         ui8 n_checkers   = 0;
         Square ep_square = SQ_NULL;
         CastlingRights castle_rights = CR_NONE;
+        mutable ui8 threats_calculated = 0;
     };
     State m_state {};
 
@@ -187,6 +194,8 @@ private:
     void compute_checkers();
     void compute_pins();
     void scan_pins(Bitboard attackers, Square king_square, Color pinned_color);
+
+    Bitboard compute_threats(Color c) const;
 };
 
 inline Color Board::color_to_move() const {
@@ -363,6 +372,8 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_added(Square s, Piece p) {
+    m_state.threats_calculated = 0;
+
     Color piece_color = p.color();
 
     Bitboard& new_color_bb  = color_bb_ref(piece_color);
@@ -387,6 +398,8 @@ inline void Board::piece_added(Square s, Piece p) {
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_removed(Square s) {
+    m_state.threats_calculated = 0;
+
     Piece prev_piece = piece_at(s);
 
     Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
@@ -624,6 +637,14 @@ inline bool Board::is_move_legal(Move move) const {
         }
     }
     return true;
+}
+
+inline Bitboard Board::threats(Color c) const {
+    if (!bit_is_set(m_state.threats_calculated, c)) {
+        m_state.threats_calculated = set_bit(m_state.threats_calculated, c);
+        m_state.threats[c] = compute_threats(c);
+    }
+    return m_state.threats[c];
 }
 
 inline bool BoardResult::is_finished() const {
