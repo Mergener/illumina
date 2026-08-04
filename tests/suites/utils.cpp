@@ -36,6 +36,10 @@ TEST_CASE("TryParseInt") {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.str);
+        CAPTURE(test.base);
+        CAPTURE(test.expect_success);
+        CAPTURE(test.expected_value);
         test.run();
     }
 }

@@ -415,6 +415,9 @@ TEST_CASE("MsbLsb") {
     };
 
     for (auto& t: tests) {
+        CAPTURE(t.n);
+        CAPTURE(t.expected_lsb);
+        CAPTURE(t.expected_msb);
         t.run();
     }
 }
@@ -519,6 +522,10 @@ TEST_CASE("Piece") {
     };
 
     for (const auto& test_case: cases) {
+        CAPTURE(test_case.piece);
+        CAPTURE(test_case.type);
+        CAPTURE(test_case.color);
+        CAPTURE(test_case.identifier);
         test_case.test();
     }
 }

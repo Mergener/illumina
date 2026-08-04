@@ -60,6 +60,8 @@ TEST_CASE("SetPieceAt") {
     };
 
     for (auto& test_case: s_cases) {
+        CAPTURE(test_case.p);
+        CAPTURE(test_case.s);
         test_case.test();
     }
 }
@@ -348,6 +350,7 @@ TEST_CASE("MakeUndoNullMove") {
     };
 
     for (auto& t: tests) {
+        CAPTURE(t.fen);
         t.run();
     }
 }
@@ -394,6 +397,9 @@ TEST_CASE("MoveGivesCheck") {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.fen);
+        CAPTURE(test.move_str);
+        CAPTURE(test.gives_check);
         test.run();
     }
 }
