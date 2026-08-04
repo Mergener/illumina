@@ -33,7 +33,6 @@ void TranspositionTableEntry::replace(ui64 key,
                                       BoundType bound_type,
                                       ui8 generation,
                                       bool ttpv) {
-    m_key_low = key & 0xFFFFFFFF;
     m_key_hi  = key >> 32;
     m_move  = move;
     m_score = score;
@@ -52,7 +51,7 @@ void TranspositionTable::new_search() {
 
 bool TranspositionTable::probe(ui64 key, TranspositionTableEntry& entry, Depth ply) {
     entry = entry_ref(key);
-    if (entry.key() != key) {
+    if (entry.key_hi() != (key >> 32)) {
         return false;
     }
     if (!entry.valid()) {

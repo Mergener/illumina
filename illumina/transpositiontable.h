@@ -10,7 +10,6 @@ namespace illumina {
 class TranspositionTableEntry {
     friend class TranspositionTable;
 public:
-    ui64      key() const;
     Move      move() const;
     BoundType bound_type() const;
     bool      valid() const;
@@ -19,9 +18,9 @@ public:
     Depth     depth() const;
     Score     static_eval() const;
     bool      ttpv() const;
+    ui32      key_hi() const;
 
 private:
-    ui32 m_key_low;
     ui32 m_key_hi;
     Move m_move;
 
@@ -80,8 +79,8 @@ private:
     const TranspositionTableEntry& entry_ref(ui64 key) const;
 };
 
-inline ui64 TranspositionTableEntry::key() const {
-    return ui64(m_key_low) | (ui64(m_key_hi) << 32);
+inline ui32 TranspositionTableEntry::key_hi() const {
+    return m_key_hi;
 }
 
 inline Move TranspositionTableEntry::move() const {
