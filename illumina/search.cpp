@@ -806,6 +806,11 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
         }
 
+        int move_history = 0;
+        if (move.is_quiet()) {
+            move_history = m_hist.quiet_history(move, m_board.last_move());
+        }
+
         // Low depth pruning.
         if (   non_pawn_bb(m_board)
             && alpha > -KNOWN_WIN) {
@@ -838,6 +843,15 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 && move_picker.stage() > MPS_GOOD_CAPTURES
                 && no_discovered_attacks()
                 && !has_good_see(m_board, move.source(), move.destination(), SEE_PRUNING_THRESHOLD)) {
+                continue;
+            }
+
+            // History pruning
+            if (!PV_NODE
+                && depth <= HIST_PRUNING_MAX_DEPTH
+                && move.is_quiet()
+                && move_history <= (HIST_PRUNING_THRESHOLD_BASE + HIST_PRUNING_THRESHOLD_FACTOR * depth)) {
+                move_picker.skip_quiets();
                 continue;
             }
 
@@ -892,11 +906,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             else if (score >= beta) {
                 return score;
             }
-        }
-
-        int move_history = 0;
-        if (move.is_quiet()) {
-            move_history = m_hist.quiet_history(move, m_board.last_move());
         }
 
         m_board.make_move(move);
