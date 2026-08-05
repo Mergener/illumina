@@ -38,8 +38,8 @@ struct NormalOptions {
     int max_random_plies = 16;
     int win_adjudication_score = 1000;
     int win_adjudication_plies = 6;
-    int min_positions_per_game = 12;
-    int max_positions_per_game = 16;
+    int min_positions_per_game = 16;
+    int max_positions_per_game = 24;
     bool exclude_checks = true;
     bool exclude_mate_scores = true;
     bool exclude_last_move_captures = true;
@@ -293,19 +293,16 @@ std::vector<DataPoint> select_data_points(const Game& game,
     Board board = game.start_pos;
 
     for (const GamePlyData& ply_data : game.ply_data) {
+        auto skip =
+            (options.exclude_checks && board.in_check())
+            || (options.exclude_last_move_captures && ply_data.best_move.is_capture())
+            || (options.exclude_mate_scores && is_mate_score(ply_data.white_pov_score));
+
+        if (!skip) {
+            extracted_data.push_back({ board.fen(false), ply_data });
+        }
+
         board.make_move(ply_data.best_move);
-
-        if (options.exclude_checks && board.in_check()) {
-            continue;
-        }
-        if (options.exclude_last_move_captures && board.last_move().is_capture()) {
-            continue;
-        }
-        if (options.exclude_mate_scores && is_mate_score(ply_data.white_pov_score)) {
-            continue;
-        }
-
-        extracted_data.push_back({ board.fen(false), ply_data });
     }
 
     std::shuffle(extracted_data.begin(), extracted_data.end(), rng);
@@ -449,7 +446,11 @@ void log_configuration(const NormalOptions& options) {
         ui64 data_points = write_marlinflow(sstream, game, data);
 
         const std::string data_str = sstream.str();
-        fstream << data_str << std::flush;
+        fstream << data_str;
+
+        if ((total_games & 4095) == 0) {
+            fstream << data_str << std::flush;
+        }
 
         total_games++;
         total_bytes += data_str.size();
