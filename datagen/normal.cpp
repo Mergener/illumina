@@ -38,11 +38,11 @@ struct NormalOptions {
     int max_random_plies = 16;
     int win_adjudication_score = 1000;
     int win_adjudication_plies = 6;
-    int min_positions_per_game = 12;
-    int max_positions_per_game = 16;
+    int min_positions_per_game = 16;
+    int max_positions_per_game = 24;
     bool exclude_checks = true;
     bool exclude_mate_scores = true;
-    bool exclude_last_move_captures = true;
+    bool exclude_best_move_captures = true;
 };
 
 struct DataPoint {
@@ -54,7 +54,7 @@ NormalOptions parse_args(int argc, char* argv[]) {
     NormalOptions options {};
     bool include_checks = false;
     bool include_mate_scores = false;
-    bool include_last_move_captures = false;
+    bool include_best_move_captures = false;
 
     argparse::ArgumentParser args(argv[0],
                                   "",
@@ -127,11 +127,11 @@ NormalOptions parse_args(int argc, char* argv[]) {
         .store_into(include_mate_scores)
         .help("keep positions whose search score is a mate score.");
 
-    args.add_argument("--include-last-move-captures")
+    args.add_argument("--include-best-move-captures")
         .default_value(false)
         .implicit_value(true)
-        .store_into(include_last_move_captures)
-        .help("keep positions whose previous move was a capture.");
+        .store_into(include_best_move_captures)
+        .help("keep positions where the best move is a capture.");
 
     try {
         args.parse_args(argc, argv);
@@ -163,7 +163,7 @@ NormalOptions parse_args(int argc, char* argv[]) {
 
     options.exclude_checks = !include_checks;
     options.exclude_mate_scores = !include_mate_scores;
-    options.exclude_last_move_captures = !include_last_move_captures;
+    options.exclude_best_move_captures = !include_best_move_captures;
     return options;
 }
 
@@ -293,19 +293,16 @@ std::vector<DataPoint> select_data_points(const Game& game,
     Board board = game.start_pos;
 
     for (const GamePlyData& ply_data : game.ply_data) {
+        auto skip =
+            (options.exclude_checks && board.in_check())
+            || (options.exclude_best_move_captures && ply_data.best_move.is_capture())
+            || (options.exclude_mate_scores && is_mate_score(ply_data.white_pov_score));
+
+        if (!skip) {
+            extracted_data.push_back({ board.fen(false), ply_data });
+        }
+
         board.make_move(ply_data.best_move);
-
-        if (options.exclude_checks && board.in_check()) {
-            continue;
-        }
-        if (options.exclude_last_move_captures && board.last_move().is_capture()) {
-            continue;
-        }
-        if (options.exclude_mate_scores && is_mate_score(ply_data.white_pov_score)) {
-            continue;
-        }
-
-        extracted_data.push_back({ board.fen(false), ply_data });
     }
 
     std::shuffle(extracted_data.begin(), extracted_data.end(), rng);
@@ -413,7 +410,7 @@ void log_configuration(const NormalOptions& options) {
                 << "\n  max_positions_per_game: " << options.max_positions_per_game
                 << "\n  exclude_checks: " << options.exclude_checks
                 << "\n  exclude_mate_scores: " << options.exclude_mate_scores
-                << "\n  exclude_last_move_captures: " << options.exclude_last_move_captures
+                << "\n  exclude_last_move_captures: " << options.exclude_best_move_captures
                 << sync_endl;
 }
 
@@ -449,7 +446,11 @@ void log_configuration(const NormalOptions& options) {
         ui64 data_points = write_marlinflow(sstream, game, data);
 
         const std::string data_str = sstream.str();
-        fstream << data_str << std::flush;
+        fstream << data_str;
+
+        if ((total_games & 4095) == 0) {
+            fstream << std::flush;
+        }
 
         total_games++;
         total_bytes += data_str.size();
