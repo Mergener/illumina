@@ -330,7 +330,6 @@ void Board::make_move(Move move) {
     m_prev_states.push_back(m_state);
     m_state.rule50++;
     m_state.last_move = move;
-    m_state.threats_calculated = 0;
 
     set_piece_at_internal<true, false>(source, PIECE_NULL);
 
@@ -472,14 +471,10 @@ void Board::undo_move() {
 }
 
 bool Board::is_attacked_by(Color c, Square s) const {
-    return bit_is_set(threats(c), s);
+    return is_attacked_by(c, s, occupancy());
 }
 
 bool Board::is_attacked_by(Color c, Square s, Bitboard occ) const {
-    if (occ == occupancy()) {
-        return is_attacked_by(c, s);
-    }
-
     Bitboard their_bishops   = piece_bb(Piece(c, PT_BISHOP));
     Bitboard bishop_atks     = bishop_attacks(s, occ);
     Bitboard bishop_attacker = bishop_atks & their_bishops;
@@ -665,10 +660,15 @@ bool Board::is_castles_pseudo_legal(Square king_square, Color c, Side castling_s
     }
 
     Bitboard king_path = unset_bit(between_bb_inclusive(king_square, castled_king_square(c, castling_side)), king_square);
-    Color them = opposite_color(c);
-    Bitboard their_threats = threats(them);
+    while (king_path) {
+        Square s = lsb(king_path);
+        if (is_attacked_by(opposite_color(c), s)) {
+            return false;
+        }
+        king_path = unset_lsb(king_path);
+    }
 
-    return (king_path & their_threats) == 0;
+    return true;
 }
 
 bool Board::is_move_movement_valid(Move move) const {
@@ -1067,40 +1067,6 @@ ui64 Board::estimate_hash_key_after(Move move) const {
     key ^= zob_piece_square_key(dst_piece, dst);
 
     return key;
-}
-
-Bitboard Board::compute_threats(Color c) const {
-    auto pawns = piece_bb(Piece(c, PT_PAWN));
-    auto knights = piece_bb(Piece(c, PT_KNIGHT));
-    auto bishops = piece_bb(Piece(c, PT_BISHOP));
-    auto rooks = piece_bb(Piece(c, PT_ROOK));
-    auto queens = piece_bb(Piece(c, PT_QUEEN));
-    const auto occ = occupancy();
-
-    Bitboard bb {};
-    while (pawns != 0) {
-        bb |= pawn_attacks(lsb(pawns), c);
-        pawns = unset_lsb(pawns);
-    }
-    while (knights != 0) {
-        bb |= knight_attacks(lsb(knights));
-        knights = unset_lsb(knights);
-    }
-    while (bishops != 0) {
-        bb |= bishop_attacks(lsb(bishops), occ);
-        bishops = unset_lsb(bishops);
-    }
-    while (rooks != 0) {
-        bb |= rook_attacks(lsb(rooks), occ);
-        rooks = unset_lsb(rooks);
-    }
-    while (queens != 0) {
-        bb |= queen_attacks(lsb(queens), occ);
-        queens = unset_lsb(queens);
-    }
-    bb |= king_attacks(king_square(c));
-
-    return bb;
 }
 
 // Board constructors below.
