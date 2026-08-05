@@ -848,6 +848,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // History pruning
             if (!PV_NODE
+                && !in_check
+                && move_picker.stage() >= MPS_QUIET
                 && depth <= HIST_PRUNING_MAX_DEPTH
                 && move.is_quiet()
                 && move_history <= (HIST_PRUNING_THRESHOLD_BASE + HIST_PRUNING_THRESHOLD_FACTOR * depth)) {
