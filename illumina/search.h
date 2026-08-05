@@ -41,7 +41,7 @@ struct SearchSettings {
     std::optional<i64>   move_time;
     std::optional<std::vector<Move>> search_moves;
     ISearchTracer* tracer = nullptr;
-    bool shallow_search_hint = true; // TODO: Change this before merging
+    bool shallow_search_hint = false;
 };
 
 struct SearchResults {

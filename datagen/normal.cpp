@@ -35,7 +35,7 @@ struct NormalOptions {
     std::string out_file_name {};
     ui64 search_node_limit = 6000;
     int min_random_plies = 8;
-    int max_random_plies = 16;
+    int max_random_plies = 18;
     int win_adjudication_score = 1000;
     int win_adjudication_plies = 6;
     int min_positions_per_game = 16;
@@ -202,6 +202,7 @@ Game simulate_game(Searcher& white_searcher,
     SearchSettings search_settings;
     search_settings.max_nodes = options.search_node_limit;
     search_settings.move_time = 10000;
+    search_settings.shallow_search_hint = true;
 
     Board board = Board::standard_startpos();
 
@@ -227,12 +228,11 @@ Game simulate_game(Searcher& white_searcher,
         auto& player = players[board.color_to_move()];
 
         SearchSettings validation_search_settings = search_settings;
-        validation_search_settings.max_nodes = UINT64_MAX;
-        validation_search_settings.max_depth = 2;
+        validation_search_settings.max_nodes = 1024;
 
         SearchResults search_results = player.searcher->search(board, validation_search_settings);
 
-        if (std::abs(search_results.score) >= 200) {
+        if (std::abs(search_results.score) >= 160) {
             board = Board::standard_startpos();
             continue;
         }
