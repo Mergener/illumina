@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 3.15)
 project(illumina)
 set(CMAKE_CXX_STANDARD 17)
 
-set(ILLUMINA_L1_SIZE 512 CACHE STRING "NNUE hidden-layer size")
-add_compile_definitions(ILLUMINA_L1_SIZE=${ILLUMINA_L1_SIZE})
-
 # Set illumina version.
 set(ILLUMINA_VERSION_MAJOR 3)
 set(ILLUMINA_VERSION_MINOR 0)
