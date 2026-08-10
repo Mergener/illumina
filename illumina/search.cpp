@@ -12,6 +12,7 @@
 #include "tunablevalues.h"
 #include "movepicker.h"
 #include "evaluation.h"
+#include "pv.h"
 #include "utils.h"
 
 namespace illumina {
@@ -34,7 +35,6 @@ struct SearchNode {
     Depth ply = 0;
     Score static_eval = 0;
     Move  skip_move = MOVE_NULL;
-    Move  pv[MAX_DEPTH];
 };
 
 class SearchWorker;
@@ -188,6 +188,8 @@ private:
     ui64  m_nodes = 0;
     Move  m_best_move = MOVE_NULL;
     Move  m_ponder_move = MOVE_NULL;
+
+    PvTable m_pv;
 
     template <TraceMode TRACE_MODE,
             SearchType SEARCH_TYPE,
@@ -516,9 +518,9 @@ void SearchWorker::aspiration_windows() {
 
         // Update ponder move if and only if we have both
         // a best move and a ponder move.
-        if (   search_stack->pv[0] != MOVE_NULL
-               && search_stack->pv[1] != MOVE_NULL) {
-            m_ponder_move = search_stack->pv[1];
+        if (m_pv.get(0, 0) != MOVE_NULL
+            && m_pv.get(0, 1) != MOVE_NULL) {
+            m_ponder_move = m_pv.get(0, 1);
         }
 
         if (score > alpha && score < beta) {
@@ -579,7 +581,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Initialize the PV line with a null move. Specially useful for all-nodes.
     if constexpr (PV_NODE) {
-        stack_node->pv[0] = MOVE_NULL;
+        m_pv.set(stack_node->ply, 0, MOVE_NULL);
     }
 
     // Don't search nodes with closed bounds.
@@ -1016,7 +1018,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
 
             if constexpr (PV_NODE && !ROOT_NODE) {
-                stack_node->pv[0] = MOVE_NULL;
+                m_pv.set(stack_node->ply, 0, MOVE_NULL);
             }
             break;
         }
@@ -1035,16 +1037,18 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // Update the PV table.
             if constexpr (PV_NODE) {
-                stack_node->pv[0] = best_move;
-                size_t i;
-                for (i = 0; i < MAX_DEPTH - 2; ++i) {
-                    Move pv_move = (stack_node + 1)->pv[i];
+                auto line = m_pv.line(stack_node->ply);
+                auto it = line.begin();
+                auto child_it = m_pv.line(stack_node->ply + 1).begin();
+                *it = best_move;
+                for (; it != line.end(); ++it, ++child_it) {
+                    Move pv_move = *child_it;
                     if (pv_move == MOVE_NULL) {
                         break;
                     }
-                    stack_node->pv[i + 1] = pv_move;
+                    *(it + 1) = pv_move;
                 }
-                stack_node->pv[i + 1] = MOVE_NULL;
+                *it = MOVE_NULL;
             }
         }
     }
@@ -1310,7 +1314,7 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
 
     // Extract the PV line.
     pv_results.line.clear();
-    for (Move pv_move: search_stack->pv) {
+    for (Move pv_move: m_pv.line(0)) {
         if (pv_move == MOVE_NULL) {
             break;
         }
