@@ -1048,7 +1048,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                     }
                     *(it + 1) = pv_move;
                 }
-                *it = MOVE_NULL;
+                *(it + 1) = MOVE_NULL;
             }
         }
     }

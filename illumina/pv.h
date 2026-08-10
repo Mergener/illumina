@@ -20,7 +20,8 @@ private:
 };
 
 class PvTable {
-    static constexpr int MAX_PV_LENGTH = MAX_DEPTH + 1;
+    static constexpr int PADDING = 1;
+    static constexpr int MAX_PV_LENGTH = MAX_DEPTH + PADDING;
     static constexpr int SIZE = MAX_PV_LENGTH * (MAX_PV_LENGTH + 1) / 2;
 
 public:
@@ -54,7 +55,7 @@ inline void PvTable::clear() {
 inline PvLineView PvTable::line(int base_ply) {
     return {
         &m_moves[ply_index(base_ply, 0)],
-        &m_moves[ply_index(base_ply, 1)]
+        &m_moves[ply_index(base_ply + 1, 0) - PADDING]
     };
 }
 
