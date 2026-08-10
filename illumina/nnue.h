@@ -3,8 +3,6 @@
 
 #include <array>
 #include <vector>
-#include <istream>
-#include <sstream>
 #include <type_traits>
 #include <immintrin.h>
 
@@ -12,14 +10,8 @@
 
 namespace illumina {
 
-enum class ActivationFunction {
-    CReLU,
-    SCReLU
-};
-
 static constexpr size_t N_INPUTS = 768;
-static constexpr ActivationFunction L1_ACTIVATION = ActivationFunction::SCReLU;
-static constexpr size_t L1_SIZE  = 512;
+static constexpr size_t L1_SIZE  = 768;
 
 struct EvalNetwork {
     alignas(32) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
@@ -27,8 +19,6 @@ struct EvalNetwork {
     alignas(32) std::array<i16, L1_SIZE * 2> output_weights;
     i16 output_bias;
 
-    EvalNetwork() = default;
-    EvalNetwork(std::istream& stream);
 };
 
 struct Accumulator {

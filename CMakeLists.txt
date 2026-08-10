@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.15)
 project(illumina)
 set(CMAKE_CXX_STANDARD 17)
 
-option(BUILD_TESTING "Build Illumina's test suite." ON)
-
 # Set illumina version.
 set(ILLUMINA_VERSION_MAJOR 3)
 set(ILLUMINA_VERSION_MINOR 0)
@@ -16,11 +14,13 @@ set(ILLUMINA_EXT_DIR ${CMAKE_SOURCE_DIR}/ext)
 
 # We might want to use a custom net.
 if(NOT DEFINED NNUE_PATH)
-    set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.json)
+    set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.bin)
 endif()
 message(STATUS "NNUE_PATH is set to: ${NNUE_PATH}")
 
 # Add some compilation options.
+option(BUILD_TESTING "Build Illumina's test suite." ON)
+
 option(TUNING "Tunable values become runtime variables that can be changed via UCI options." OFF)
 if (TUNING)
     add_definitions(-DTUNING_BUILD)
