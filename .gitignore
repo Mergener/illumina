@@ -22,3 +22,4 @@ builds/*
 build/*
 openbench/build/*
 cmake-build-*
+tmp/*

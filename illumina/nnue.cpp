@@ -1,7 +1,11 @@
 #include "nnue.h"
 
+#define INCBIN_ALIGNMENT_INDEX 5
 #include <incbin/incbin.h>
-#include <nlohmann/json/json.hpp>
+
+#include <algorithm>
+#include <cstddef>
+#include <stdexcept>
 
 #ifdef HAS_AVX2
 #include <immintrin.h>
@@ -9,16 +13,33 @@
 
 namespace illumina {
 
-INCTXT(_default_network, NNUE_PATH);
+INCBIN(_default_network, NNUE_PATH);
 
 static const EvalNetwork* s_default_network = nullptr;
 
 constexpr int SCALE = 400;
 constexpr int Q1    = 255;
 constexpr int Q2    = 64;
-constexpr int Q     = L1_ACTIVATION == ActivationFunction::CReLU
-                      ? (Q1 * Q2)
-                      : (Q1 * Q1 * Q2);
+
+constexpr size_t L1_WEIGHTS_BYTES = N_INPUTS * L1_SIZE * sizeof(i16);
+constexpr size_t L1_BIASES_BYTES = L1_SIZE * sizeof(i16);
+constexpr size_t OUTPUT_WEIGHTS_BYTES = 2 * L1_SIZE * sizeof(i16);
+constexpr size_t NETWORK_PAYLOAD_BYTES = L1_WEIGHTS_BYTES
+                                       + L1_BIASES_BYTES
+                                       + OUTPUT_WEIGHTS_BYTES
+                                       + sizeof(i16);
+constexpr size_t NETWORK_OBJECT_BYTES = (NETWORK_PAYLOAD_BYTES + 31) & ~size_t(31);
+constexpr size_t NETWORK_FILE_BYTES = (NETWORK_PAYLOAD_BYTES + 63) & ~size_t(63);
+
+static_assert(offsetof(EvalNetwork, l1_weights) == 0);
+static_assert(offsetof(EvalNetwork, l1_biases) == L1_WEIGHTS_BYTES);
+static_assert(offsetof(EvalNetwork, output_weights) == L1_WEIGHTS_BYTES + L1_BIASES_BYTES);
+static_assert(offsetof(EvalNetwork, output_bias) == L1_WEIGHTS_BYTES + L1_BIASES_BYTES + OUTPUT_WEIGHTS_BYTES);
+static_assert(std::is_standard_layout_v<EvalNetwork>);
+static_assert(std::is_trivially_copyable_v<EvalNetwork>);
+static_assert(sizeof(EvalNetwork) == NETWORK_OBJECT_BYTES);
+static_assert(sizeof(EvalNetwork) <= NETWORK_FILE_BYTES);
+static_assert(alignof(EvalNetwork) <= INCBIN_ALIGNMENT);
 
 void NNUE::clear() {
     // Copy all biases.
@@ -64,7 +85,10 @@ int NNUE::forward(Color color) const {
     sum1 = _mm_shuffle_epi32(sum0, _MM_SHUFFLE(2, 3, 0, 1));
     sum0 = _mm_add_epi32(sum0, sum1);
 
-    return (_mm_cvtsi128_si32(sum0) + m_net->output_bias) * SCALE / Q;
+    int output = _mm_cvtsi128_si32(sum0);
+    output /= Q1;
+    output += m_net->output_bias;
+    return output * SCALE / (Q1 * Q2);
 #else
     int sum = 0;
 
@@ -81,7 +105,9 @@ int NNUE::forward(Color color) const {
         sum += their_activated * m_net->output_weights[L1_SIZE + i];
     }
 
-    return (sum + m_net->output_bias) * SCALE / Q;
+    sum /= Q1;
+    sum += m_net->output_bias;
+    return sum * SCALE / (Q1 * Q2);
 #endif
 }
 
@@ -109,30 +135,12 @@ NNUE::NNUE()
     clear();
 }
 
-template <typename T>
-static void copy_params_from_json(const nlohmann::json& j,
-                                  std::string_view json_field_name,
-                                  T& arr) {
-    nlohmann::json j_arr = j[json_field_name];
-    for (size_t i = 0; i < arr.size(); ++i) {
-        arr[i] = j_arr.at(i);
-    }
-}
-
-EvalNetwork::EvalNetwork(std::istream& stream) {
-    nlohmann::json j = nlohmann::json::parse(stream);
-
-    copy_params_from_json(j, "l1_weights", l1_weights);
-    copy_params_from_json(j, "l1_biases", l1_biases);
-    copy_params_from_json(j, "out_weights", output_weights);
-
-    output_bias = j.at("out_biases")[0];
-}
-
 void init_nnue() {
-    std::string str = std::string(g_default_networkData, g_default_networkSize);
-    std::istringstream stream(str);
-    s_default_network = new EvalNetwork(stream);
+    if (g_default_networkSize != NETWORK_FILE_BYTES) {
+        throw std::runtime_error("Embedded NNUE has an unexpected size");
+    }
+
+    s_default_network = reinterpret_cast<const EvalNetwork*>(g_default_networkData);
 }
 
 } // illumina
