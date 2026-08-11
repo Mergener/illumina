@@ -512,7 +512,7 @@ void SearchWorker::aspiration_windows() {
             update_pv_results(search_stack, alpha, beta);
 
             if (m_main) {
-                m_context->time_manager().on_iteration_complete(m_best_move);
+                m_context->time_manager().on_iteration_complete(m_best_move, m_nodes);
             }
 
             break;
@@ -908,6 +908,11 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             move_history = m_hist.quiet_history(move, m_board.last_move());
         }
 
+        ui64 nodes_before;
+        if constexpr (ROOT_NODE) {
+            nodes_before = m_nodes;
+        }
+
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
 
@@ -968,6 +973,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         }
 
         m_board.undo_move();
+
+        if constexpr (ROOT_NODE) {
+            m_context->time_manager().add_spent_effort(move, m_nodes - nodes_before);
+        }
 
         if (move.is_quiet()) {
             quiets_played.push_back(move);

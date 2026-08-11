@@ -1,6 +1,8 @@
 #ifndef ILLUMINA_TIMEMANAGER_H
 #define ILLUMINA_TIMEMANAGER_H
 
+#include <memory>
+
 #include "clock.h"
 #include "searchdefs.h"
 #include "types.h"
@@ -18,7 +20,8 @@ public:
     bool finished_hard() const;
     i64 elapsed() const;
 
-    void on_iteration_complete(Move best_move);
+    void on_iteration_complete(Move best_move, ui64 nodes);
+    void add_spent_effort(Move move, ui64 nodes);
 
 private:
     TimePoint m_time_start = now();
@@ -34,6 +37,12 @@ private:
 
     Move m_last_best_move = MOVE_NULL;
     int m_move_stability_count = 0;
+
+    struct SpentEffortTable {
+        std::array<std::array<ui64, SQ_COUNT>, SQ_COUNT> by_move {};
+    };
+    std::unique_ptr<SpentEffortTable> m_spent_effort = std::make_unique<SpentEffortTable>();
+    ui64 m_nodes = 0;
 
     void calculate_bounds();
 };

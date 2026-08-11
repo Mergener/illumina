@@ -23,13 +23,18 @@ void TimeManager::start(Color us, const SearchLimits& limits) {
     calculate_bounds();
 }
 
-void TimeManager::on_iteration_complete(Move best_move) {
+void TimeManager::on_iteration_complete(Move best_move, ui64 nodes) {
     if (best_move == m_last_best_move) {
         m_move_stability_count++;
     }
     m_last_best_move = best_move;
+    m_nodes = nodes;
 
     calculate_bounds();
+}
+
+void TimeManager::add_spent_effort(Move move, ui64 nodes) {
+    m_spent_effort->by_move[move.source()][move.destination()] += nodes;
 }
 
 void TimeManager::calculate_bounds() {
@@ -49,6 +54,10 @@ void TimeManager::calculate_bounds() {
     double soft_bound = total_time * TM_SOFT_BOUND_FACTOR + increment * TM_INC_FACTOR;
 
     soft_bound *= TM_MOVE_STABILITY_BASE - m_move_stability_count * TM_MOVE_STABILITY_SLOPE;
+
+    double spent_effort = static_cast<double>(m_spent_effort->by_move[m_last_best_move.source()][m_last_best_move.destination()]);
+    double inverse_effort_ratio = 1 - spent_effort / static_cast<double>(m_nodes);
+    soft_bound *= std::max(TM_NODES_BASE, inverse_effort_ratio * TM_NODES_SLOPE + TM_NODES_BIAS);
 
     if (m_limits.move_time.has_value()) {
         hard_bound = std::min(static_cast<double>(*m_limits.move_time) - OVERHEAD, hard_bound);
