@@ -33,7 +33,9 @@ void TimeManager::on_iteration_complete(Move best_move) {
 }
 
 void TimeManager::calculate_bounds() {
-    m_infinite = false;
+    if (m_infinite) {
+        return;
+    }
 
     if (!m_limits.our_time.has_value()) {
         m_hard_bound = m_soft_bound = std::max(*m_limits.move_time - OVERHEAD, 1.0);
