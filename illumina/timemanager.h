@@ -18,13 +18,24 @@ public:
     bool finished_hard() const;
     i64 elapsed() const;
 
+    void on_iteration_complete(Move best_move);
+
 private:
     TimePoint m_time_start = now();
     i64 m_soft_bound = 0;
     i64 m_hard_bound = 0;
     bool m_infinite = false;
 
-    void calculate_bounds(Color us, const SearchLimits& limits);
+    struct {
+        std::optional<i64> move_time;
+        std::optional<i64> our_time;
+        i64 our_inc;
+    } m_limits {};
+
+    Move m_last_best_move = MOVE_NULL;
+    int m_move_stability_count = 0;
+
+    void calculate_bounds();
 };
 
 inline i64 TimeManager::elapsed() const {

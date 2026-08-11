@@ -8,33 +8,48 @@ static constexpr double OVERHEAD = 10.0;
 static constexpr double MIN_TIME = 1.0;
 
 void TimeManager::start(Color us, const SearchLimits& limits) {
-    m_time_start = now();
+    *this = {}; // make sure everything is properly reset on every search
 
-    calculate_bounds(us, limits);
-}
-
-void TimeManager::calculate_bounds(Color us, const SearchLimits& limits) {
     auto our_time = us == CL_WHITE ? limits.white_time : limits.black_time;
     if (!our_time.has_value() && !limits.move_time.has_value()) {
         m_infinite = true;
-        return;
+    }
+    else {
+        m_limits.move_time = limits.move_time;
+        m_limits.our_time = our_time;
+        m_limits.our_inc = us == CL_WHITE ? limits.white_inc.value_or(0) : limits.black_inc.value_or(0);
     }
 
+    calculate_bounds();
+}
+
+void TimeManager::on_iteration_complete(Move best_move) {
+    if (best_move == m_last_best_move) {
+        m_move_stability_count++;
+    }
+    m_last_best_move = best_move;
+
+    calculate_bounds();
+}
+
+void TimeManager::calculate_bounds() {
     m_infinite = false;
 
-    if (!our_time.has_value()) {
-        m_hard_bound = m_soft_bound = std::max(*limits.move_time - OVERHEAD, 1.0);
+    if (!m_limits.our_time.has_value()) {
+        m_hard_bound = m_soft_bound = std::max(*m_limits.move_time - OVERHEAD, 1.0);
         return;
     }
 
-    const double total_time = *our_time;
-    const double increment = (us == CL_WHITE ? limits.white_inc : limits.black_inc).value_or(0);
+    const double total_time = *m_limits.our_time;
+    const double increment = m_limits.our_inc;
 
     double hard_bound = total_time * TM_HARD_BOUND_FACTOR;
     double soft_bound = total_time * TM_SOFT_BOUND_FACTOR + increment * TM_INC_FACTOR;
 
-    if (limits.move_time.has_value()) {
-        hard_bound = std::min(static_cast<double>(*limits.move_time) - OVERHEAD, hard_bound);
+    soft_bound *= TM_MOVE_STABILITY_BASE - m_move_stability_count * TM_MOVE_STABILITY_SLOPE;
+
+    if (m_limits.move_time.has_value()) {
+        hard_bound = std::min(static_cast<double>(*m_limits.move_time) - OVERHEAD, hard_bound);
     }
 
     // Safeguard against latency...

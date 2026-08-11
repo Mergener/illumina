@@ -510,6 +510,11 @@ void SearchWorker::aspiration_windows() {
             // We found an exact score within our bounds, finish
             // the current depth search.
             update_pv_results(search_stack, alpha, beta);
+
+            if (m_main) {
+                m_context->time_manager().on_iteration_complete(m_best_move);
+            }
+
             break;
         }
 
