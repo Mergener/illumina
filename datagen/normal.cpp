@@ -199,10 +199,12 @@ Game simulate_game(Searcher& white_searcher,
         { &black_searcher }
     };
 
-    SearchSettings search_settings;
-    search_settings.max_nodes = options.search_node_limit;
-    search_settings.move_time = 10000;
-    search_settings.shallow_search_hint = true;
+    SearchLimits search_limits;
+    search_limits.max_nodes = options.search_node_limit;
+    search_limits.move_time = 10000;
+
+    SearchOptions search_options;
+    search_options.shallow_search_hint = true;
 
     Board board = Board::standard_startpos();
 
@@ -227,10 +229,10 @@ Game simulate_game(Searcher& white_searcher,
 
         auto& player = players[board.color_to_move()];
 
-        SearchSettings validation_search_settings = search_settings;
-        validation_search_settings.max_nodes = 1024;
+        SearchLimits validation_search_limits = search_limits;
+        validation_search_limits.max_nodes = 1024;
 
-        SearchResults search_results = player.searcher->search(board, validation_search_settings);
+        SearchResults search_results = player.searcher->search(board, validation_search_limits, search_options);
 
         if (std::abs(search_results.score) >= 160) {
             board = Board::standard_startpos();
@@ -249,7 +251,7 @@ Game simulate_game(Searcher& white_searcher,
         GamePlyData ply_data {};
         auto& player = players[board.color_to_move()];
 
-        SearchResults search_results = player.searcher->search(board, search_settings);
+        SearchResults search_results = player.searcher->search(board, search_limits, search_options);
         Move best_move = search_results.best_move;
 
         ply_data.best_move = best_move;

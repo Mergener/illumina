@@ -79,19 +79,20 @@ std::string sql_type_map() {
 
 void SearchTracer::new_search(const Board& root,
                               size_t hash_size_mb,
-                              const SearchSettings& settings) {
+                              const SearchLimits& limits,
+                              const SearchOptions& options) {
     m_curr_search = {};
 
     m_curr_search.id = random_ui64();
     m_curr_search.hash     = hash_size_mb;
     m_curr_search.root_fen = root.fen(root.detect_frc());
 
-    m_curr_search.limits_wtime = settings.white_time.value_or(0);
-    m_curr_search.limits_winc  = settings.white_inc.value_or(0);
-    m_curr_search.limits_btime = settings.black_time.value_or(0);
-    m_curr_search.limits_binc  = settings.black_inc.value_or(0);
-    m_curr_search.limits_nodes = settings.max_nodes;
-    m_curr_search.limits_movetime = settings.move_time.value_or(0);
+    m_curr_search.limits_wtime = limits.white_time.value_or(0);
+    m_curr_search.limits_winc  = limits.white_inc.value_or(0);
+    m_curr_search.limits_btime = limits.black_time.value_or(0);
+    m_curr_search.limits_binc  = limits.black_inc.value_or(0);
+    m_curr_search.limits_nodes = limits.max_nodes;
+    m_curr_search.limits_movetime = limits.move_time.value_or(0);
 
     m_curr_tree = {};
     m_curr_tree.search = m_curr_search.id;

@@ -6,7 +6,7 @@ BenchSettings default_bench_settings() {
     BenchSettings settings;
 
     settings.hash_size_mb = DEFAULT_BENCH_HASH_SIZE_MB;
-    settings.search_settings.max_depth = DEFAULT_BENCH_DEPTH;
+    settings.search_limits.max_depth = DEFAULT_BENCH_DEPTH;
 
     settings.boards = {
         Board::standard_startpos(),
@@ -42,7 +42,8 @@ BenchResults bench(const BenchSettings& settings) {
 
         TimePoint search_before = Clock::now();
         SearchResults search_results = searcher.search(board,
-                                                       settings.search_settings);
+                                                       settings.search_limits,
+                                                       settings.search_options);
         TimePoint search_after = Clock::now();
 
         results.search_time_ms += delta_ms(search_after, search_before);

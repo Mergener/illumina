@@ -26,19 +26,12 @@ struct PVResults {
     std::vector<Move> line;
 };
 
-struct SearchSettings {
+struct SearchOptions {
     Score contempt = 0;
     int n_pvs = 1;
     int n_threads = 1;
     int eval_random_margin = 0;
     ui64 eval_rand_seed = 0;
-    ui64 max_nodes = UINT64_MAX;
-    std::optional<Depth> max_depth;
-    std::optional<i64>   white_time;
-    std::optional<i64>   white_inc;
-    std::optional<i64>   black_time;
-    std::optional<i64>   black_inc;
-    std::optional<i64>   move_time;
     std::optional<std::vector<Move>> search_moves;
     ISearchTracer* tracer = nullptr;
     bool shallow_search_hint = false;
@@ -62,7 +55,8 @@ public:
     TranspositionTable& tt();
 
     SearchResults search(const Board& board,
-                         const SearchSettings& settings);
+                         const SearchLimits& limits,
+                         const SearchOptions& options);
     void stop();
 
     void set_pv_finish_listener(const PVFinishListener& listener);
