@@ -27,6 +27,9 @@ void TimeManager::on_iteration_complete(Move best_move, ui64 nodes) {
     if (best_move == m_last_best_move) {
         m_move_stability_count++;
     }
+    else {
+        m_move_stability_count = 0;
+    }
     m_last_best_move = best_move;
     m_nodes = nodes;
 
