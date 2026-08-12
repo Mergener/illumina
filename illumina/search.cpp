@@ -974,7 +974,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
         m_board.undo_move();
 
-        if constexpr (ROOT_NODE) {
+        if (ROOT_NODE && m_main) {
             m_context->time_manager().add_spent_effort(move, m_nodes - nodes_before);
         }
 
