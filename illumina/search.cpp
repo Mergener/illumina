@@ -918,9 +918,11 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
         int move_history = 0;
         if (move.is_quiet()) {
-            auto source_is_threatened = bit_is_set(threats, move.source());
-            auto dest_is_threatened = bit_is_set(threats, move.destination());
-            move_history = m_hist.quiet_history(move, m_board.last_move(), source_is_threatened, dest_is_threatened);
+            move_history = m_hist.quiet_history(
+                move,
+                m_board.last_move(),
+                bit_is_set(threats, move.source()),
+                bit_is_set(threats, move.destination()));
         }
 
         m_board.make_move(move);
