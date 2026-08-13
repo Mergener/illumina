@@ -486,31 +486,34 @@ void SearchWorker::aspiration_windows() {
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
 
+    int fail_highs = 0;
+
     Move best_move = m_best_move;
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
         Score score;
+        Score effective_depth = depth - std::min(fail_highs, 3);
         if (tracing()) {
             ISearchTracer* tracer = m_settings->tracer;
             tracer->new_tree(m_root_depth,
                              m_curr_pv_idx + 1,
                              alpha, beta);
             if (!m_settings->shallow_search_hint) {
-                score = negamax<TRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
+                score = negamax<TRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0]);
             }
             else {
-                score = negamax<TRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
+                score = negamax<TRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0]);
             }
             tracer->set(Traceable::SCORE, score);
             tracer->finish_tree();
         }
         else {
             if (!m_settings->shallow_search_hint) {
-                score = negamax<UNTRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
+                score = negamax<UNTRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0]);
             }
             else {
-                score = negamax<UNTRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
+                score = negamax<UNTRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0]);
             }
         }
 
@@ -529,6 +532,7 @@ void SearchWorker::aspiration_windows() {
         }
 
         if (score <= alpha) {
+            fail_highs = 0;
             beta  = (alpha + beta) / 2;
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_root_depth;
@@ -538,6 +542,7 @@ void SearchWorker::aspiration_windows() {
             update_pv_results(search_stack, alpha, beta, false);
         }
         else if (score >= beta) {
+            fail_highs++;
             beta = std::min(MAX_SCORE, beta + window);
 
             prev_score = score;
