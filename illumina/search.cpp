@@ -197,8 +197,7 @@ private:
     Score negamax(Depth depth,
                   Score alpha,
                   Score beta,
-                  SearchNode* stack_node,
-                  bool cut_node);
+                  SearchNode* stack_node);
 
     template <TraceMode TRACE_MODE, SearchType SEARCH_TYPE>
     Score quiescence_search(Depth ply, Score alpha, Score beta);
@@ -487,31 +486,34 @@ void SearchWorker::aspiration_windows() {
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
 
+    int fail_highs = 0;
+
     Move best_move = m_best_move;
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
         Score score;
+        Score effective_depth = depth - std::min(fail_highs, 3);
         if (tracing()) {
             ISearchTracer* tracer = m_settings->tracer;
             tracer->new_tree(m_root_depth,
                              m_curr_pv_idx + 1,
                              alpha, beta);
             if (!m_settings->shallow_search_hint) {
-                score = negamax<TRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0], false);
+                score = negamax<TRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0]);
             }
             else {
-                score = negamax<TRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0], false);
+                score = negamax<TRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0]);
             }
             tracer->set(Traceable::SCORE, score);
             tracer->finish_tree();
         }
         else {
             if (!m_settings->shallow_search_hint) {
-                score = negamax<UNTRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0], false);
+                score = negamax<UNTRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0]);
             }
             else {
-                score = negamax<UNTRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0], false);
+                score = negamax<UNTRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0]);
             }
         }
 
@@ -530,6 +532,7 @@ void SearchWorker::aspiration_windows() {
         }
 
         if (score <= alpha) {
+            fail_highs = 0;
             beta  = (alpha + beta) / 2;
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_root_depth;
@@ -539,6 +542,7 @@ void SearchWorker::aspiration_windows() {
             update_pv_results(search_stack, alpha, beta, false);
         }
         else if (score >= beta) {
+            fail_highs++;
             beta = std::min(MAX_SCORE, beta + window);
 
             prev_score = score;
@@ -560,7 +564,7 @@ template<TraceMode TRACE_MODE,
         SearchFlags FLAGS,
         SkipNmpMode SKIP_NMP_MODE,
         RootMode ROOT_MODE>
-Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* stack_node, bool cut_node) {
+Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* stack_node) {
     constexpr bool PV_NODE      = SEARCH_TYPE   == PVS;
     constexpr bool ROOT_NODE    = ROOT_MODE     == ROOT;
     constexpr bool TRACING      = TRACE_MODE    == TRACED;
@@ -725,7 +729,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         Depth reduction = depth / 3 + 4;
 
         m_board.make_null_move();
-        Score score = -negamax<TRACE_MODE, ZWS, FLAGS, SKIP_NMP>(depth - reduction, -beta, -beta + 1, stack_node + 1, false);
+        Score score = -negamax<TRACE_MODE, ZWS, FLAGS, SKIP_NMP>(depth - reduction, -beta, -beta + 1, stack_node + 1);
         TRACE_SET(Traceable::SCORE, -score);
         m_board.undo_null_move();
 
@@ -766,7 +770,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             Score pc_score = -quiescence_search<TRACE_MODE, ZWS>(ply + 1, -pc_beta, -pc_beta + 1);
             if (pc_score >= pc_beta) {
                 TRACE_PUSH_SIBLING();
-                pc_score = -negamax<TRACE_MODE, ZWS, FLAGS>(pc_depth, -pc_beta, -pc_beta + 1, stack_node + 1, !cut_node);
+                pc_score = -negamax<TRACE_MODE, ZWS, FLAGS>(pc_depth, -pc_beta, -pc_beta + 1, stack_node + 1);
                 TRACE_POP();
             }
             m_board.undo_move();
@@ -896,7 +900,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             TRACE_PUSH_SIBLING();
             TRACE_SET(Traceable::SKIP_MOVE, stack_node->skip_move);
 
-            Score score = negamax<TRACE_MODE, ZWS, FLAGS>(depth / 2, se_beta - 1, se_beta, stack_node, cut_node);
+            Score score = negamax<TRACE_MODE, ZWS, FLAGS>(depth / 2, se_beta - 1, se_beta, stack_node);
             TRACE_SET(Traceable::SCORE, score);
 
             TRACE_POP();
@@ -910,14 +914,12 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                     extensions++;
                 }
             }
-            // Multi-cut pruning.
+                // Multi-cut pruning.
             else if (score >= beta) {
                 return score;
             }
-            else if (tt_entry.score() >= beta || cut_node) {
-                extensions -= 3;
-            }
         }
+
 
         int move_history = 0;
         if (move.is_quiet()) {
@@ -962,26 +964,26 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
-            score = -negamax<TRACE_MODE, SEARCH_TYPE, FLAGS>(depth - 1 + extensions, -beta, -alpha, stack_node + 1, false);
+            score = -negamax<TRACE_MODE, SEARCH_TYPE, FLAGS>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
             TRACE_SET(Traceable::SCORE, -score);
         }
         else {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -negamax<TRACE_MODE, ZWS, FLAGS>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, stack_node + 1, true);
+            score = -negamax<TRACE_MODE, ZWS, FLAGS>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, stack_node + 1);
             TRACE_SET(Traceable::SCORE, -score);
 
             if (score > alpha && reductions > 1) {
                 TRACE_PUSH_SIBLING();
-                score = -negamax<TRACE_MODE, ZWS, FLAGS>(depth - 1 + extensions, -alpha - 1, -alpha, stack_node + 1, !cut_node);
+                score = -negamax<TRACE_MODE, ZWS, FLAGS>(depth - 1 + extensions, -alpha - 1, -alpha, stack_node + 1);
                 TRACE_SET(Traceable::SCORE, -score);
                 TRACE_POP();
             }
 
             if (score > alpha && score < beta) {
                 TRACE_PUSH_SIBLING();
-                score = -negamax<TRACE_MODE, SEARCH_TYPE, FLAGS>(depth - 1 + extensions, -beta, -alpha, stack_node + 1, !cut_node);
+                score = -negamax<TRACE_MODE, SEARCH_TYPE, FLAGS>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
                 TRACE_SET(Traceable::SCORE, -score);
                 TRACE_POP();
             }
