@@ -3,9 +3,8 @@
 
 #include <array>
 #include <vector>
-#include <type_traits>
-#include <immintrin.h>
 
+#include "simd.h"
 #include "types.h"
 
 namespace illumina {
@@ -79,128 +78,37 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
     static_assert(N_ENABLED >= 0  && N_ENABLED <= 2);
     static_assert(N_DISABLED >= 0 && N_DISABLED <= 2);
 
-    using EnabledIndexesArray  = typename std::conditional_t<(N_ENABLED > 0),
-            std::array<size_t, N_ENABLED>,
-            std::nullptr_t>;
+    std::array<size_t, N_ENABLED>  en_white_idxs;
+    std::array<size_t, N_ENABLED>  en_black_idxs;
+    std::array<size_t, N_DISABLED> dis_white_idxs;
+    std::array<size_t, N_DISABLED> dis_black_idxs;
 
-    using DisabledIndexesArray = typename std::conditional_t<(N_DISABLED > 0),
-            std::array<size_t, N_DISABLED>,
-            std::nullptr_t>;
-
-    EnabledIndexesArray  en_white_idxs;
-    EnabledIndexesArray  en_black_idxs;
-    DisabledIndexesArray dis_white_idxs;
-    DisabledIndexesArray dis_black_idxs;
-
-    if constexpr (N_ENABLED >= 1) {
-        en_white_idxs[0] = feature_index<CL_WHITE>(enabled_squares[0], enabled_pieces[0]);
-        en_black_idxs[0] = feature_index<CL_BLACK>(enabled_squares[0], enabled_pieces[0]);
+    for (int i = 0; i < N_ENABLED; ++i) {
+        en_white_idxs[i] = feature_index<CL_WHITE>(enabled_squares[i], enabled_pieces[i]);
+        en_black_idxs[i] = feature_index<CL_BLACK>(enabled_squares[i], enabled_pieces[i]);
     }
-    if constexpr (N_ENABLED >= 2) {
-        en_white_idxs[1] = feature_index<CL_WHITE>(enabled_squares[1], enabled_pieces[1]);
-        en_black_idxs[1] = feature_index<CL_BLACK>(enabled_squares[1], enabled_pieces[1]);
-    }
-    if constexpr (N_DISABLED >= 1) {
-        dis_white_idxs[0] = feature_index<CL_WHITE>(disabled_squares[0], disabled_pieces[0]);
-        dis_black_idxs[0] = feature_index<CL_BLACK>(disabled_squares[0], disabled_pieces[0]);
-    }
-    if constexpr (N_DISABLED >= 2) {
-        dis_white_idxs[1] = feature_index<CL_WHITE>(disabled_squares[1], disabled_pieces[1]);
-        dis_black_idxs[1] = feature_index<CL_BLACK>(disabled_squares[1], disabled_pieces[1]);
+    for (int i = 0; i < N_DISABLED; ++i) {
+        dis_white_idxs[i] = feature_index<CL_WHITE>(disabled_squares[i], disabled_pieces[i]);
+        dis_black_idxs[i] = feature_index<CL_BLACK>(disabled_squares[i], disabled_pieces[i]);
     }
 
-#ifdef HAS_AVX2
-    constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
-    for (size_t i = 0; i < L1_SIZE; i += STRIDE) {
-        __m256i* white_accum_ptr = reinterpret_cast<__m256i*>(&m_accum.white[i]);
-        __m256i* black_accum_ptr = reinterpret_cast<__m256i*>(&m_accum.black[i]);
+    auto update = [this](auto& accum, const auto& enabled, const auto& disabled) {
+        for (size_t i = 0; i < L1_SIZE; i += SimdVecI16::STRIDE) {
+            SimdVecI16 value = SimdVecI16::load_aligned(&accum[i]);
 
-        if constexpr (N_ENABLED >= 1) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_white_idxs[0] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(white_accum_ptr);
-            __m256i sum     = _mm256_add_epi16(accum, weights);
-            _mm256_store_si256(white_accum_ptr, sum);
-        }
-        if constexpr (N_ENABLED >= 2) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_white_idxs[1] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(white_accum_ptr);
-            __m256i sum     = _mm256_add_epi16(accum, weights);
-            _mm256_store_si256(white_accum_ptr, sum);
-        }
-        if constexpr (N_DISABLED >= 1) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_white_idxs[0] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(white_accum_ptr);
-            __m256i sub     = _mm256_sub_epi16(accum, weights);
-            _mm256_store_si256(white_accum_ptr, sub);
-        }
-        if constexpr (N_DISABLED >= 2) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_white_idxs[1] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(white_accum_ptr);
-            __m256i sub     = _mm256_sub_epi16(accum, weights);
-            _mm256_store_si256(white_accum_ptr, sub);
-        }
+            for (size_t index : enabled) {
+                value += SimdVecI16::load_aligned(&m_net->l1_weights[index * L1_SIZE + i]);
+            }
+            for (size_t index : disabled) {
+                value -= SimdVecI16::load_aligned(&m_net->l1_weights[index * L1_SIZE + i]);
+            }
 
-        if constexpr (N_ENABLED >= 1) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_black_idxs[0] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(black_accum_ptr);
-            __m256i sum     = _mm256_add_epi16(accum, weights);
-            _mm256_store_si256(black_accum_ptr, sum);
+            value.store_aligned(&accum[i]);
         }
-        if constexpr (N_ENABLED >= 2) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[en_black_idxs[1] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(black_accum_ptr);
-            __m256i sum     = _mm256_add_epi16(accum, weights);
-            _mm256_store_si256(black_accum_ptr, sum);
-        }
-        if constexpr (N_DISABLED >= 1) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_black_idxs[0] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(black_accum_ptr);
-            __m256i sub     = _mm256_sub_epi16(accum, weights);
-            _mm256_store_si256(black_accum_ptr, sub);
-        }
-        if constexpr (N_DISABLED >= 2) {
-            const __m256i* weights_ptr = reinterpret_cast<const __m256i*>(&m_net->l1_weights[dis_black_idxs[1] * L1_SIZE + i]);
-            __m256i weights = _mm256_load_si256(weights_ptr);
-            __m256i accum   = _mm256_load_si256(black_accum_ptr);
-            __m256i sub     = _mm256_sub_epi16(accum, weights);
-            _mm256_store_si256(black_accum_ptr, sub);
-        }
-    }
-#else
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        if constexpr (N_ENABLED >= 1) {
-            m_accum.white[i] += m_net->l1_weights[en_white_idxs[0] * L1_SIZE + i];
-        }
-        if constexpr (N_ENABLED >= 2) {
-            m_accum.white[i] += m_net->l1_weights[en_white_idxs[1] * L1_SIZE + i];
-        }
-        if constexpr (N_DISABLED >= 1) {
-            m_accum.white[i] -= m_net->l1_weights[dis_white_idxs[0] * L1_SIZE + i];
-        }
-        if constexpr (N_DISABLED >= 2) {
-            m_accum.white[i] -= m_net->l1_weights[dis_white_idxs[1] * L1_SIZE + i];
-        }
-        if constexpr (N_ENABLED >= 1) {
-            m_accum.black[i] += m_net->l1_weights[en_black_idxs[0] * L1_SIZE + i];
-        }
-        if constexpr (N_ENABLED >= 2) {
-            m_accum.black[i] += m_net->l1_weights[en_black_idxs[1] * L1_SIZE + i];
-        }
-        if constexpr (N_DISABLED >= 1) {
-            m_accum.black[i] -= m_net->l1_weights[dis_black_idxs[0] * L1_SIZE + i];
-        }
-        if constexpr (N_DISABLED >= 2) {
-            m_accum.black[i] -= m_net->l1_weights[dis_black_idxs[1] * L1_SIZE + i];
-        }
-    }
-#endif
+    };
+
+    update(m_accum.white, en_white_idxs, dis_white_idxs);
+    update(m_accum.black, en_black_idxs, dis_black_idxs);
 }
 
 } // illumina
