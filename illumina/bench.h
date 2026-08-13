@@ -12,7 +12,8 @@ static constexpr size_t DEFAULT_BENCH_HASH_SIZE_MB = 32;
 static constexpr Depth  DEFAULT_BENCH_DEPTH = 14;
 
 struct BenchSettings {
-    SearchSettings search_settings;
+    SearchLimits search_limits;
+    SearchOptions search_options;
     size_t hash_size_mb;
     std::vector<Board> boards;
     std::function<void(const Board& board, Score score, Move move)> on_board_searched = nullptr;

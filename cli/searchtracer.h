@@ -26,7 +26,8 @@ class SearchTracer : public ISearchTracer {
 public:
     void new_search(const Board& root,
                     size_t hash_size_mb,
-                    const SearchSettings& settings) override;
+                    const SearchLimits& limits,
+                    const SearchOptions& options) override;
 
     void new_tree(int root_depth,
                   int multi_pv,

@@ -6,6 +6,7 @@
 #include <type_traits>
 
 #include "board.h"
+#include "searchdefs.h"
 
 namespace illumina {
 
@@ -30,13 +31,14 @@ using TracedValue = std::variant<std::monostate, i64, bool, Move, double>;
                                                 "Unsupported traceable type.");
 #include "traceables.def"
 
-struct SearchSettings;
+struct SearchOptions;
 
 class ISearchTracer {
 public:
     virtual void new_search(const Board& root,
                             size_t hash_size_mb,
-                            const SearchSettings& settings) = 0;
+                            const SearchLimits& limits,
+                            const SearchOptions& settings) = 0;
     virtual void finish_search() = 0;
     virtual void new_tree(int root_depth,
                           int multi_pv,

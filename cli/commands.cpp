@@ -120,31 +120,32 @@ void register_commands(CLIApplication& server) {
     });
 
     server.register_command("go", [](const CommandContext& ctx) {
-        SearchSettings settings;
-        settings.max_depth = ctx.int_after("depth", MAX_DEPTH);
+        SearchLimits limits;
+        SearchOptions options;
+        limits.max_depth = ctx.int_after("depth", MAX_DEPTH);
 
         if (ctx.has_arg("wtime")) {
-            settings.white_time = ctx.int_after("wtime");
+            limits.white_time = ctx.int_after("wtime");
         }
 
         if (ctx.has_arg("winc")) {
-            settings.white_inc = ctx.int_after("winc");
+            limits.white_inc = ctx.int_after("winc");
         }
 
         if (ctx.has_arg("btime")) {
-            settings.black_time = ctx.int_after("btime");
+            limits.black_time = ctx.int_after("btime");
         }
 
         if (ctx.has_arg("binc")) {
-            settings.black_inc = ctx.int_after("binc");
+            limits.black_inc = ctx.int_after("binc");
         }
 
         if (ctx.has_arg("movetime")) {
-            settings.move_time = ctx.int_after("movetime");
+            limits.move_time = ctx.int_after("movetime");
         }
 
         if (ctx.has_arg("nodes")) {
-            settings.max_nodes = ctx.int_after("nodes");
+            limits.max_nodes = ctx.int_after("nodes");
         }
 
         bool trace = false;
@@ -165,10 +166,10 @@ void register_commands(CLIApplication& server) {
                 }
                 search_moves.push_back(move);
             }
-            settings.search_moves = search_moves;
+            options.search_moves = search_moves;
         }
 
-        global_state().search(settings, trace);
+        global_state().search(limits, options, trace);
     });
 
     server.register_command("stop", [](const CommandContext& ctx) {

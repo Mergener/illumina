@@ -165,12 +165,14 @@ public:
     SearchWorker(bool main,
                  const Board& board,
                  SearchContext* context,
-                 const SearchSettings* settings);
+                 const SearchOptions* settings,
+                 const SearchLimits& limits);
 
 private:
-    const SearchSettings* m_settings;
+    const SearchOptions* m_settings;
     const SearchContext*  m_context;
     const bool m_main;
+    SearchLimits m_limits;
     int m_eval_random_margin = 0;
     int m_eval_random_seed = 0;
     std::vector<Move> m_search_moves;
@@ -205,8 +207,7 @@ private:
     void aspiration_windows();
 
     void update_pv_results(const SearchNode* search_stack,
-                           Score alpha, Score beta,
-                           bool notify_tm);
+                           Score alpha, Score beta);
 
     Score evaluate();
     Score draw_score() const;
@@ -276,7 +277,8 @@ do {                                      \
 } while (false)
 
 SearchResults Searcher::search(const Board& board,
-                               const SearchSettings& settings) {
+                               const SearchLimits& limits,
+                               const SearchOptions& options) {
     // Create root info data.
     RootInfo root_info;
     root_info.color = board.color_to_move();
@@ -290,8 +292,8 @@ SearchResults Searcher::search(const Board& board,
     Move* end = generate_moves(board, &legal_moves[0]);
     for (Move* it = &legal_moves[0]; it != end; ++it) {
         Move move = *it;
-        if (settings.search_moves.has_value()) {
-            const std::vector<Move>& search_moves = settings.search_moves.value();
+        if (options.search_moves.has_value()) {
+            const std::vector<Move>& search_moves = options.search_moves.value();
             // Skip move if not included in search moves.
             if (std::find(search_moves.begin(), search_moves.end(), move) == search_moves.end()) {
                 continue;
@@ -321,46 +323,29 @@ SearchResults Searcher::search(const Board& board,
     SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
 
     // Create main worker.
-    SearchWorker main_worker(true, board, &context, &settings);
+    SearchWorker main_worker(true, board, &context, &options, limits);
 
     // Kickstart our time manager.
-    ui64 our_time = UINT64_MAX;
-    if (settings.move_time.has_value()) {
-        // 'movetime'
-        our_time = settings.move_time.value();
-        m_tm.start_movetime(our_time);
-    }
-    else if (settings.white_time.has_value() || settings.black_time.has_value()) {
-        // 'wtime/winc/btime/binc'
-        our_time = board.color_to_move() == CL_WHITE
-                   ? settings.white_time.value_or(UINT64_MAX)
-                   : settings.black_time.value_or(UINT64_MAX);
-
-        m_tm.start_tourney_time(our_time, 0, 0, 0);
-    }
-    else {
-        // 'infinite'
-        m_tm.stop();
-    }
+    m_tm.start(board.color_to_move(), limits);
 
     // Determine the number of helper threads to be used.
-    int n_helper_threads = std::max(1, settings.n_threads) - 1;
+    int n_helper_threads = std::max(1, options.n_threads) - 1;
 
     // Fire secondary threads.
     secondary_workers.clear();
     std::vector<std::thread> helper_threads;
     secondary_workers.resize(n_helper_threads);
     for (int i = 0; i < n_helper_threads; ++i) {
-        helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
-            auto worker = std::make_unique<SearchWorker>(false, board, &context, &settings);
+        helper_threads.emplace_back([&secondary_workers, &board, &context, &options, &limits, i]() {
+            auto worker = std::make_unique<SearchWorker>(false, board, &context, &options, limits);
             worker->iterative_deepening();
             secondary_workers[i] = std::move(worker);
         });
     }
 
     // Initialize tracer search.
-    if (settings.tracer != nullptr) {
-        settings.tracer->new_search(board, tt().size() / (1024 * 1024), settings);
+    if (options.tracer != nullptr) {
+        options.tracer->new_search(board, tt().size() / (1024 * 1024), limits, options);
     }
 
     main_worker.iterative_deepening();
@@ -369,8 +354,8 @@ SearchResults Searcher::search(const Board& board,
     context.stop_search();
 
     // Finish tracing search.
-    if (settings.tracer != nullptr) {
-        settings.tracer->finish_search();
+    if (options.tracer != nullptr) {
+        options.tracer->finish_search();
     }
 
     // Wait for secondary threads to stop.
@@ -404,7 +389,7 @@ SearchResults Searcher::search(const Board& board,
 }
 
 void SearchWorker::iterative_deepening() {
-    Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
+    Depth max_depth = m_limits.max_depth.value_or(MAX_DEPTH);
     for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
         // If we finished soft, we don't want to start a new iteration.
         if (   m_main
@@ -524,7 +509,12 @@ void SearchWorker::aspiration_windows() {
         if (score > alpha && score < beta) {
             // We found an exact score within our bounds, finish
             // the current depth search.
-            update_pv_results(search_stack, alpha, beta, true);
+            update_pv_results(search_stack, alpha, beta);
+
+            if (m_main) {
+                m_context->time_manager().on_iteration_complete(m_best_move, m_nodes);
+            }
+
             break;
         }
 
@@ -535,14 +525,14 @@ void SearchWorker::aspiration_windows() {
 
             m_score = prev_score;
             m_best_move = best_move;
-            update_pv_results(search_stack, alpha, beta, false);
+            update_pv_results(search_stack, alpha, beta);
         }
         else if (score >= beta) {
             beta = std::min(MAX_SCORE, beta + window);
 
             prev_score = score;
             best_move  = m_best_move;
-            update_pv_results(search_stack, alpha, beta, true);
+            update_pv_results(search_stack, alpha, beta);
         }
 
         check_limits();
@@ -925,6 +915,11 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 bit_is_set(threats, move.destination()));
         }
 
+        ui64 nodes_before;
+        if constexpr (ROOT_NODE) {
+            nodes_before = m_nodes;
+        }
+
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
 
@@ -985,6 +980,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         }
 
         m_board.undo_move();
+
+        if (ROOT_NODE && m_main) {
+            m_context->time_manager().add_spent_effort(move, m_nodes - nodes_before);
+        }
 
         if (move.is_quiet()) {
             quiets_played.push_back(move);
@@ -1285,8 +1284,7 @@ Score SearchWorker::evaluate() {
 }
 
 void SearchWorker::update_pv_results(const SearchNode* search_stack,
-                                     Score alpha, Score beta,
-                                     bool notify_tm) {
+                                     Score alpha, Score beta) {
     // We only want the main thread to update results, the others
     // should just assist on the search.
     if (!m_main) {
@@ -1334,13 +1332,6 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
         pv_results.best_move = pv_results.line[0];
     }
 
-    // Notify the time manager that we finished a pv iteration.
-    if (notify_tm) {
-        m_context->time_manager().on_new_pv(pv_results.depth,
-                                            pv_results.best_move,
-                                            pv_results.score);
-    }
-
     // Notify whoever else needs to know about it.
     m_context->listeners().pv_finish(pv_results);
 }
@@ -1351,7 +1342,7 @@ void SearchWorker::check_limits() {
     }
 
     ui64 nodes = this->nodes();
-    if (nodes >= m_settings->max_nodes) {
+    if (nodes >= m_limits.max_nodes) {
         m_context->stop_search();
         return;
     }
@@ -1424,13 +1415,15 @@ Move SearchWorker::ponder_move() const {
 SearchWorker::SearchWorker(bool main,
                            const Board& board,
                            SearchContext* context,
-                           const SearchSettings* settings)
+                           const SearchOptions* settings,
+                           const SearchLimits& limits)
         : m_settings(settings),
           m_context(context),
           m_main(main),
           m_eval_random_margin(settings->eval_random_margin),
           m_eval_random_seed(settings->eval_rand_seed),
-          m_board(board) {
+          m_board(board),
+          m_limits(limits) {
     m_eval.on_new_board(m_board);
 
     // Dispatch board callbacks to Worker's methods.

@@ -86,7 +86,7 @@ void State::bench() const {
 
     std::cout << "Starting bench...\n" << std::endl;
     std::cout << "Bench hash size is " << settings.hash_size_mb << " MiB (" << settings.hash_size_mb * 1024 * 1024 << " bytes)" << std::endl;
-    std::cout << "Bench search depth is " << settings.search_settings.max_depth.value() << std::endl;
+    std::cout << "Bench search depth is " << settings.search_limits.max_depth.value() << std::endl;
     std::cout << std::endl;
 
     settings.on_board_searched = [](const Board& board,
@@ -306,14 +306,14 @@ void State::setup_searcher() {
     });
 }
 
-void State::search(SearchSettings settings, bool trace) {
+void State::search(SearchLimits limits, SearchOptions search_options, bool trace) {
     // Prepare some search settings before searching based on UCI options.
-    settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
-    settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
-    settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
-    settings.eval_random_margin  = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
-    settings.eval_rand_seed      = m_eval_random_seed;
-    settings.shallow_search_hint = m_options.option<UCIOptionCheck>("OptimizeForShallowSearches").value();
+    search_options.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
+    search_options.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
+    search_options.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
+    search_options.eval_random_margin  = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
+    search_options.eval_rand_seed      = m_eval_random_seed;
+    search_options.shallow_search_hint = m_options.option<UCIOptionCheck>("OptimizeForShallowSearches").value();
 
     // User might want to override number of search nodes.
     // This is useful when performing node-odds testing on a GUI that
@@ -321,7 +321,7 @@ void State::search(SearchSettings settings, bool trace) {
     // and OverrideNodesLimit allows Illumina to bypass this instruction.
     ui64 node_option = m_options.option<UCIOptionSpin>("OverrideNodesLimit").value();
     if (node_option != 0) {
-        settings.max_nodes = node_option;
+        limits.max_nodes = node_option;
     }
 
     // Setup search tracing (if build supports it).
@@ -334,11 +334,11 @@ void State::search(SearchSettings settings, bool trace) {
             std::string trace_path = m_options.option<UCIOptionString>("TraceFile").value();
             size_t trace_batch_size = m_options.option<UCIOptionSpin>("TraceBatchSize").value();
             tracer = std::make_shared<SearchTracer>(trace_path, trace_batch_size);
-            settings.tracer = tracer.get();
+            search_options.tracer = tracer.get();
         }
         catch (const std::exception& e) {
             std::cerr << "Caught exception when initializing tracer (search will continue but tracing will be disabled):\n" << e.what() << std::endl;
-            settings.tracer = nullptr;
+            search_options.tracer = nullptr;
         }
 #endif
     }
@@ -349,10 +349,10 @@ void State::search(SearchSettings settings, bool trace) {
     // Finally, fire the search thread.
     // Note that we need to capture the tracer in the lambda in order
     // to keep the tracer object alive.
-    m_search_thread = std::thread([this, settings, tracer]() {
+    m_search_thread = std::thread([this, limits, search_options, tracer]() {
         try {
             m_search_start = Clock::now();
-            SearchResults results = m_searcher.search(m_board, settings);
+            SearchResults results = m_searcher.search(m_board, limits, search_options);
 
             std::cout << "bestmove " << results.best_move.to_uci(m_frc);
 

@@ -107,6 +107,16 @@ inline void SearchMove::reduce_value(i32 val) {
     m_val -= val;
 }
 
+struct SearchLimits {
+    ui64 max_nodes = UINT64_MAX;
+    std::optional<Depth> max_depth;
+    std::optional<i64> white_time;
+    std::optional<i64> white_inc;
+    std::optional<i64> black_time;
+    std::optional<i64> black_inc;
+    std::optional<i64> move_time;
+};
+
 }
 
 #endif // ILLUMINA_SEARCHTYPES_H
