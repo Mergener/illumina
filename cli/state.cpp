@@ -311,8 +311,9 @@ void State::search(SearchSettings settings, bool trace) {
     settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
     settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
     settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
-    settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
-    settings.eval_rand_seed     = m_eval_random_seed;
+    settings.eval_random_margin  = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
+    settings.eval_rand_seed      = m_eval_random_seed;
+    settings.shallow_search_hint = m_options.option<UCIOptionCheck>("OptimizeForShallowSearches").value();
 
     // User might want to override number of search nodes.
     // This is useful when performing node-odds testing on a GUI that
@@ -496,6 +497,7 @@ void State::register_options() {
     m_options.register_option<UCIOptionSpin>("OverrideNodesLimit", 0, 0, INT32_MAX);
     m_options.register_option<UCIOptionCheck>("NormalizeScores", true);
     m_options.register_option<UCIOptionCheck>("UCI_ShowWDL", false);
+    m_options.register_option<UCIOptionCheck>("OptimizeForShallowSearches", false);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \
