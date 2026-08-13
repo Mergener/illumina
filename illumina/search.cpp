@@ -737,7 +737,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             pc_hash_move = hash_move;
         }
 
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist, pc_hash_move, pc_see);
+        auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
+        MovePicker<true> pc_move_picker(m_board, ply, m_hist, threats, pc_hash_move, pc_see);
 
         int pc_searched_moves = 0;
         SearchMove move;
@@ -784,7 +785,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     int move_idx = -1;
 
-    MovePicker move_picker(m_board, ply, m_hist, hash_move);
+    auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
+    MovePicker move_picker(m_board, ply, m_hist, threats, hash_move);
     SearchMove move {};
     Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
@@ -903,9 +905,14 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
         }
 
+
         int move_history = 0;
         if (move.is_quiet()) {
-            move_history = m_hist.quiet_history(move, m_board.last_move());
+            move_history = m_hist.quiet_history(
+                move,
+                m_board.last_move(),
+                bit_is_set(threats, move.source()),
+                bit_is_set(threats, move.destination()));
         }
 
         ui64 nodes_before;
@@ -1003,7 +1010,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                     m_hist.update_quiet_history(quiet,
                                                 m_board.last_move(),
                                                 depth,
-                                                quiet == best_move);
+                                                quiet == best_move,
+                                                bit_is_set(threats, quiet.source()),
+                                                bit_is_set(threats, quiet.destination()));
                 }
             }
 
@@ -1187,7 +1196,8 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     }
 
     // Finally, start looping over available noisy moves.
-    MovePicker<true> move_picker(m_board, ply, m_hist, tt_move);
+    auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
+    MovePicker<true> move_picker(m_board, ply, m_hist, threats, tt_move);
     SearchMove move;
     SearchMove best_move;
     Score best_score = stand_pat;
