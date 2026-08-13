@@ -168,7 +168,7 @@ void test_move_picker() {
                 }
             }
 
-            MovePicker<QUIESCE> move_picker(board, ply, mv_hist, hash_move);
+            MovePicker<QUIESCE> move_picker(board, ply, mv_hist, 0, hash_move);
             SearchMove move {};
             std::vector<SearchMove> mp_moves;
             MovePickingStage highest_stage = MPS_NOT_STARTED;
