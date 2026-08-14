@@ -557,7 +557,7 @@ void SearchWorker::aspiration_windows() {
     }
 }
 
-static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
+static std::array<std::array<int, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<TraceMode TRACE_MODE,
@@ -934,35 +934,34 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
 
         // Late move reductions.
-        Depth reductions = 0;
+        int r = 0;
         if (   n_searched_moves >= LMR_MIN_MOVE_IDX
             && depth >= LMR_MIN_DEPTH
             && !in_check
             && !m_board.in_check()) {
-            reductions = s_lmr_table[n_searched_moves - 1][depth];
+            r = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
                 // Further reduce moves that are not improving the static evaluation.
-                reductions += !improving;
+                r += !improving * LMR_IMPROVING_FACTOR;
 
                 // Further reduce moves that have been historically very bad.
-                reductions += move_history <= LMR_BAD_HISTORY_THRESHOLD;
+                r += (move_history <= LMR_BAD_HISTORY_THRESHOLD) * LMR_BAD_HIST_FACTOR;
 
                 // Don't reduce nodes that have been on the PV as much.
-                reductions -= ttpv;
+                r -= ttpv * LMR_TTPV_FACTOR;
 
                 // Further reduce cut nodes
-                reductions += cut_node;
+                r += cut_node * LMR_CUT_NODE_FACTOR;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
                 // and probably don't need unsound sacrifices.
                 bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
-                reductions -= !stable * (reductions / 2);
+                r -= !stable * (r / 2);
             }
-
-            // Prevent too high or below zero reductions.
-            reductions = std::clamp(reductions, 0, depth);
         }
+
+        Depth reductions = std::clamp(r / 1024, 0, depth);
 
         Score score;
         if (n_searched_moves == 0) {
@@ -1465,7 +1464,7 @@ bool SearchWorker::tracing() const {
 static void init_search_constants() {
     for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
         for (Depth d = 0; d < MAX_DEPTH; ++d) {
-            s_lmr_table[m][d] = Depth(LMR_REDUCTIONS_BASE + std::log(d) * std::log(m) * 100.0 / LMR_REDUCTIONS_DIVISOR);
+            s_lmr_table[m][d] = Depth((LMR_REDUCTIONS_BASE + std::log(d) * std::log(m) * 100.0 / LMR_REDUCTIONS_DIVISOR) * 1024);
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {
