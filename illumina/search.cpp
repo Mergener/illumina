@@ -703,7 +703,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     if (   !PV_NODE
         && !in_check
         && stack_node->skip_move == MOVE_NULL
-        && depth <= RFP_MAX_DEPTH + cut_node
+        && depth <= RFP_MAX_DEPTH + !cut_node
         && alpha < MATE_THRESHOLD
         && static_eval - rfp_margin > beta) {
         return static_eval - rfp_margin;
