@@ -42,6 +42,8 @@ public:
     void set_killer(Depth ply, Move killer);
     void reset();
 
+    void age();
+
     void update_corrhist(const Board& board,
                          Depth depth,
                          int diff);
@@ -128,6 +130,14 @@ inline void MoveHistory::set_killer(Depth ply, Move killer) {
 
 inline void MoveHistory::reset() {
     std::memset(m_data.get(), 0, sizeof(Data));
+}
+
+inline void MoveHistory::age() {
+    for (auto& arr: m_data->butterfly) {
+        for (auto& hist: arr) {
+            hist = hist * 3 / 4;
+        }
+    }
 }
 
 inline int MoveHistory::quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const {
