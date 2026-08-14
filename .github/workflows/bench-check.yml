@@ -1,22 +1,23 @@
 name: Bench Validation
 
-permissions:
-  contents: write 
-  
 on:
   push:
     branches:
-      - '*'
-      - '**'
-  workflow_dispatch:
+      - main
+
+permissions:
+  contents: write
 
 jobs:
   run-bench:
+    if: github.event.head_commit.author.email != 'actions@github.com'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up C++ compiler and CMake
         run: |
@@ -31,12 +32,12 @@ jobs:
           bench_nodes=$(echo "$output" | grep -o '^[0-9]*' | head -n 1)
           echo "$bench_nodes" > bench.txt
 
-      - name: Verify Bench File and Commit Changes
+      - name: Commit bench result
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           bench_message=$(cat openbench/bench.txt)
-          echo $(date) >> openbench/bench.txt
+          date >> openbench/bench.txt
           git add openbench/bench.txt
           git commit -m "bench $bench_message"
           git push
