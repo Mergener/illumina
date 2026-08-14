@@ -406,6 +406,7 @@ SearchResults Searcher::search(const Board& board,
 }
 
 void SearchWorker::iterative_deepening() {
+    m_hist.age();
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
         // If we finished soft, we don't want to start a new iteration.
