@@ -1464,7 +1464,8 @@ bool SearchWorker::tracing() const {
 static void init_search_constants() {
     for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
         for (Depth d = 0; d < MAX_DEPTH; ++d) {
-            s_lmr_table[m][d] = Depth((LMR_REDUCTIONS_BASE + std::log(d) * std::log(m) * 100.0 / LMR_REDUCTIONS_DIVISOR) * 1024);
+            // TODO: Multiply by 1024 before flooring (currently lost elo but will probably gain after SPSA)
+            s_lmr_table[m][d] = Depth((LMR_REDUCTIONS_BASE + std::log(d) * std::log(m) * 100.0 / LMR_REDUCTIONS_DIVISOR)) * 1024;
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {
