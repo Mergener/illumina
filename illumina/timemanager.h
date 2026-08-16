@@ -37,6 +37,7 @@ private:
 
     Move m_last_best_move = MOVE_NULL;
     int m_move_stability_count = 0;
+    Depth m_curr_depth = 1;
 
     struct SpentEffortTable {
         std::array<std::array<ui64, SQ_COUNT>, SQ_COUNT> by_move {};

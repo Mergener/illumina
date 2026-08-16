@@ -31,9 +31,10 @@ void TimeManager::on_iteration_complete(Depth depth, Move best_move, ui64 nodes)
         else {
             m_move_stability_count = 0;
         }
-        m_last_best_move = best_move;
-        m_nodes = nodes;
     }
+    m_last_best_move = best_move;
+    m_nodes = nodes;
+    m_curr_depth = depth;
 
     calculate_bounds();
 }
@@ -58,7 +59,9 @@ void TimeManager::calculate_bounds() {
     double hard_bound = total_time * TM_HARD_BOUND_FACTOR;
     double soft_bound = total_time * TM_SOFT_BOUND_FACTOR + increment * TM_INC_FACTOR;
 
-    soft_bound *= std::max(TM_MOVE_STABILITY_BASE - m_move_stability_count * TM_MOVE_STABILITY_SLOPE, 0.0);
+    if (m_curr_depth >= TM_MOVE_STABILITY_MIN_DEPTH) {
+        soft_bound *= std::max(TM_MOVE_STABILITY_BASE - m_move_stability_count * TM_MOVE_STABILITY_SLOPE, 0.0);
+    }
 
     double spent_effort = static_cast<double>(m_spent_effort->by_move[m_last_best_move.source()][m_last_best_move.destination()]);
     double inverse_effort_ratio = 1 - spent_effort / static_cast<double>(m_nodes);
