@@ -512,7 +512,7 @@ void SearchWorker::aspiration_windows() {
             update_pv_results(search_stack, alpha, beta);
 
             if (m_main) {
-                m_context->time_manager().on_iteration_complete(m_best_move, m_nodes);
+                m_context->time_manager().on_iteration_complete(m_root_depth, m_best_move, m_nodes);
             }
 
             break;

@@ -20,7 +20,7 @@ public:
     bool finished_hard() const;
     i64 elapsed() const;
 
-    void on_iteration_complete(Move best_move, ui64 nodes);
+    void on_iteration_complete(Depth depth, Move best_move, ui64 nodes);
     void add_spent_effort(Move move, ui64 nodes);
 
 private:
