@@ -219,7 +219,7 @@ inline void MoveHistory::update_history_by_depth(int& history,
     int delta = (depth < MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD)
               ? (depth * depth)
               : (MV_HIST_QUIET_HIGH_DEPTH_FACTOR * depth * depth);
-    int sign  = good ? 1 : -1;
+    int sign  = good ? 1 : -2;
     update_history(history, sign * delta);
 }
 
