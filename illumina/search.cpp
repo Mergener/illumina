@@ -797,7 +797,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Store played quiet moves in this list.
     // Useful for history updates later on.
-    StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
+    StaticList<Move, MAX_GENERATED_MOVES> played_quiets;
+    StaticList<Move, MAX_GENERATED_MOVES> played_captures;
 
     int move_idx = -1;
 
@@ -994,7 +995,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         m_board.undo_move();
 
         if (move.is_quiet()) {
-            quiets_played.push_back(move);
+            played_quiets.push_back(move);
+        }
+        else if (move.is_capture()) {
+            played_captures.push_back(move);
         }
 
         n_searched_moves++;
@@ -1011,10 +1015,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             TRACE_SET(Traceable::BEST_MOVE_RAW, best_move.raw());
 
             // Update our history scores and refutation moves.
+            for (auto capt: played_captures) {
+                m_hist.update_capture_history(capt, depth, capt == best_move);
+            }
             if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);
 
-                for (Move quiet: quiets_played) {
+                for (Move quiet: played_quiets) {
                     m_hist.update_quiet_history(quiet,
                                                 m_board.last_move(),
                                                 depth,
