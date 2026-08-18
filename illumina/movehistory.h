@@ -76,8 +76,9 @@ private:
         ButterflyArray<i16> butterfly {};
         std::array<std::array<PieceToArray<i16>, 2>, 2> threat_history {};
         PieceToArray<PieceToArray<i16>> counter_move_history {};
+        
         // PT_COUNT - 2 since we exclude kings and PT_NULL
-        PieceToArray<std::array<int, PT_COUNT - 2>> capt_hist {};
+        PieceToArray<std::array<i16, PT_COUNT - 2>> capt_hist {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
