@@ -496,7 +496,7 @@ void SearchWorker::aspiration_windows() {
         Score score;
         Score effective_depth = depth - std::min(fail_highs, 3);
         if (tracing()) {
-            ISearchTracer* tracer = m_settings->tracer;
+            SearchTracer* tracer = m_settings->tracer;
             tracer->new_tree(m_root_depth,
                              m_curr_pv_idx + 1,
                              alpha, beta);

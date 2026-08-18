@@ -325,7 +325,7 @@ void State::search(SearchSettings settings, bool trace) {
     }
 
     // Setup search tracing (if build supports it).
-    std::shared_ptr<ISearchTracer> tracer = nullptr;
+    std::shared_ptr<SearchTracer> tracer = nullptr;
     if (trace) {
 #ifndef TRACING_ENABLED
         std::cout << "info string Tracing is not enabled in this version -- option skipped." << std::endl;
@@ -333,7 +333,7 @@ void State::search(SearchSettings settings, bool trace) {
         try {
             std::string trace_path = m_options.option<UCIOptionString>("TraceFile").value();
             size_t trace_batch_size = m_options.option<UCIOptionSpin>("TraceBatchSize").value();
-            tracer = std::make_shared<SearchTracer>(trace_path, trace_batch_size);
+            tracer = std::make_shared<SqliteSearchTracer>(trace_path, trace_batch_size);
             settings.tracer = tracer.get();
         }
         catch (const std::exception& e) {
