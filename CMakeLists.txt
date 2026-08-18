@@ -21,6 +21,11 @@ message(STATUS "NNUE_PATH is set to: ${NNUE_PATH}")
 # Add some compilation options.
 option(BUILD_TESTING "Build Illumina's test suite." ON)
 
+option(OPTIMIZE_SHALLOW_SEARCH "Optimize for shallow searches. This option is always implicitly enabled for datagen binaries." OFF)
+if (OPTIMIZE_SHALLOW_SEARCH)
+    add_compile_definitions(OPTIMIZE_SHALLOW_SEARCH)
+endif()
+
 option(TUNING "Tunable values become runtime variables that can be changed via UCI options." OFF)
 if (TUNING)
     add_definitions(-DTUNING_BUILD)

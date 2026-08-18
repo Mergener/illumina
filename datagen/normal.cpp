@@ -202,7 +202,6 @@ Game simulate_game(Searcher& white_searcher,
     SearchSettings search_settings;
     search_settings.max_nodes = options.search_node_limit;
     search_settings.move_time = 10000;
-    search_settings.shallow_search_hint = true;
 
     Board board = Board::standard_startpos();
 

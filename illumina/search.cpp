@@ -152,6 +152,12 @@ enum SearchFlags {
     SHALLOW = BIT(0)
 };
 
+#ifdef OPTIMIZE_SHALLOW_SEARCH
+constexpr SearchFlags ROOT_SEARCH_FLAGS = SHALLOW;
+#else
+constexpr SearchFlags ROOT_SEARCH_FLAGS = NO_SEARCH_FLAGS;
+#endif
+
 class SearchWorker {
 public:
     void iterative_deepening();
@@ -500,22 +506,12 @@ void SearchWorker::aspiration_windows() {
             tracer->new_tree(m_root_depth,
                              m_curr_pv_idx + 1,
                              alpha, beta);
-            if (!m_settings->shallow_search_hint) {
-                score = negamax<TRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
-            }
-            else {
-                score = negamax<TRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
-            }
+            score = negamax<TRACED, PVS, ROOT_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
             tracer->set(Traceable::SCORE, score);
             tracer->finish_tree();
         }
         else {
-            if (!m_settings->shallow_search_hint) {
-                score = negamax<UNTRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
-            }
-            else {
-                score = negamax<UNTRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
-            }
+            score = negamax<UNTRACED, PVS, ROOT_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
         }
 
         // Update ponder move if and only if we have both
