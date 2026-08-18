@@ -736,6 +736,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
         if (score >= beta) {
             tt.try_store(board_key, ply, MOVE_NULL, score, depth, static_eval, BT_LOWERBOUND, ttpv);
+            if (alpha >= static_eval) {
+                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+            }
             return score;
         }
     }
