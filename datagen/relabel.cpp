@@ -25,6 +25,7 @@ struct RelabelOptions {
     int threads = 6;
     ui64 search_node_limit = 10000;
     double complete_output_size_ratio = 0.97;
+    bool generate_contradictions = false;
 };
 
 struct RelabelTask {
@@ -84,6 +85,11 @@ RelabelOptions parse_args(int argc, char* argv[]) {
         .default_value(options.complete_output_size_ratio)
         .store_into(options.complete_output_size_ratio)
         .help("skip outputs at least this large relative to their input.");
+
+    args.add_argument("--generate-contradictions")
+        .default_value(options.generate_contradictions)
+        .store_into(options.generate_contradictions)
+        .help("generate contradiction files alongside output.");
 
     try {
         args.parse_args(argc, argv);
@@ -246,7 +252,11 @@ void relabel_file(const RelabelTask& task,
     }
 
     std::ofstream output(task.output_path, std::ios_base::app);
-    std::ofstream contradictions(contradiction_path(task.output_path), std::ios_base::app);
+
+    std::unique_ptr<std::ofstream> contradictions = nullptr;
+    if (options.generate_contradictions) {
+        contradictions = std::make_unique<std::ofstream>(contradiction_path(task.output_path), std::ios_base::app);
+    }
     if (!output || !contradictions) {
         throw std::runtime_error("failed to open outputs for " + task.input_path.string());
     }
@@ -273,14 +283,14 @@ void relabel_file(const RelabelTask& task,
             output << fen << " | " << new_score << " | " << wdl << '\n' << std::flush;
 
             const Score normalized = normalize_score(new_score, board);
-            if (is_contradiction(normalized, wdl)) {
-                contradictions << fen
-                               << "\n\tprev: " << previous_score
-                               << " (" << normalize_score(previous_score, board) << " normalized)"
-                               << "\n\tnew: " << new_score
-                               << " (" << normalized << " normalized)"
-                               << "\n\twdl: " << wdl << "\n\n"
-                               << std::flush;
+            if (contradictions != nullptr && is_contradiction(normalized, wdl)) {
+                *contradictions << fen
+                                << "\n\tprev: " << previous_score
+                                << " (" << normalize_score(previous_score, board) << " normalized)"
+                                << "\n\tnew: " << new_score
+                                << " (" << normalized << " normalized)"
+                                << "\n\twdl: " << wdl << "\n\n"
+                                << std::flush;
             }
         }
         catch (const std::exception& e) {
