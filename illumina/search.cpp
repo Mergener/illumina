@@ -917,6 +917,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
             // Multi-cut pruning.
             else if (score >= beta) {
+                if (alpha <= static_eval) {
+                    m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                }
                 return score;
             }
         }
