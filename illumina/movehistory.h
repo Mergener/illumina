@@ -52,11 +52,16 @@ public:
     int correct_eval_with_corrhist(const Board& board,
                                    int static_eval) const;
 
-    int  quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const;
+    int quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const;
     void update_quiet_history(Move move,
                               Move last_move,
                               Depth depth,
                               bool good, bool threatened_from, bool threatened_to);
+
+    int capture_history(Move move) const;
+    void update_capture_history(Move move,
+                                Depth depth,
+                                bool good);
 
     MoveHistory();
 
@@ -71,6 +76,9 @@ private:
         ButterflyArray<int> butterfly {};
         std::array<std::array<PieceToArray<int>, 2>, 2> threat_history {};
         PieceToArray<PieceToArray<int>> counter_move_history {};
+
+        // PT_COUNT - 2 since we exclude kings and PT_NULL
+        PieceToArray<std::array<int, PT_COUNT - 2>> capt_hist {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
@@ -148,6 +156,14 @@ inline void MoveHistory::update_quiet_history(Move move,
     if (last_move != MOVE_NULL) {
         update_history_by_depth(m_data->counter_move_history.get(last_move).get(move), depth, good);
     }
+}
+
+inline int MoveHistory::capture_history(Move move) const {
+    return m_data->capt_hist.get(move)[move.captured_piece().type() - 1];
+}
+
+inline void MoveHistory::update_capture_history(Move move, Depth depth, bool good) {
+    update_history_by_depth(m_data->capt_hist.get(move)[move.captured_piece().type() - 1], depth, good);
 }
 
 inline void MoveHistory::update_corrhist_entry(CorrhistTable& table,
