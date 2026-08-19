@@ -9,7 +9,6 @@
 #include "movehistory.h"
 
 #include <iostream>
-#include <signal.h>
 
 namespace illumina {
 
