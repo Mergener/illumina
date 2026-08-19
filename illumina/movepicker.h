@@ -182,10 +182,6 @@ void MovePicker<QUIESCE>::generate_quiet_evasions() {
         score_move(m);
     }
 
-    insertion_sort(begin, m_moves_end, [](SearchMove& a, SearchMove& b) {
-        return a.value() > b.value();
-    });
-
     m_curr_move_range = { begin, m_moves_end };
 }
 
@@ -257,9 +253,6 @@ void MovePicker<QUIESCE>::generate_quiets() {
         score_move(*it);
     }
 
-    insertion_sort(begin, m_moves_end, [](SearchMove& a, SearchMove& b) {
-        return a.value() > b.value();
-    });
     m_curr_move_range = { begin, m_moves_end };
 }
 
@@ -414,7 +407,22 @@ inline SearchMove MovePicker<QUIESCE>::next() {
         return next();
     }
 
-    SearchMove move = *m_moves_it++;
+    SearchMove move;
+    if (stage() == MPS_QUIET || stage() == MPS_QUIET_EVASIONS) {
+        auto best = std::max_element(
+            m_moves_it,
+            m_curr_move_range.end,
+            [](const SearchMove& a, const SearchMove& b) {
+                return a.value() < b.value();
+            }
+        );
+
+        std::iter_swap(m_moves_it, best);
+        move = *m_moves_it++;
+    }
+    else {
+        move = *m_moves_it++;
+    }
 
     // Prevent hash move revisits.
     if (move == m_hash_move) {
