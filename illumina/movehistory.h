@@ -73,12 +73,12 @@ private:
         CorrhistTable pawn_corrhist;
         CorrhistTable non_pawn_corrhist;
         std::array<std::array<Move, 2>, MAX_DEPTH> killers {};
-        ButterflyArray<int> butterfly {};
-        std::array<std::array<PieceToArray<int>, 2>, 2> threat_history {};
-        PieceToArray<PieceToArray<int>> counter_move_history {};
-
+        ButterflyArray<i16> butterfly {};
+        std::array<std::array<PieceToArray<i16>, 2>, 2> threat_history {};
+        PieceToArray<PieceToArray<i16>> counter_move_history {};
+        
         // PT_COUNT - 2 since we exclude kings and PT_NULL
-        PieceToArray<std::array<int, PT_COUNT - 2>> capt_hist {};
+        PieceToArray<std::array<i16, PT_COUNT - 2>> capt_hist {};
     };
     std::unique_ptr<Data> m_data = std::make_unique<Data>();
 
@@ -88,11 +88,11 @@ private:
                                int depth_score,
                                int diff);
 
-    static void update_history_by_depth(int& history,
+    static void update_history_by_depth(i16& history,
                                         Depth depth,
                                         bool good);
 
-    static void update_history(int& history,
+    static void update_history(i16& history,
                                int bonus);
 };
 
@@ -229,7 +229,7 @@ inline int MoveHistory::correct_eval_with_corrhist(const Board& board,
                       -KNOWN_WIN, KNOWN_WIN);
 }
 
-inline void MoveHistory::update_history_by_depth(int& history,
+inline void MoveHistory::update_history_by_depth(i16& history,
                                                  Depth depth,
                                                  bool good) {
     int delta = (depth < MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD)
@@ -239,7 +239,7 @@ inline void MoveHistory::update_history_by_depth(int& history,
     update_history(history, sign * delta);
 }
 
-inline void MoveHistory::update_history(int& history, int bonus) {
+inline void MoveHistory::update_history(i16& history, int bonus) {
     int clamped_bonus = std::clamp(bonus, -MAX_HISTORY, MAX_HISTORY);
     history          += clamped_bonus - history * std::abs(clamped_bonus) / MAX_HISTORY;
 }
