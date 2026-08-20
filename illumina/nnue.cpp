@@ -18,23 +18,30 @@ constexpr int Q2    = 64;
 
 constexpr size_t L1_WEIGHTS_BYTES = N_INPUTS * L1_SIZE * sizeof(i16);
 constexpr size_t L1_BIASES_BYTES = L1_SIZE * sizeof(i16);
-constexpr size_t OUTPUT_WEIGHTS_BYTES = 2 * L1_SIZE * sizeof(i16);
+constexpr size_t OUTPUT_WEIGHTS_BYTES = OUTPUT_BUCKETS * 2 * L1_SIZE * sizeof(i16);
+constexpr size_t OUTPUT_BIASES_BYTES = OUTPUT_BUCKETS * sizeof(i16);
 constexpr size_t NETWORK_PAYLOAD_BYTES = L1_WEIGHTS_BYTES
                                        + L1_BIASES_BYTES
                                        + OUTPUT_WEIGHTS_BYTES
-                                       + sizeof(i16);
+                                       + OUTPUT_BIASES_BYTES;
 constexpr size_t NETWORK_OBJECT_BYTES = (NETWORK_PAYLOAD_BYTES + 63) & ~size_t(63);
 constexpr size_t NETWORK_FILE_BYTES = (NETWORK_PAYLOAD_BYTES + 63) & ~size_t(63);
 
 static_assert(offsetof(EvalNetwork, l1_weights) == 0);
 static_assert(offsetof(EvalNetwork, l1_biases) == L1_WEIGHTS_BYTES);
 static_assert(offsetof(EvalNetwork, output_weights) == L1_WEIGHTS_BYTES + L1_BIASES_BYTES);
-static_assert(offsetof(EvalNetwork, output_bias) == L1_WEIGHTS_BYTES + L1_BIASES_BYTES + OUTPUT_WEIGHTS_BYTES);
+static_assert(offsetof(EvalNetwork, output_biases) == L1_WEIGHTS_BYTES + L1_BIASES_BYTES + OUTPUT_WEIGHTS_BYTES);
 static_assert(std::is_standard_layout_v<EvalNetwork>);
 static_assert(std::is_trivially_copyable_v<EvalNetwork>);
 static_assert(sizeof(EvalNetwork) == NETWORK_OBJECT_BYTES);
 static_assert(sizeof(EvalNetwork) <= NETWORK_FILE_BYTES);
 static_assert(alignof(EvalNetwork) <= INCBIN_ALIGNMENT);
+
+constexpr size_t output_bucket(size_t piece_count) {
+    const size_t divisor = (32 + OUTPUT_BUCKETS - 1) / OUTPUT_BUCKETS;
+    const size_t non_king_pieces = piece_count > 2 ? piece_count - 2 : 0;
+    return std::min(non_king_pieces / divisor, OUTPUT_BUCKETS - 1);
+}
 
 void NNUE::clear() {
     // Copy all biases.
@@ -42,27 +49,32 @@ void NNUE::clear() {
     std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), m_accum.black.begin());
 }
 
-int NNUE::forward(Color color) const {
+int NNUE::forward(Color color, size_t piece_count) const {
+    ILLUMINA_ASSERT(bucket < OUTPUT_BUCKETS);
+
+    size_t bucket = output_bucket(piece_count);
+
     SimdVecI32 sum = SimdVecI32::zero();
     const SimdVecI16 zero = SimdVecI16::zero();
     const SimdVecI16 max  = SimdVecI16::broadcast(Q1);
 
     const auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
     const auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+    const i16* output_weights = m_net->output_weights.data() + bucket * 2 * L1_SIZE;
 
     for (size_t i = 0; i < L1_SIZE; i += SimdVecI16::STRIDE) {
         SimdVecI16 activated = SimdVecI16::clamp(SimdVecI16::load_aligned(&our_accum[i]), zero, max);
-        SimdVecI16 weighted  = activated * SimdVecI16::load_aligned(&m_net->output_weights[i]);
+        SimdVecI16 weighted  = activated * SimdVecI16::load_aligned(&output_weights[i]);
         sum += SimdVecI16::madd(activated, weighted);
 
         activated = SimdVecI16::clamp(SimdVecI16::load_aligned(&their_accum[i]), zero, max);
-        weighted = activated * SimdVecI16::load_aligned(&m_net->output_weights[L1_SIZE + i]);
+        weighted = activated * SimdVecI16::load_aligned(&output_weights[L1_SIZE + i]);
         sum += SimdVecI16::madd(activated, weighted);
     }
 
     int output = sum.hadd();
     output /= Q1;
-    output += m_net->output_bias;
+    output += m_net->output_biases[bucket];
     return output * SCALE / (Q1 * Q2);
 }
 

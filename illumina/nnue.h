@@ -1,6 +1,7 @@
 #ifndef ILLUMINA_NNUE_H
 #define ILLUMINA_NNUE_H
 
+#include <algorithm>
 #include <array>
 #include <vector>
 
@@ -11,13 +12,13 @@ namespace illumina {
 
 static constexpr size_t N_INPUTS = 768;
 static constexpr size_t L1_SIZE  = 768;
+static constexpr size_t OUTPUT_BUCKETS = 2;
 
 struct EvalNetwork {
     alignas(64) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
     alignas(64) std::array<i16, L1_SIZE> l1_biases;
-    alignas(64) std::array<i16, L1_SIZE * 2> output_weights;
-    i16 output_bias;
-
+    alignas(64) std::array<i16, OUTPUT_BUCKETS * L1_SIZE * 2> output_weights;
+    std::array<i16, OUTPUT_BUCKETS> output_biases;
 };
 
 struct Accumulator {
@@ -40,7 +41,7 @@ public:
                          const std::array<Square, N_DISABLED>& disabled_squares,
                          const std::array<Piece, N_DISABLED>& disabled_pieces);
 
-    int forward(Color color) const;
+    int forward(Color color, size_t piece_count) const;
 
     NNUE();
 

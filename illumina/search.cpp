@@ -1287,7 +1287,7 @@ Score SearchWorker::evaluate() {
 
     // If we're not in a known endgame, use our regular
     // static evaluation function.
-    Score score = m_eval.compute();
+    Score score = m_eval.compute(m_board);
     if (m_eval_random_margin != 0) {
         // User has requested evaluation randomness, apply the noise.
         i32 seed   = Score((m_eval_random_seed * m_board.hash_key()) & BITMASK(15));
