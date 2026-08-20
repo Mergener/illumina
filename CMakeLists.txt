@@ -101,14 +101,20 @@ if (   CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
 endif()
 
 # Define our supported architectures here.
-set(ARCHS bmi2 avx2 base)
+set(ARCHS avx512 bmi2 avx2 base)
 
 # General setup.
 include_directories(${CMAKE_SOURCE_DIR}/ext/include)
 
 # Define architecture specific options here.
 function(apply_arch_options TARGET ARCH)
-    if (${ARCH} STREQUAL bmi2)
+    if (${ARCH} STREQUAL avx512)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            target_compile_options(${TARGET} PRIVATE -mavx512f -mavx512bw)
+            target_compile_definitions(${TARGET} PRIVATE HAS_AVX512)
+        endif()
+        apply_arch_options(${TARGET} bmi2)
+    elseif(${ARCH} STREQUAL bmi2)
         if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             target_compile_options(${TARGET} PRIVATE -mbmi2)
             target_compile_definitions(${TARGET} PRIVATE HAS_PEXT)
