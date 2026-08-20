@@ -42,6 +42,11 @@ private:
 
     explicit SimdVecI16(__m256i v) : m_v(v) {
     }
+#elif defined(HAS_SSE2)
+    __m128i m_v;
+
+    explicit SimdVecI16(__m128i v) : m_v(v) {
+    }
 #else
     i16 m_v;
     explicit SimdVecI16(i16 v) : m_v(v) {
@@ -73,6 +78,11 @@ private:
     __m256i m_v;
 
     explicit SimdVecI32(__m256i v) : m_v(v) {
+    }
+#elif defined(HAS_SSE2)
+    __m128i m_v;
+
+    explicit SimdVecI32(__m128i v) : m_v(v) {
     }
 #else
     i32 m_v;
@@ -274,6 +284,104 @@ inline SimdVecI16 SimdVecI16::clamp(SimdVecI16 v, SimdVecI16 lo, SimdVecI16 hi) 
 
 inline SimdVecI32 SimdVecI16::madd(SimdVecI16 a, SimdVecI16 b) {
     return SimdVecI32(_mm256_madd_epi16(a.m_v, b.m_v));
+}
+
+#elif defined(HAS_SSE2)
+
+inline SimdVecI16 SimdVecI16::zero() {
+    return SimdVecI16(_mm_setzero_si128());
+}
+
+inline SimdVecI16 SimdVecI16::broadcast(i16 scalar) {
+    return SimdVecI16(_mm_set1_epi16(scalar));
+}
+
+inline SimdVecI16 SimdVecI16::load_aligned(const i16* src) {
+    return SimdVecI16(_mm_load_si128(reinterpret_cast<const __m128i*>(src)));
+}
+
+inline void SimdVecI16::store_aligned(i16* dst) const {
+    _mm_store_si128(reinterpret_cast<__m128i*>(dst), m_v);
+}
+
+inline SimdVecI16& SimdVecI16::operator+=(const SimdVecI16& rhs) {
+    m_v = _mm_add_epi16(m_v, rhs.m_v);
+    return *this;
+}
+
+inline SimdVecI16& SimdVecI16::operator-=(const SimdVecI16& rhs) {
+    m_v = _mm_sub_epi16(m_v, rhs.m_v);
+    return *this;
+}
+
+inline SimdVecI16& SimdVecI16::operator*=(const SimdVecI16& rhs) {
+    m_v = _mm_mullo_epi16(m_v, rhs.m_v);
+    return *this;
+}
+
+inline SimdVecI16 SimdVecI16::operator+(const SimdVecI16& rhs) const {
+    SimdVecI16 t = *this;
+    t += rhs;
+    return t;
+}
+
+inline SimdVecI16 SimdVecI16::operator-(const SimdVecI16& rhs) const {
+    SimdVecI16 t = *this;
+    t -= rhs;
+    return t;
+}
+
+inline SimdVecI16 SimdVecI16::operator*(const SimdVecI16& rhs) const {
+    SimdVecI16 t = *this;
+    t *= rhs;
+    return t;
+}
+
+inline SimdVecI16 SimdVecI16::operator-() const {
+    return zero() - *this;
+}
+
+inline i32 SimdVecI16::hadd() const {
+    return SimdVecI32(_mm_madd_epi16(m_v, _mm_set1_epi16(1))).hadd();
+}
+
+inline SimdVecI16 SimdVecI16::min(SimdVecI16 a, SimdVecI16 b) {
+    return SimdVecI16(_mm_min_epi16(a.m_v, b.m_v));
+}
+
+inline SimdVecI16 SimdVecI16::max(SimdVecI16 a, SimdVecI16 b) {
+    return SimdVecI16(_mm_max_epi16(a.m_v, b.m_v));
+}
+
+inline SimdVecI16 SimdVecI16::clamp(SimdVecI16 v, SimdVecI16 lo, SimdVecI16 hi) {
+    return min(max(v, lo), hi);
+}
+
+inline SimdVecI32 SimdVecI16::madd(SimdVecI16 a, SimdVecI16 b) {
+    return SimdVecI32(_mm_madd_epi16(a.m_v, b.m_v));
+}
+
+inline SimdVecI32 SimdVecI32::zero() {
+    return SimdVecI32(_mm_setzero_si128());
+}
+
+inline SimdVecI32& SimdVecI32::operator+=(const SimdVecI32& rhs) {
+    m_v = _mm_add_epi32(m_v, rhs.m_v);
+    return *this;
+}
+
+inline SimdVecI32 SimdVecI32::operator+(const SimdVecI32& rhs) const {
+    SimdVecI32 t = *this;
+    t += rhs;
+    return t;
+}
+
+inline i32 SimdVecI32::hadd() const {
+    __m128i hi = _mm_unpackhi_epi64(m_v, m_v);
+    __m128i sum = _mm_add_epi32(m_v, hi);
+    hi = _mm_shuffle_epi32(sum, _MM_SHUFFLE(2, 3, 0, 1));
+    sum = _mm_add_epi32(sum, hi);
+    return _mm_cvtsi128_si32(sum);
 }
 
 #else
