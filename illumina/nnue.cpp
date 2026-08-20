@@ -1,6 +1,6 @@
 #include "nnue.h"
 
-#define INCBIN_ALIGNMENT_INDEX 5
+#define INCBIN_ALIGNMENT_INDEX 6
 #include <incbin/incbin.h>
 
 #include <cstddef>
@@ -23,7 +23,7 @@ constexpr size_t NETWORK_PAYLOAD_BYTES = L1_WEIGHTS_BYTES
                                        + L1_BIASES_BYTES
                                        + OUTPUT_WEIGHTS_BYTES
                                        + sizeof(i16);
-constexpr size_t NETWORK_OBJECT_BYTES = (NETWORK_PAYLOAD_BYTES + 31) & ~size_t(31);
+constexpr size_t NETWORK_OBJECT_BYTES = (NETWORK_PAYLOAD_BYTES + 63) & ~size_t(63);
 constexpr size_t NETWORK_FILE_BYTES = (NETWORK_PAYLOAD_BYTES + 63) & ~size_t(63);
 
 static_assert(offsetof(EvalNetwork, l1_weights) == 0);

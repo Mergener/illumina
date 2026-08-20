@@ -16,8 +16,11 @@ TARGET ?= illumina_cli_base
 BINARY ?= illumina_base
 
 # Detect CPU capabilities and set the best target and binary name
-# Prioritize BMI2 architecture check over AVX2
-ifeq ($(shell grep -m1 -o bmi2 /proc/cpuinfo 2>/dev/null),bmi2)
+# AVX-512 inference requires both the foundation and byte/word instruction sets.
+ifeq ($(shell grep -m1 -o avx512bw /proc/cpuinfo 2>/dev/null),avx512bw)
+	TARGET := illumina_cli_avx512
+	BINARY := illumina_avx512
+else ifeq ($(shell grep -m1 -o bmi2 /proc/cpuinfo 2>/dev/null),bmi2)
 	TARGET := illumina_cli_bmi2
 	BINARY := illumina_bmi2
 else ifeq ($(shell grep -m1 -o avx2 /proc/cpuinfo 2>/dev/null),avx2)
@@ -78,4 +81,4 @@ move: build
 # Clean the build directory and binaries.
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f illumina_base illumina_bmi2 illumina_avx2
+	rm -f illumina_base illumina_bmi2 illumina_avx2 illumina_avx512

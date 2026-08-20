@@ -32,7 +32,12 @@ public:
     static SimdVecI32 madd(SimdVecI16 a, SimdVecI16 b);
 
 private:
-#ifdef HAS_AVX2
+#ifdef HAS_AVX512
+    __m512i m_v;
+
+    explicit SimdVecI16(__m512i v) : m_v(v) {
+    }
+#elif defined(HAS_AVX2)
     __m256i m_v;
 
     explicit SimdVecI16(__m256i v) : m_v(v) {
@@ -59,7 +64,12 @@ public:
     static SimdVecI32 zero();
 
 private:
-#ifdef HAS_AVX2
+#ifdef HAS_AVX512
+    __m512i m_v;
+
+    explicit SimdVecI32(__m512i v) : m_v(v) {
+    }
+#elif defined(HAS_AVX2)
     __m256i m_v;
 
     explicit SimdVecI32(__m256i v) : m_v(v) {
@@ -71,7 +81,99 @@ private:
 #endif
 };
 
-#ifdef HAS_AVX2
+#ifdef HAS_AVX512
+
+inline SimdVecI16 SimdVecI16::zero() {
+    return SimdVecI16(_mm512_setzero_si512());
+}
+
+inline SimdVecI16 SimdVecI16::broadcast(i16 scalar) {
+    return SimdVecI16(_mm512_set1_epi16(scalar));
+}
+
+inline SimdVecI16 SimdVecI16::load_aligned(const i16* src) {
+    return SimdVecI16(_mm512_load_si512(src));
+}
+
+inline void SimdVecI16::store_aligned(i16* dst) const {
+    _mm512_store_si512(dst, m_v);
+}
+
+inline SimdVecI16& SimdVecI16::operator+=(const SimdVecI16& rhs) {
+    m_v = _mm512_add_epi16(m_v, rhs.m_v);
+    return *this;
+}
+
+inline SimdVecI16& SimdVecI16::operator-=(const SimdVecI16& rhs) {
+    m_v = _mm512_sub_epi16(m_v, rhs.m_v);
+    return *this;
+}
+
+inline SimdVecI16& SimdVecI16::operator*=(const SimdVecI16& rhs) {
+    m_v = _mm512_mullo_epi16(m_v, rhs.m_v);
+    return *this;
+}
+
+inline SimdVecI16 SimdVecI16::operator+(const SimdVecI16& rhs) const {
+    SimdVecI16 t = *this;
+    t += rhs;
+    return t;
+}
+
+inline SimdVecI16 SimdVecI16::operator-(const SimdVecI16& rhs) const {
+    SimdVecI16 t = *this;
+    t -= rhs;
+    return t;
+}
+
+inline SimdVecI16 SimdVecI16::operator*(const SimdVecI16& rhs) const {
+    SimdVecI16 t = *this;
+    t *= rhs;
+    return t;
+}
+
+inline SimdVecI16 SimdVecI16::operator-() const { return zero() - *this; }
+
+inline i32 SimdVecI16::hadd() const {
+    return _mm512_reduce_add_epi32(_mm512_madd_epi16(m_v, _mm512_set1_epi16(1)));
+}
+
+inline SimdVecI32 SimdVecI32::zero() {
+    return SimdVecI32(_mm512_setzero_si512());
+}
+
+inline SimdVecI32& SimdVecI32::operator+=(const SimdVecI32& rhs) {
+    m_v = _mm512_add_epi32(m_v, rhs.m_v);
+    return *this;
+}
+
+inline SimdVecI32 SimdVecI32::operator+(const SimdVecI32& rhs) const {
+    SimdVecI32 t = *this;
+    t += rhs;
+    return t;
+}
+
+inline i32 SimdVecI32::hadd() const {
+    return _mm512_reduce_add_epi32(m_v);
+}
+
+inline SimdVecI16 SimdVecI16::min(SimdVecI16 a, SimdVecI16 b) {
+    return SimdVecI16(_mm512_min_epi16(a.m_v, b.m_v));
+}
+
+inline SimdVecI16 SimdVecI16::max(SimdVecI16 a, SimdVecI16 b) {
+    return SimdVecI16(_mm512_max_epi16(a.m_v, b.m_v));
+}
+
+inline SimdVecI16 SimdVecI16::clamp(SimdVecI16 v, SimdVecI16 lo, SimdVecI16 hi) {
+    return min(max(v, lo), hi);
+}
+
+inline SimdVecI32 SimdVecI16::madd(SimdVecI16 a, SimdVecI16 b) {
+    return SimdVecI32(_mm512_madd_epi16(a.m_v, b.m_v));
+}
+
+#elif defined(HAS_AVX2)
 
 inline SimdVecI16 SimdVecI16::zero() {
     return SimdVecI16(_mm256_setzero_si256());

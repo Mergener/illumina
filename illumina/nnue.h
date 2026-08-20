@@ -13,16 +13,16 @@ static constexpr size_t N_INPUTS = 768;
 static constexpr size_t L1_SIZE  = 768;
 
 struct EvalNetwork {
-    alignas(32) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
-    alignas(32) std::array<i16, L1_SIZE> l1_biases;
-    alignas(32) std::array<i16, L1_SIZE * 2> output_weights;
+    alignas(64) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
+    alignas(64) std::array<i16, L1_SIZE> l1_biases;
+    alignas(64) std::array<i16, L1_SIZE * 2> output_weights;
     i16 output_bias;
 
 };
 
 struct Accumulator {
-    alignas(32) std::array<i16, L1_SIZE> white {};
-    alignas(32) std::array<i16, L1_SIZE> black {};
+    alignas(64) std::array<i16, L1_SIZE> white {};
+    alignas(64) std::array<i16, L1_SIZE> black {};
 };
 
 class NNUE {
