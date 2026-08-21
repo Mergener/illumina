@@ -666,10 +666,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     bool ttpv = PV_NODE || (found_in_tt && tt_entry.ttpv());
 
-    // Check extensions.
-    // Extend positions in check.
-    depth += in_check;
-
     // Clamp excessive depths.
     depth = std::min(std::min(MAX_DEPTH, depth), m_root_depth * 2 - ply);
 
