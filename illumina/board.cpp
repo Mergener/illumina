@@ -1069,6 +1069,17 @@ ui64 Board::estimate_hash_key_after(Move move) const {
     return key;
 }
 
+ui64 Board::estimate_hash_key_after_null_move() const {
+    ui64 key = hash_key();
+
+    key ^= zob_color_to_move_key(color_to_move());
+    key ^= zob_color_to_move_key(opposite_color(color_to_move()));
+    key ^= zob_en_passant_square_key(ep_square());
+    key ^= zob_en_passant_square_key(SQ_NULL);
+
+    return key;
+}
+
 // Board constructors below.
 // We don't use default copy/assignment constructor implementations since
 // we don't want listeners to be copied from a board object to another.

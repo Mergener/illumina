@@ -1421,6 +1421,7 @@ template <bool TRACING>
 void SearchWorker::on_make_null_move(const illumina::Board& board) {
     TRACE_PUSH();
     m_nodes++;
+    m_context->tt().prefetch(board.estimate_hash_key_after_null_move());
     m_eval.on_make_null_move(board);
 
     TRACE_SET(Traceable::LAST_MOVE, MOVE_NULL);
