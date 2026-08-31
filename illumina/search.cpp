@@ -35,6 +35,7 @@ struct SearchNode {
     Score static_eval = 0;
     Move  skip_move = MOVE_NULL;
     Move  pv[MAX_DEPTH];
+    bool has_static_eval = false;
 };
 
 class SearchWorker;
@@ -678,6 +679,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     if (!in_check) {
         raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
         static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
+        stack_node->has_static_eval = true;
         TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
         TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
     }
@@ -687,7 +689,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     }
     TRACE_SET(Traceable::STATIC_EVAL, static_eval);
 
-    bool improving = ply > 2 && !in_check && ((stack_node - 2)->static_eval < static_eval);
+    bool improving = [&]() {
+        const SearchNode* prev_node = stack_node - 2;
+        return ply >= 2
+            && stack_node->has_static_eval
+            && prev_node->has_static_eval
+            && prev_node->static_eval < static_eval;
+    }();
     TRACE_SET(Traceable::IMPROVING, improving);
 
     // Internal iterative reductions.
