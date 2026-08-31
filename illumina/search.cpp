@@ -1220,7 +1220,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     while ((move = move_picker.next()) != MOVE_NULL) {
         n_searched++;
 
-        if (best_score > stand_pat && n_searched > 3) {
+        if (!PV_NODE && best_score > stand_pat && n_searched > 3) {
             break;
         }
 
