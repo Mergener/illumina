@@ -631,7 +631,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     // to use information gathered in other searches (or transpositions)
     // to improve the current search.
     TranspositionTableEntry tt_entry {};
-    bool found_in_tt = tt.probe(board_key, tt_entry, stack_node->ply);
+    bool found_in_tt = stack_node->skip_move == MOVE_NULL && tt.probe(board_key, tt_entry, stack_node->ply);
 
     if (   found_in_tt
         && tt_entry.move() != MOVE_NULL
