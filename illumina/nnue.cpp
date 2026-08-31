@@ -1,15 +1,10 @@
 #include "nnue.h"
 
-#define INCBIN_ALIGNMENT_INDEX 5
+#define INCBIN_ALIGNMENT_INDEX 6
 #include <incbin/incbin.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <stdexcept>
-
-#ifdef HAS_AVX2
-#include <immintrin.h>
-#endif
 
 namespace illumina {
 
@@ -23,23 +18,30 @@ constexpr int Q2    = 64;
 
 constexpr size_t L1_WEIGHTS_BYTES = N_INPUTS * L1_SIZE * sizeof(i16);
 constexpr size_t L1_BIASES_BYTES = L1_SIZE * sizeof(i16);
-constexpr size_t OUTPUT_WEIGHTS_BYTES = 2 * L1_SIZE * sizeof(i16);
+constexpr size_t OUTPUT_WEIGHTS_BYTES = OUTPUT_BUCKETS * 2 * L1_SIZE * sizeof(i16);
+constexpr size_t OUTPUT_BIASES_BYTES = OUTPUT_BUCKETS * sizeof(i16);
 constexpr size_t NETWORK_PAYLOAD_BYTES = L1_WEIGHTS_BYTES
                                        + L1_BIASES_BYTES
                                        + OUTPUT_WEIGHTS_BYTES
-                                       + sizeof(i16);
-constexpr size_t NETWORK_OBJECT_BYTES = (NETWORK_PAYLOAD_BYTES + 31) & ~size_t(31);
+                                       + OUTPUT_BIASES_BYTES;
+constexpr size_t NETWORK_OBJECT_BYTES = (NETWORK_PAYLOAD_BYTES + 63) & ~size_t(63);
 constexpr size_t NETWORK_FILE_BYTES = (NETWORK_PAYLOAD_BYTES + 63) & ~size_t(63);
 
 static_assert(offsetof(EvalNetwork, l1_weights) == 0);
 static_assert(offsetof(EvalNetwork, l1_biases) == L1_WEIGHTS_BYTES);
 static_assert(offsetof(EvalNetwork, output_weights) == L1_WEIGHTS_BYTES + L1_BIASES_BYTES);
-static_assert(offsetof(EvalNetwork, output_bias) == L1_WEIGHTS_BYTES + L1_BIASES_BYTES + OUTPUT_WEIGHTS_BYTES);
+static_assert(offsetof(EvalNetwork, output_biases) == L1_WEIGHTS_BYTES + L1_BIASES_BYTES + OUTPUT_WEIGHTS_BYTES);
 static_assert(std::is_standard_layout_v<EvalNetwork>);
 static_assert(std::is_trivially_copyable_v<EvalNetwork>);
 static_assert(sizeof(EvalNetwork) == NETWORK_OBJECT_BYTES);
 static_assert(sizeof(EvalNetwork) <= NETWORK_FILE_BYTES);
 static_assert(alignof(EvalNetwork) <= INCBIN_ALIGNMENT);
+
+constexpr size_t output_bucket(size_t piece_count) {
+    const size_t divisor = (32 + OUTPUT_BUCKETS - 1) / OUTPUT_BUCKETS;
+    const size_t non_king_pieces = piece_count > 2 ? piece_count - 2 : 0;
+    return std::min(non_king_pieces / divisor, OUTPUT_BUCKETS - 1);
+}
 
 void NNUE::clear() {
     // Copy all biases.
@@ -47,68 +49,33 @@ void NNUE::clear() {
     std::copy(m_net->l1_biases.begin(), m_net->l1_biases.end(), m_accum.black.begin());
 }
 
-int NNUE::forward(Color color) const {
-#ifdef HAS_AVX2
-    constexpr size_t STRIDE = sizeof(__m256i) / sizeof(i16);
-    __m256i sum = _mm256_setzero_si256();
+int NNUE::forward(Color color, size_t piece_count) const {
+    ILLUMINA_ASSERT(bucket < OUTPUT_BUCKETS);
 
-    auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
-    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+    size_t bucket = output_bucket(piece_count);
 
-    for (size_t i = 0; i < L1_SIZE / STRIDE; ++i)
-    {
-        __m256i accum_val;
-        __m256i clamped;
-        __m256i squared;
+    SimdVecI32 sum = SimdVecI32::zero();
+    const SimdVecI16 zero = SimdVecI16::zero();
+    const SimdVecI16 max  = SimdVecI16::broadcast(Q1);
 
-        accum_val = _mm256_load_si256(reinterpret_cast<const __m256i*>(&our_accum[i * STRIDE]));
-        clamped   = _mm256_max_epi16(_mm256_min_epi16(accum_val, _mm256_set1_epi16(Q1)), _mm256_setzero_si256());
-        squared   = _mm256_mullo_epi16(clamped, _mm256_load_si256(reinterpret_cast<const __m256i *>(&m_net->output_weights[i * STRIDE])));
-        squared   = _mm256_madd_epi16(clamped, squared);
-        sum       = _mm256_add_epi32(sum, squared);
+    const auto& our_accum   = color == CL_WHITE ? m_accum.white : m_accum.black;
+    const auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
+    const i16* output_weights = m_net->output_weights.data() + bucket * 2 * L1_SIZE;
 
-        accum_val = _mm256_load_si256(reinterpret_cast<const __m256i*>(&their_accum[i * STRIDE]));
-        clamped   = _mm256_max_epi16(_mm256_min_epi16(accum_val, _mm256_set1_epi16(Q1)), _mm256_setzero_si256());
-        squared   = _mm256_mullo_epi16(clamped, _mm256_load_si256(reinterpret_cast<const __m256i *>(&m_net->output_weights[L1_SIZE + i * STRIDE])));
-        squared   = _mm256_madd_epi16(clamped, squared);
-        sum       = _mm256_add_epi32(sum, squared);
+    for (size_t i = 0; i < L1_SIZE; i += SimdVecI16::STRIDE) {
+        SimdVecI16 activated = SimdVecI16::clamp(SimdVecI16::load_aligned(&our_accum[i]), zero, max);
+        SimdVecI16 weighted  = activated * SimdVecI16::load_aligned(&output_weights[i]);
+        sum += SimdVecI16::madd(activated, weighted);
+
+        activated = SimdVecI16::clamp(SimdVecI16::load_aligned(&their_accum[i]), zero, max);
+        weighted = activated * SimdVecI16::load_aligned(&output_weights[L1_SIZE + i]);
+        sum += SimdVecI16::madd(activated, weighted);
     }
 
-    __m128i sum0;
-    __m128i sum1;
-
-    sum0 = _mm256_castsi256_si128(sum);
-    sum1 = _mm256_extracti128_si256(sum, 1);
-    sum0 = _mm_add_epi32(sum0, sum1);
-    sum1 = _mm_unpackhi_epi64(sum0, sum0);
-    sum0 = _mm_add_epi32(sum0, sum1);
-    sum1 = _mm_shuffle_epi32(sum0, _MM_SHUFFLE(2, 3, 0, 1));
-    sum0 = _mm_add_epi32(sum0, sum1);
-
-    int output = _mm_cvtsi128_si32(sum0);
+    int output = sum.hadd();
     output /= Q1;
-    output += m_net->output_bias;
+    output += m_net->output_biases[bucket];
     return output * SCALE / (Q1 * Q2);
-#else
-    int sum = 0;
-
-    auto& our_accum = color == CL_WHITE ? m_accum.white : m_accum.black;
-    auto& their_accum = color == CL_WHITE ? m_accum.black : m_accum.white;
-
-    for (size_t i = 0; i < L1_SIZE; ++i) {
-        int our_activated = std::clamp(int(our_accum[i]), 0, Q1);
-        our_activated *= our_activated;
-        sum += our_activated * m_net->output_weights[i];
-
-        int their_activated = std::clamp(int(their_accum[i]), 0, Q1);
-        their_activated *= their_activated;
-        sum += their_activated * m_net->output_weights[L1_SIZE + i];
-    }
-
-    sum /= Q1;
-    sum += m_net->output_bias;
-    return sum * SCALE / (Q1 * Q2);
-#endif
 }
 
 void NNUE::enable_feature(Square square, Piece piece) {

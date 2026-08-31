@@ -199,7 +199,8 @@ private:
     Score negamax(Depth depth,
                   Score alpha,
                   Score beta,
-                  SearchNode* stack_node);
+                  SearchNode* stack_node,
+                  bool cut_node);
 
     template <TraceMode TRACE_MODE, SearchType SEARCH_TYPE>
     Score quiescence_search(Depth ply, Score alpha, Score beta);
@@ -488,31 +489,34 @@ void SearchWorker::aspiration_windows() {
         beta  = std::min(MAX_SCORE,  prev_score + window);
     }
 
+    int fail_highs = 0;
+
     Move best_move = m_best_move;
 
     // Perform search with aspiration windows.
     while (!should_stop()) {
         Score score;
+        Score effective_depth = depth - std::min(fail_highs, 3);
         if (tracing()) {
-            ISearchTracer* tracer = m_settings->tracer;
+            SearchTracer* tracer = m_settings->tracer;
             tracer->new_tree(m_root_depth,
                              m_curr_pv_idx + 1,
                              alpha, beta);
             if (!m_settings->shallow_search_hint) {
-                score = negamax<TRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
+                score = negamax<TRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
             }
             else {
-                score = negamax<TRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
+                score = negamax<TRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
             }
             tracer->set(Traceable::SCORE, score);
             tracer->finish_tree();
         }
         else {
             if (!m_settings->shallow_search_hint) {
-                score = negamax<UNTRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
+                score = negamax<UNTRACED, PVS, NO_SEARCH_FLAGS, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
             }
             else {
-                score = negamax<UNTRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(depth, alpha, beta, &search_stack[0]);
+                score = negamax<UNTRACED, PVS, SHALLOW, SKIP_NMP, ROOT>(effective_depth, alpha, beta, &search_stack[0], false);
             }
         }
 
@@ -531,6 +535,7 @@ void SearchWorker::aspiration_windows() {
         }
 
         if (score <= alpha) {
+            fail_highs = 0;
             beta  = (alpha + beta) / 2;
             alpha = std::max(-MAX_SCORE, alpha - window);
             depth = m_root_depth;
@@ -540,6 +545,7 @@ void SearchWorker::aspiration_windows() {
             update_pv_results(search_stack, alpha, beta, false);
         }
         else if (score >= beta) {
+            fail_highs++;
             beta = std::min(MAX_SCORE, beta + window);
 
             prev_score = score;
@@ -553,7 +559,7 @@ void SearchWorker::aspiration_windows() {
     }
 }
 
-static std::array<std::array<Depth, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
+static std::array<std::array<int, MAX_DEPTH>, MAX_GENERATED_MOVES> s_lmr_table;
 static std::array<std::array<int, MAX_DEPTH>, 2> s_lmp_count_table;
 
 template<TraceMode TRACE_MODE,
@@ -561,7 +567,7 @@ template<TraceMode TRACE_MODE,
         SearchFlags FLAGS,
         SkipNmpMode SKIP_NMP_MODE,
         RootMode ROOT_MODE>
-Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* stack_node) {
+Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* stack_node, bool cut_node) {
     constexpr bool PV_NODE      = SEARCH_TYPE   == PVS;
     constexpr bool ROOT_NODE    = ROOT_MODE     == ROOT;
     constexpr bool TRACING      = TRACE_MODE    == TRACED;
@@ -726,7 +732,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         Depth reduction = depth / 3 + 4;
 
         m_board.make_null_move();
-        Score score = -negamax<TRACE_MODE, ZWS, FLAGS, SKIP_NMP>(depth - reduction, -beta, -beta + 1, stack_node + 1);
+        Score score = -negamax<TRACE_MODE, ZWS, FLAGS, SKIP_NMP>(depth - reduction, -beta, -beta + 1, stack_node + 1, false);
         TRACE_SET(Traceable::SCORE, -score);
         m_board.undo_null_move();
 
@@ -749,7 +755,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             pc_hash_move = hash_move;
         }
 
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist, pc_hash_move, pc_see);
+        auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
+        MovePicker<true> pc_move_picker(m_board, ply, m_hist, threats, pc_hash_move, pc_see);
 
         int pc_searched_moves = 0;
         SearchMove move;
@@ -766,7 +773,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             Score pc_score = -quiescence_search<TRACE_MODE, ZWS>(ply + 1, -pc_beta, -pc_beta + 1);
             if (pc_score >= pc_beta) {
                 TRACE_PUSH_SIBLING();
-                pc_score = -negamax<TRACE_MODE, ZWS, FLAGS>(pc_depth, -pc_beta, -pc_beta + 1, stack_node + 1);
+                pc_score = -negamax<TRACE_MODE, ZWS, FLAGS>(pc_depth, -pc_beta, -pc_beta + 1, stack_node + 1, !cut_node);
                 TRACE_POP();
             }
             m_board.undo_move();
@@ -792,11 +799,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Store played quiet moves in this list.
     // Useful for history updates later on.
-    StaticList<Move, MAX_GENERATED_MOVES> quiets_played;
+    StaticList<Move, MAX_GENERATED_MOVES> played_quiets;
+    StaticList<Move, MAX_GENERATED_MOVES> played_captures;
 
     int move_idx = -1;
 
-    MovePicker move_picker(m_board, ply, m_hist, hash_move);
+    auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
+    MovePicker move_picker(m_board, ply, m_hist, threats, hash_move);
     SearchMove move {};
     Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
@@ -895,7 +904,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             TRACE_PUSH_SIBLING();
             TRACE_SET(Traceable::SKIP_MOVE, stack_node->skip_move);
 
-            Score score = negamax<TRACE_MODE, ZWS, FLAGS>(depth / 2, se_beta - 1, se_beta, stack_node);
+            Score score = negamax<TRACE_MODE, ZWS, FLAGS>(depth / 2, se_beta - 1, se_beta, stack_node, cut_node);
             TRACE_SET(Traceable::SCORE, score);
 
             TRACE_POP();
@@ -909,7 +918,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                     extensions++;
                 }
             }
-                // Multi-cut pruning.
+            // Multi-cut pruning.
             else if (score >= beta) {
                 return score;
             }
@@ -917,63 +926,69 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
         int move_history = 0;
         if (move.is_quiet()) {
-            move_history = m_hist.quiet_history(move, m_board.last_move());
+            move_history = m_hist.quiet_history(
+                move,
+                m_board.last_move(),
+                bit_is_set(threats, move.source()),
+                bit_is_set(threats, move.destination()));
         }
 
         m_board.make_move(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
 
         // Late move reductions.
-        Depth reductions = 0;
+        int r = 0;
         if (   n_searched_moves >= LMR_MIN_MOVE_IDX
             && depth >= LMR_MIN_DEPTH
             && !in_check
             && !m_board.in_check()) {
-            reductions = s_lmr_table[n_searched_moves - 1][depth];
+            r = s_lmr_table[n_searched_moves - 1][depth];
             if (move.is_quiet()) {
                 // Further reduce moves that are not improving the static evaluation.
-                reductions += !improving;
+                r += !improving * LMR_IMPROVING_FACTOR;
 
                 // Further reduce moves that have been historically very bad.
-                reductions += move_history <= LMR_BAD_HISTORY_THRESHOLD;
+                r += (move_history <= LMR_BAD_HISTORY_THRESHOLD) * LMR_BAD_HIST_FACTOR;
 
                 // Don't reduce nodes that have been on the PV as much.
-                reductions -= ttpv;
+                r -= ttpv * LMR_TTPV_FACTOR;
+
+                // Further reduce cut nodes
+                r += cut_node * LMR_CUT_NODE_FACTOR;
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
                 // and probably don't need unsound sacrifices.
                 bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
-                reductions -= !stable * (reductions / 2);
+                r -= !stable * (r / 2);
             }
-
-            // Prevent too high or below zero reductions.
-            reductions = std::clamp(reductions, 0, depth);
         }
+
+        Depth reductions = std::clamp(r / 1024, 0, depth);
 
         Score score;
         if (n_searched_moves == 0) {
             // Perform PVS. First move of the list is always PVS.
-            score = -negamax<TRACE_MODE, SEARCH_TYPE, FLAGS>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
+            score = -negamax<TRACE_MODE, SEARCH_TYPE, FLAGS>(depth - 1 + extensions, -beta, -alpha, stack_node + 1, false);
             TRACE_SET(Traceable::SCORE, -score);
         }
         else {
             // Perform a null window search. Searches after the first move are
             // performed with a null window. If the search fails high, do a
             // re-search with the full window.
-            score = -negamax<TRACE_MODE, ZWS, FLAGS>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, stack_node + 1);
+            score = -negamax<TRACE_MODE, ZWS, FLAGS>(depth - 1 - reductions + extensions, -alpha - 1, -alpha, stack_node + 1, true);
             TRACE_SET(Traceable::SCORE, -score);
 
             if (score > alpha && reductions > 1) {
                 TRACE_PUSH_SIBLING();
-                score = -negamax<TRACE_MODE, ZWS, FLAGS>(depth - 1 + extensions, -alpha - 1, -alpha, stack_node + 1);
+                score = -negamax<TRACE_MODE, ZWS, FLAGS>(depth - 1 + extensions, -alpha - 1, -alpha, stack_node + 1, !cut_node);
                 TRACE_SET(Traceable::SCORE, -score);
                 TRACE_POP();
             }
 
             if (score > alpha && score < beta) {
                 TRACE_PUSH_SIBLING();
-                score = -negamax<TRACE_MODE, SEARCH_TYPE, FLAGS>(depth - 1 + extensions, -beta, -alpha, stack_node + 1);
+                score = -negamax<TRACE_MODE, SEARCH_TYPE, FLAGS>(depth - 1 + extensions, -beta, -alpha, stack_node + 1, !cut_node);
                 TRACE_SET(Traceable::SCORE, -score);
                 TRACE_POP();
             }
@@ -982,7 +997,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         m_board.undo_move();
 
         if (move.is_quiet()) {
-            quiets_played.push_back(move);
+            played_quiets.push_back(move);
+        }
+        else if (move.is_capture()) {
+            played_captures.push_back(move);
         }
 
         n_searched_moves++;
@@ -999,14 +1017,19 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             TRACE_SET(Traceable::BEST_MOVE_RAW, best_move.raw());
 
             // Update our history scores and refutation moves.
+            for (auto capt: played_captures) {
+                m_hist.update_capture_history(capt, depth, capt == best_move);
+            }
             if (move.is_quiet()) {
                 m_hist.set_killer(ply, move);
 
-                for (Move quiet: quiets_played) {
+                for (Move quiet: played_quiets) {
                     m_hist.update_quiet_history(quiet,
                                                 m_board.last_move(),
                                                 depth,
-                                                quiet == best_move);
+                                                quiet == best_move,
+                                                bit_is_set(threats, quiet.source()),
+                                                bit_is_set(threats, quiet.destination()));
                 }
             }
 
@@ -1192,7 +1215,8 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     }
 
     // Finally, start looping over available noisy moves.
-    MovePicker<true> move_picker(m_board, ply, m_hist, tt_move);
+    auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
+    MovePicker<true> move_picker(m_board, ply, m_hist, threats, tt_move);
     SearchMove move;
     SearchMove best_move;
     Score best_score = stand_pat;
@@ -1267,7 +1291,7 @@ Score SearchWorker::evaluate() {
 
     // If we're not in a known endgame, use our regular
     // static evaluation function.
-    Score score = m_eval.compute();
+    Score score = m_eval.compute(m_board);
     if (m_eval_random_margin != 0) {
         // User has requested evaluation randomness, apply the noise.
         i32 seed   = Score((m_eval_random_seed * m_board.hash_key()) & BITMASK(15));
@@ -1451,7 +1475,8 @@ bool SearchWorker::tracing() const {
 static void init_search_constants() {
     for (size_t m = 0; m < MAX_GENERATED_MOVES; ++m) {
         for (Depth d = 0; d < MAX_DEPTH; ++d) {
-            s_lmr_table[m][d] = Depth(LMR_REDUCTIONS_BASE + std::log(d) * std::log(m) * 100.0 / LMR_REDUCTIONS_DIVISOR);
+            // TODO: Multiply by 1024 before flooring (currently lost elo but will probably gain after SPSA)
+            s_lmr_table[m][d] = Depth((LMR_REDUCTIONS_BASE + std::log(d) * std::log(m) * 100.0 / LMR_REDUCTIONS_DIVISOR)) * 1024;
         }
     }
     for (Depth d = 0; d < MAX_DEPTH; ++d) {

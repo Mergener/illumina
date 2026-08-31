@@ -173,7 +173,7 @@ void State::evaluate() const {
     Evaluation eval;
     Board repl = m_board;
     eval.on_new_board(repl);
-    Score score = normalize_score_if_desired(eval.compute(), repl);
+    Score score = normalize_score_if_desired(eval.compute(repl), repl);
 
     std::cout << "      ";
 
@@ -197,7 +197,7 @@ void State::evaluate() const {
             else {
                 repl.set_piece_at(s, PIECE_NULL);
                 eval.on_new_board(repl);
-                Score score_without_piece = normalize_score_if_desired(eval.compute(), repl);
+                Score score_without_piece = normalize_score_if_desired(eval.compute(repl), repl);
                 repl.set_piece_at(s, p);
 
                 std::cout << std::setw(6)
@@ -325,7 +325,7 @@ void State::search(SearchSettings settings, bool trace) {
     }
 
     // Setup search tracing (if build supports it).
-    std::shared_ptr<ISearchTracer> tracer = nullptr;
+    std::shared_ptr<SearchTracer> tracer = nullptr;
     if (trace) {
 #ifndef TRACING_ENABLED
         std::cout << "info string Tracing is not enabled in this version -- option skipped." << std::endl;
@@ -333,7 +333,7 @@ void State::search(SearchSettings settings, bool trace) {
         try {
             std::string trace_path = m_options.option<UCIOptionString>("TraceFile").value();
             size_t trace_batch_size = m_options.option<UCIOptionSpin>("TraceBatchSize").value();
-            tracer = std::make_shared<SearchTracer>(trace_path, trace_batch_size);
+            tracer = std::make_shared<SqliteSearchTracer>(trace_path, trace_batch_size);
             settings.tracer = tracer.get();
         }
         catch (const std::exception& e) {

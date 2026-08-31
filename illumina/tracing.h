@@ -32,7 +32,7 @@ using TracedValue = std::variant<std::monostate, i64, bool, Move, double>;
 
 struct SearchSettings;
 
-class ISearchTracer {
+class SearchTracer {
 public:
     virtual void new_search(const Board& root,
                             size_t hash_size_mb,
@@ -48,7 +48,7 @@ public:
     virtual void set(Traceable which, TracedValue value) = 0;
     virtual void pop_node(bool discard = false) = 0;
 
-    virtual ~ISearchTracer() = default;
+    virtual ~SearchTracer() = default;
 };
 
 } // illumina

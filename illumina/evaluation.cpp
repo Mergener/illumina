@@ -123,9 +123,9 @@ void Evaluation::apply_undo_null_move() {
     m_ctm = opposite_color(m_ctm);
 }
 
-Score Evaluation::compute() {
+Score Evaluation::compute(const Board& board) {
     apply_lazy_updates();
-    return std::clamp(m_nnue.forward(m_ctm), -KNOWN_WIN + 1, KNOWN_WIN - 1);
+    return std::clamp(m_nnue.forward(m_ctm, popcount(board.occupancy())), -KNOWN_WIN + 1, KNOWN_WIN - 1);
 }
 
 static std::pair<double, double> wdl_params(Score score, const Board& board) {

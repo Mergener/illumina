@@ -51,7 +51,7 @@ void bind_to_statement(SQLite::Statement& stmt,
     }, value);
 }
 
-void SearchTracer::set(Traceable which, TracedValue value) {
+void SqliteSearchTracer::set(Traceable which, TracedValue value) {
     m_curr_node.traced_values[int(which)] = value;
 }
 
@@ -77,7 +77,7 @@ std::string sql_type_map() {
     }
 }
 
-void SearchTracer::new_search(const Board& root,
+void SqliteSearchTracer::new_search(const Board& root,
                               size_t hash_size_mb,
                               const SearchSettings& settings) {
     m_curr_search = {};
@@ -97,7 +97,7 @@ void SearchTracer::new_search(const Board& root,
     m_curr_tree.search = m_curr_search.id;
 }
 
-void SearchTracer::new_tree(int root_depth, int multi_pv, int asp_alpha, int asp_beta) {
+void SqliteSearchTracer::new_tree(int root_depth, int multi_pv, int asp_alpha, int asp_beta) {
     m_curr_tree = {};
     m_curr_tree.id         = random_ui64();
     m_curr_tree.search     = m_curr_search.id;
@@ -109,7 +109,7 @@ void SearchTracer::new_tree(int root_depth, int multi_pv, int asp_alpha, int asp
     push_node();
 }
 
-void SearchTracer::push_node() {
+void SqliteSearchTracer::push_node() {
     NodeInfo new_node;
     new_node.index = m_curr_tree.next_node_index++;
     new_node.parent_index = m_curr_node.index;
@@ -119,14 +119,14 @@ void SearchTracer::push_node() {
     m_curr_node = new_node;
 }
 
-void SearchTracer::push_sibling_node() {
+void SqliteSearchTracer::push_sibling_node() {
     NodeInfo new_node = m_curr_node;
     new_node.index = m_curr_tree.next_node_index++;
     m_node_stack.push_back(m_curr_node);
     m_curr_node = new_node;
 }
 
-void SearchTracer::pop_node(bool discard) {
+void SqliteSearchTracer::pop_node(bool discard) {
     if (m_node_stack.empty()) {
         return;
     }
@@ -142,7 +142,7 @@ void SearchTracer::pop_node(bool discard) {
     m_node_stack.pop_back();
 }
 
-void SearchTracer::finish_tree() {
+void SqliteSearchTracer::finish_tree() {
     while (!m_node_stack.empty()) {
         pop_node();
     }
@@ -152,14 +152,14 @@ void SearchTracer::finish_tree() {
     m_curr_tree = {};
 }
 
-void SearchTracer::finish_search() {
+void SqliteSearchTracer::finish_search() {
     flush_nodes();
     save_search(m_curr_search);
     std::cout << "info string Saved search with id " << i64(m_curr_search.id) << std::dec << std::endl;
     m_curr_search = {};
 }
 
-void SearchTracer::flush_nodes() {
+void SqliteSearchTracer::flush_nodes() {
     // Log flushing to console, but don't spam it when flushing
     // few amounts of nodes.
     if (m_target_node_count >= 16384) {
@@ -220,7 +220,7 @@ static bool column_exists(const SQLite::Database& db,
     return false;
 }
 
-void SearchTracer::bootstrap_db() {
+void SqliteSearchTracer::bootstrap_db() {
     try {
         // Create metadata table.
         if (!m_db.tableExists("meta")) {
@@ -300,7 +300,7 @@ void SearchTracer::bootstrap_db() {
     }
 }
 
-void SearchTracer::save_tree(const TreeInfo& tree) {
+void SqliteSearchTracer::save_tree(const TreeInfo& tree) {
     try {
         SQLite::Statement statement(m_db, "INSERT INTO trees (id, search, root_depth,"
                                           "asp_alpha, asp_beta, multipv) VALUES"
@@ -321,7 +321,7 @@ void SearchTracer::save_tree(const TreeInfo& tree) {
     }
 }
 
-void SearchTracer::save_search(const SearchInfo& search) {
+void SqliteSearchTracer::save_search(const SearchInfo& search) {
     try {
         SQLite::Statement statement(m_db, "INSERT INTO searches (id,"
                                           "limits_depth, limits_nodes, limits_wtime,"
@@ -348,7 +348,7 @@ void SearchTracer::save_search(const SearchInfo& search) {
     }
 }
 
-SearchTracer::SearchTracer(const std::string& db_path,
+SqliteSearchTracer::SqliteSearchTracer(const std::string& db_path,
                            size_t batch_size_mib)
     : m_db(db_path, SQLite::OPEN_CREATE | SQLite::OPEN_READWRITE),
       m_target_node_count((batch_size_mib * 1024 * 1024) / sizeof(NodeInfo)){

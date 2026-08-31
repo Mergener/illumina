@@ -46,6 +46,7 @@ public:
     explicit MovePicker(const Board& board,
                         Depth ply,
                         const MoveHistory& move_hist,
+                        Bitboard threats,
                         Move hash_move = MOVE_NULL,
                         int good_capt_see_threshold = 0);
 
@@ -62,6 +63,7 @@ private:
     SearchMove*      m_moves_it;
     SearchMove*      m_moves_end;
     MoveRange        m_bad_captures_range;
+    Bitboard         m_threats;
     bool             m_do_quiets = true;
     int              m_good_capture_see_threshold = 0;
 
@@ -274,6 +276,7 @@ template <bool QUIESCE>
 inline MovePicker<QUIESCE>::MovePicker(const Board& board,
                                        Depth ply,
                                        const MoveHistory& move_hist,
+                                       Bitboard threats,
                                        Move hash_move,
                                        int good_capt_see_threshold)
     : m_curr_move_range({ &m_moves[0], &m_moves[0] }),
@@ -282,8 +285,8 @@ inline MovePicker<QUIESCE>::MovePicker(const Board& board,
       m_board(&board), m_mv_hist(&move_hist),
       m_end_stage(board.in_check() ? MPS_END_IN_CHECK : MPS_END_NOT_CHECK),
       m_hash_move(hash_move), m_ply(ply),
-      m_good_capture_see_threshold(good_capt_see_threshold) {
-}
+      m_good_capture_see_threshold(good_capt_see_threshold),
+      m_threats(threats) { }
 
 template<bool QUIESCE>
 void MovePicker<QUIESCE>::advance_stage() {
@@ -443,23 +446,20 @@ template<bool QUIESCE>
 void MovePicker<QUIESCE>::score_move(SearchMove& move) {
     move.set_value(0);
     if (move.is_capture()) {
-        // Perform MMV-LVA: Most valuable victims -> Least valuable attackers
-        constexpr i32 MVV_LVA[PT_COUNT][PT_COUNT] {
-            /*         x-    xP    xN    xB    xR    xQ    xK  */
-            /* -- */ { 0,    0,    0,    0,    0,    0,    0   },
-            /* Px */ { 0,   105,  205,  305,  405,  505,  9999 },
-            /* Nx */ { 0,   104,  204,  304,  404,  504,  9999 },
-            /* Bx */ { 0,   103,  203,  303,  403,  503,  9999 },
-            /* Rx */ { 0,   102,  202,  302,  600,  502,  9999 },
-            /* Qx */ { 0,   101,  201,  301,  401,  501,  9999 },
-            /* Kx */ { 0,   100,  200,  300,  400,  500,  9999 },
-        };
-
-        move.add_value(MVV_LVA[move.source_piece().type()][move.captured_piece().type()]);
+        constexpr i32 MVV[PT_COUNT] { 0, 0, 10240, 20480, 30720 , 40960, 51200 };
+        move.add_value(MVV[move.captured_piece().type()]);
+        move.add_value(m_mv_hist->capture_history(move));
     }
     else {
         // Adjust score based on move history.
-        move.add_value(m_mv_hist->quiet_history(move, m_board->last_move()));
+        move.add_value(
+            m_mv_hist->quiet_history(
+                move,
+                m_board->last_move(),
+                bit_is_set(m_threats, move.source()),
+                bit_is_set(m_threats, move.destination())
+            )
+        );
     }
 }
 

@@ -22,7 +22,7 @@ static constexpr size_t DEFAULT_TRACER_BATCH_SIZE = 512;
  */
 static const char* TRACER_VERSION = "v1.0";
 
-class SearchTracer : public ISearchTracer {
+class SqliteSearchTracer : public SearchTracer {
 public:
     void new_search(const Board& root,
                     size_t hash_size_mb,
@@ -42,10 +42,10 @@ public:
 
     void set(Traceable which, TracedValue value) override;
 
-    explicit SearchTracer(const std::string& db_path,
+    explicit SqliteSearchTracer(const std::string& db_path,
                           size_t batch_size_mib = DEFAULT_TRACER_BATCH_SIZE);
 
-    ~SearchTracer() override = default;
+    ~SqliteSearchTracer() override = default;
 
 private:
     SQLite::Database m_db;
