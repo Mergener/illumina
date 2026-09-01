@@ -164,6 +164,7 @@ public:
     Move  ponder_move() const;
 
     SearchWorker(bool main,
+                 MoveHistory* hist,
                  const Board& board,
                  SearchContext* context,
                  const SearchSettings* settings);
@@ -176,8 +177,8 @@ private:
     int m_eval_random_seed = 0;
     std::vector<Move> m_search_moves;
 
+    MoveHistory* m_hist;
     Board       m_board;
-    MoveHistory m_hist;
     Evaluation  m_eval {};
     Depth       m_root_depth = 1;
     Move        m_curr_move  = MOVE_NULL;
@@ -318,12 +319,13 @@ SearchResults Searcher::search(const Board& board,
 
     // Create search context.
     std::vector<std::unique_ptr<SearchWorker>> secondary_workers;
+    std::vector<std::unique_ptr<MoveHistory>> secondary_histories;
     m_stop.store(false, std::memory_order::memory_order_seq_cst);
     m_tt.new_search();
     SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
 
     // Create main worker.
-    SearchWorker main_worker(true, board, &context, &settings);
+    SearchWorker main_worker(true, m_main_worker_history.get(), board, &context, &settings);
 
     // Kickstart our time manager.
     ui64 our_time = UINT64_MAX;
@@ -352,11 +354,14 @@ SearchResults Searcher::search(const Board& board,
     secondary_workers.clear();
     std::vector<std::thread> helper_threads;
     secondary_workers.resize(n_helper_threads);
+    secondary_histories.resize(n_helper_threads);
     for (int i = 0; i < n_helper_threads; ++i) {
-        helper_threads.emplace_back([&secondary_workers, &board, &context, &settings, i]() {
-            auto worker = std::make_unique<SearchWorker>(false, board, &context, &settings);
+        helper_threads.emplace_back([&secondary_workers, &secondary_histories, &board, &context, &settings, i]() {
+            auto history = std::make_unique<MoveHistory>();
+            auto worker = std::make_unique<SearchWorker>(false, history.get(), board, &context, &settings);
             worker->iterative_deepening();
-            secondary_workers[i] = std::move(worker);
+            secondary_workers[i]   = std::move(worker);
+            secondary_histories[i] = std::move(history);
         });
     }
 
@@ -406,7 +411,7 @@ SearchResults Searcher::search(const Board& board,
 }
 
 void SearchWorker::iterative_deepening() {
-    m_hist.age();
+    m_hist->age();
     Depth max_depth = m_settings->max_depth.value_or(MAX_DEPTH);
     for (m_root_depth = 1; m_root_depth <= max_depth; ++m_root_depth) {
         // If we finished soft, we don't want to start a new iteration.
@@ -679,10 +684,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     Score raw_eval;
     if (!in_check) {
         raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
-        static_eval = m_hist.correct_eval_with_corrhist(m_board, raw_eval);
+        static_eval = m_hist->correct_eval_with_corrhist(m_board, raw_eval);
         stack_node->has_static_eval = true;
-        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist.pawn_corrhist(m_board) / CORRHIST_GRAIN);
-        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist.non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist->pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist->non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
     }
     else {
         raw_eval    = 0;
@@ -763,7 +768,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         }
 
         auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
-        MovePicker<true> pc_move_picker(m_board, ply, m_hist, threats, pc_hash_move, pc_see);
+        MovePicker<true> pc_move_picker(m_board, ply, *m_hist, threats, pc_hash_move, pc_see);
 
         int pc_searched_moves = 0;
         SearchMove move;
@@ -812,7 +817,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     int move_idx = -1;
 
     auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
-    MovePicker move_picker(m_board, ply, m_hist, threats, hash_move);
+    MovePicker move_picker(m_board, ply, *m_hist, threats, hash_move);
     SearchMove move {};
     Move best_move = found_in_tt ? tt_entry.move() : MOVE_NULL;
     bool has_legal_moves = false;
@@ -933,7 +938,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
         int move_history = 0;
         if (move.is_quiet()) {
-            move_history = m_hist.quiet_history(
+            move_history = m_hist->quiet_history(
                 move,
                 m_board.last_move(),
                 bit_is_set(threats, move.source()),
@@ -1025,13 +1030,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
             // Update our history scores and refutation moves.
             for (auto capt: played_captures) {
-                m_hist.update_capture_history(capt, depth, capt == best_move);
+                m_hist->update_capture_history(capt, depth, capt == best_move);
             }
             if (move.is_quiet()) {
-                m_hist.set_killer(ply, move);
+                m_hist->set_killer(ply, move);
 
                 for (Move quiet: played_quiets) {
-                    m_hist.update_quiet_history(quiet,
+                    m_hist->update_quiet_history(quiet,
                                                 m_board.last_move(),
                                                 depth,
                                                 quiet == best_move,
@@ -1109,7 +1114,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha >= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                m_hist->update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
@@ -1124,7 +1129,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha <= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                m_hist->update_corrhist(m_board, depth, alpha - static_eval);
             }
         } else {
             // We have an exact score.
@@ -1139,7 +1144,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha >= static_eval) {
-                m_hist.update_corrhist(m_board, depth, alpha - static_eval);
+                m_hist->update_corrhist(m_board, depth, alpha - static_eval);
             }
         }
     }
@@ -1203,7 +1208,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     Score raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
     Score stand_pat = raw_eval;
     if (!m_board.in_check()) {
-        stand_pat = m_hist.correct_eval_with_corrhist(m_board, stand_pat);
+        stand_pat = m_hist->correct_eval_with_corrhist(m_board, stand_pat);
     }
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
@@ -1221,7 +1226,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
 
     // Finally, start looping over available noisy moves.
     auto threats = all_attacked_squares(m_board, opposite_color(m_board.color_to_move()));
-    MovePicker<true> move_picker(m_board, ply, m_hist, threats, tt_move);
+    MovePicker<true> move_picker(m_board, ply, *m_hist, threats, tt_move);
     SearchMove move;
     SearchMove best_move;
     Score best_score = stand_pat;
@@ -1445,10 +1450,12 @@ Move SearchWorker::ponder_move() const {
 }
 
 SearchWorker::SearchWorker(bool main,
+                           MoveHistory* hist,
                            const Board& board,
                            SearchContext* context,
                            const SearchSettings* settings)
         : m_settings(settings),
+          m_hist(hist),
           m_context(context),
           m_main(main),
           m_eval_random_margin(settings->eval_random_margin),
