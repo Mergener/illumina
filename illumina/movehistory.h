@@ -210,7 +210,7 @@ inline int MoveHistory::pawn_corrhist(const Board& board) const {
 
 inline int MoveHistory::non_pawn_corrhist(const Board& board) const {
     CorrhistEntry& entry = m_data->non_pawn_corrhist[board.color_to_move()]
-                                                    [board.pawn_key() % CORRHIST_ENTRIES];
+                                                    [board.non_pawn_key() % CORRHIST_ENTRIES];
     return entry.key_low == (board.non_pawn_key() & BITMASK(16))
          ? entry.value
          : 0;
