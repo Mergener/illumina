@@ -1185,18 +1185,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         }
     }
 
-    if (   found_in_tt
-        && tt_entry.move() != MOVE_NULL
-        && (   !m_board.is_move_pseudo_legal(tt_entry.move())
-                  || !m_board.is_move_legal(tt_entry.move()))) {
-        found_in_tt = false;
-    }
-    else {
-        tt_move = found_in_tt && tt_entry.move().is_capture()
-                  ? tt_entry.move()
-                  : MOVE_NULL;
-    }
-
     m_sel_depth = std::max(m_sel_depth, ply);
 
     Score raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
