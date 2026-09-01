@@ -1,7 +1,5 @@
 #include "evaluation.h"
 
-#include "endgame.h"
-
 #include <cmath>
 
 namespace illumina {

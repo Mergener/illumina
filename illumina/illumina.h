@@ -6,7 +6,6 @@
 #include "board.h"
 #include "clock.h"
 #include "debug.h"
-#include "endgame.h"
 #include "evaluation.h"
 #include "movegen.h"
 #include "parsehelper.h"
