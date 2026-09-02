@@ -11,6 +11,7 @@
 #include "tracing.h"
 #include "types.h"
 #include "transpositiontable.h"
+#include "movehistory.h"
 
 namespace illumina {
 
@@ -80,6 +81,8 @@ private:
     TranspositionTable m_tt;
 
     TimeManager m_tm;
+
+    std::unique_ptr<MoveHistory> m_main_worker_history = std::make_unique<MoveHistory>();
 
     struct Listeners {
         PVFinishListener    pv_finish = [](PVResults&) {};

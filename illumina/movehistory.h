@@ -42,6 +42,8 @@ public:
     void set_killer(Depth ply, Move killer);
     void reset();
 
+    void age();
+
     void update_corrhist(const Board& board,
                          Depth depth,
                          int diff);
@@ -66,21 +68,13 @@ public:
     MoveHistory();
 
 private:
-    // Search history contains rather heavy array. To prevent unintended
-    // stack allocations, all history data is kept in an indirect fashion,
-    // with its lifetime managed by a unique_ptr.
-    struct Data {
-        CorrhistTable pawn_corrhist;
-        CorrhistTable non_pawn_corrhist;
-        std::array<std::array<Move, 2>, MAX_DEPTH> killers {};
-        ButterflyArray<i16> butterfly {};
-        std::array<std::array<PieceToArray<i16>, 2>, 2> threat_history {};
-        PieceToArray<PieceToArray<i16>> counter_move_history {};
-        
-        // PT_COUNT - 2 since we exclude kings and PT_NULL
-        PieceToArray<std::array<i16, PT_COUNT - 2>> capt_hist {};
-    };
-    std::unique_ptr<Data> m_data = std::make_unique<Data>();
+    CorrhistTable m_pawn_corrhist {};
+    CorrhistTable m_non_pawn_corrhist {};
+    std::array<std::array<Move, 2>, MAX_DEPTH> m_killers {};
+    ButterflyArray<i16> m_butterfly {};
+    std::array<std::array<PieceToArray<i16>, 2>, 2> m_threat_history {};
+    PieceToArray<PieceToArray<i16>> m_counter_move_history {};
+    PieceToArray<std::array<i16, PT_COUNT - 2>> m_capt_hist {};
 
     void update_corrhist_entry(CorrhistTable& table,
                                ui64 key,
@@ -117,7 +111,7 @@ const T& PieceToArray<T>::get(Move move) const {
 }
 
 inline const std::array<Move, 2>& MoveHistory::killers(Depth ply) const {
-    return m_data->killers[ply];
+    return m_killers[ply];
 }
 
 inline bool MoveHistory::is_killer(Depth ply, Move move) const {
@@ -126,7 +120,7 @@ inline bool MoveHistory::is_killer(Depth ply, Move move) const {
 }
 
 inline void MoveHistory::set_killer(Depth ply, Move killer) {
-    std::array<Move, 2>& arr = m_data->killers[ply];
+    std::array<Move, 2>& arr = m_killers[ply];
     if (killer == arr[0]) {
         return;
     }
@@ -135,14 +129,22 @@ inline void MoveHistory::set_killer(Depth ply, Move killer) {
 }
 
 inline void MoveHistory::reset() {
-    std::memset(m_data.get(), 0, sizeof(Data));
+    std::memset(this, 0, sizeof(*this));
+}
+
+inline void MoveHistory::age() {
+    for (auto& arr: m_butterfly) {
+        for (auto& hist: arr) {
+            hist = hist * 3 / 4;
+        }
+    }
 }
 
 inline int MoveHistory::quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const {
     return int(
-               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_data->butterfly.get(move))
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_data->counter_move_history.get(last_move).get(move))
-             + i64(MV_HIST_THREAT_QHIST_WEIGHT) * m_data->threat_history[threatened_from][threatened_to].get(move));
+               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_butterfly.get(move))
+             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_counter_move_history.get(last_move).get(move))
+             + i64(MV_HIST_THREAT_QHIST_WEIGHT) * m_threat_history[threatened_from][threatened_to].get(move));
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
@@ -151,19 +153,19 @@ inline void MoveHistory::update_quiet_history(Move move,
                                               bool good,
                                               bool threatened_from,
                                               bool threatened_to) {
-    update_history_by_depth(m_data->butterfly.get(move), depth, good);
-    update_history_by_depth(m_data->threat_history[threatened_from][threatened_to].get(move), depth, good);
+    update_history_by_depth(m_butterfly.get(move), depth, good);
+    update_history_by_depth(m_threat_history[threatened_from][threatened_to].get(move), depth, good);
     if (last_move != MOVE_NULL) {
-        update_history_by_depth(m_data->counter_move_history.get(last_move).get(move), depth, good);
+        update_history_by_depth(m_counter_move_history.get(last_move).get(move), depth, good);
     }
 }
 
 inline int MoveHistory::capture_history(Move move) const {
-    return m_data->capt_hist.get(move)[move.captured_piece().type() - 1];
+    return m_capt_hist.get(move)[move.captured_piece().type() - 1];
 }
 
 inline void MoveHistory::update_capture_history(Move move, Depth depth, bool good) {
-    update_history_by_depth(m_data->capt_hist.get(move)[move.captured_piece().type() - 1], depth, good);
+    update_history_by_depth(m_capt_hist.get(move)[move.captured_piece().type() - 1], depth, good);
 }
 
 inline void MoveHistory::update_corrhist_entry(CorrhistTable& table,
@@ -186,14 +188,14 @@ inline void MoveHistory::update_corrhist(const Board& board,
     int depth_score = std::min(depth * depth + 2 * depth + 1, 128);
 
     // Update pawn corrhist.
-    update_corrhist_entry(m_data->pawn_corrhist,
+    update_corrhist_entry(m_pawn_corrhist,
                           board.pawn_key(),
                           color,
                           depth_score,
                           diff);
 
     // Update non-pawn corrhist.
-    update_corrhist_entry(m_data->non_pawn_corrhist,
+    update_corrhist_entry(m_non_pawn_corrhist,
                           board.non_pawn_key(),
                           color,
                           depth_score,
@@ -201,7 +203,7 @@ inline void MoveHistory::update_corrhist(const Board& board,
 }
 
 inline int MoveHistory::pawn_corrhist(const Board& board) const {
-    CorrhistEntry& entry = m_data->pawn_corrhist[board.color_to_move()]
+    const CorrhistEntry& entry = m_pawn_corrhist[board.color_to_move()]
                                                 [board.pawn_key() % CORRHIST_ENTRIES];
     return entry.key_low == (board.pawn_key() & BITMASK(16))
          ? entry.value
@@ -209,7 +211,7 @@ inline int MoveHistory::pawn_corrhist(const Board& board) const {
 }
 
 inline int MoveHistory::non_pawn_corrhist(const Board& board) const {
-    CorrhistEntry& entry = m_data->non_pawn_corrhist[board.color_to_move()]
+    const CorrhistEntry& entry = m_non_pawn_corrhist[board.color_to_move()]
                                                     [board.pawn_key() % CORRHIST_ENTRIES];
     return entry.key_low == (board.non_pawn_key() & BITMASK(16))
          ? entry.value
