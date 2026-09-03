@@ -452,7 +452,7 @@ void SearchWorker::iterative_deepening() {
             // If we finished soft, we don't want to start a new iteration.
             if (   m_main
                 && m_root_depth > 2
-                && m_context->time_manager().finished_soft()) {
+                && (m_context->time_manager().finished_soft() || m_nodes > m_settings->max_nodes)) {
                 m_context->stop_search();
             }
 
@@ -1383,7 +1383,7 @@ void SearchWorker::check_limits() {
     }
 
     ui64 nodes = this->nodes();
-    if (nodes >= m_settings->max_nodes) {
+    if (!m_settings->soft_nodes && nodes >= m_settings->max_nodes) {
         m_context->stop_search();
         return;
     }

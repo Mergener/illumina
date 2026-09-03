@@ -22,6 +22,7 @@ namespace {
 struct GamePlyData {
     Score white_pov_score;
     Move  best_move;
+    int piece_count;
 };
 
 struct Game {
@@ -38,8 +39,7 @@ struct NormalOptions {
     int max_random_plies = 18;
     int win_adjudication_score = 1000;
     int win_adjudication_plies = 6;
-    int min_positions_per_game = 16;
-    int max_positions_per_game = 24;
+    int positions_per_bucket = 1;
     bool exclude_checks = true;
     bool exclude_mate_scores = true;
     bool exclude_best_move_captures = true;
@@ -105,15 +105,10 @@ NormalOptions parse_args(int argc, char* argv[]) {
         .store_into(options.win_adjudication_plies)
         .help("number of consecutive high-score plies needed for win adjudication.");
 
-    args.add_argument("--min-positions-per-game")
-        .default_value(options.min_positions_per_game)
-        .store_into(options.min_positions_per_game)
-        .help("minimum number of positions kept from each game.");
-
-    args.add_argument("--max-positions-per-game")
-        .default_value(options.max_positions_per_game)
-        .store_into(options.max_positions_per_game)
-        .help("maximum number of positions kept from each game.");
+    args.add_argument("--positions-per-bucker")
+        .default_value(options.positions_per_bucket)
+        .store_into(options.positions_per_bucket)
+        .help("number of consecutive high-score plies needed for win adjudication.");
 
     args.add_argument("--include-checks")
         .default_value(false)
@@ -150,12 +145,6 @@ NormalOptions parse_args(int argc, char* argv[]) {
     }
     if (options.max_random_plies < options.min_random_plies) {
         throw std::invalid_argument("max-random-plies must be >= min-random-plies");
-    }
-    if (options.min_positions_per_game < 0) {
-        throw std::invalid_argument("min-positions-per-game must be non-negative");
-    }
-    if (options.max_positions_per_game < options.min_positions_per_game) {
-        throw std::invalid_argument("max-positions-per-game must be >= min-positions-per-game");
     }
     if (options.win_adjudication_plies < 1) {
         throw std::invalid_argument("win-adjudication-plies must be at least 1");
@@ -203,6 +192,7 @@ Game simulate_game(Searcher& white_searcher,
     search_settings.max_nodes = options.search_node_limit;
     search_settings.move_time = 10000;
     search_settings.shallow_search_hint = true;
+    search_settings.soft_nodes = true;
 
     Board board = Board::standard_startpos();
 
@@ -257,6 +247,7 @@ Game simulate_game(Searcher& white_searcher,
                                    ? search_results.score
                                    : -search_results.score;
         ply_data.white_pov_score = std::clamp(ply_data.white_pov_score, -3000, 3000);
+        ply_data.piece_count = static_cast<int>(popcount(board.occupancy()));
 
         game.ply_data.push_back(ply_data);
 
@@ -289,7 +280,9 @@ std::vector<DataPoint> select_data_points(const Game& game,
                                           const NormalOptions& options) {
     static thread_local std::mt19937 rng(std::random_device{}());
 
+    std::unordered_map<int, std::vector<DataPoint>> data_points_by_bucket;
     std::vector<DataPoint> extracted_data;
+    extracted_data.reserve(game.ply_data.size());
     Board board = game.start_pos;
 
     for (const GamePlyData& ply_data : game.ply_data) {
@@ -299,18 +292,18 @@ std::vector<DataPoint> select_data_points(const Game& game,
             || (options.exclude_mate_scores && is_mate_score(ply_data.white_pov_score));
 
         if (!skip) {
-            extracted_data.push_back({ board.fen(false), ply_data });
+            data_points_by_bucket[ply_data.piece_count].push_back({ board.fen(false), ply_data });
         }
 
         board.make_move(ply_data.best_move);
     }
 
-    std::shuffle(extracted_data.begin(), extracted_data.end(), rng);
-
-    size_t n_data_points = std::min(size_t(options.min_positions_per_game) + game.ply_data.size() / 32,
-                                    size_t(options.max_positions_per_game));
-    n_data_points = std::min(n_data_points, extracted_data.size());
-    extracted_data.erase(extracted_data.begin() + n_data_points, extracted_data.end());
+    for (auto& pair: data_points_by_bucket) {
+        std::shuffle(pair.second.begin(), pair.second.end(), rng);
+        for (size_t i = 0; i < std::min(static_cast<size_t>(options.positions_per_bucket), pair.second.size()); ++i) {
+            extracted_data.push_back(pair.second[i]);
+        }
+    }
 
     return extracted_data;
 }
@@ -406,8 +399,7 @@ void log_configuration(const NormalOptions& options) {
                 << "\n  max_random_plies: " << options.max_random_plies
                 << "\n  win_adjudication_score: " << options.win_adjudication_score
                 << "\n  win_adjudication_plies: " << options.win_adjudication_plies
-                << "\n  min_positions_per_game: " << options.min_positions_per_game
-                << "\n  max_positions_per_game: " << options.max_positions_per_game
+                << "\n  positions_per_bucket: " << options.positions_per_bucket
                 << "\n  exclude_checks: " << options.exclude_checks
                 << "\n  exclude_mate_scores: " << options.exclude_mate_scores
                 << "\n  exclude_last_move_captures: " << options.exclude_best_move_captures

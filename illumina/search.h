@@ -43,6 +43,7 @@ struct SearchSettings {
     std::optional<std::vector<Move>> search_moves;
     SearchTracer* tracer = nullptr;
     bool shallow_search_hint = false;
+    bool soft_nodes = false;
 };
 
 struct SearchResults {
