@@ -936,6 +936,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             else if (score >= beta) {
                 return score;
             }
+            else if (tt_entry.score() >= beta) {
+                extensions -= 2;
+            }
         }
 
         int move_history = 0;
