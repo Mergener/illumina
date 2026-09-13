@@ -131,8 +131,8 @@ Score Evaluation::compute(const Board& board) {
 static std::pair<double, double> wdl_params(Score score, const Board& board) {
     // Stockfish WDL normalization model parameters.
     // Generated using https://github.com/official-stockfish/WDL_model.
-    constexpr double AS[] = {-50.97445783, 210.31918996, -445.02953945, 518.19869977};
-    constexpr double BS[] = {56.58194844, -159.07046468, 144.13419462, 41.10541912};
+    constexpr double AS[] = {-416.97348813, 1213.95351188, -1368.58758315, 855.21105608};
+    constexpr double BS[] = {-155.52564502, 417.75145499, -364.40511303, 181.81249513};
 
     int material = 1 * popcount(board.piece_type_bb(PT_PAWN))
                    + 3 * popcount(board.piece_type_bb(PT_KNIGHT))
