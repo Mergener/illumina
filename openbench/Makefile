@@ -26,6 +26,9 @@ else ifeq ($(shell grep -m1 -o bmi2 /proc/cpuinfo 2>/dev/null),bmi2)
 else ifeq ($(shell grep -m1 -o avx2 /proc/cpuinfo 2>/dev/null),avx2)
 	TARGET := illumina_cli_avx2
 	BINARY := illumina_avx2
+else ifeq ($(shell grep -m1 -o sse2 /proc/cpuinfo 2>/dev/null),sse2)
+	TARGET := illumina_cli_sse2
+	BINARY := illumina_sse2
 endif
 
 # Detect if the environment is Windows and append the .exe extension if so.
@@ -81,4 +84,4 @@ move: build
 # Clean the build directory and binaries.
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f illumina_base illumina_bmi2 illumina_avx2 illumina_avx512
+	rm -f illumina_base illumina_sse2 illumina_bmi2 illumina_avx2 illumina_avx512
