@@ -42,7 +42,7 @@ constexpr Score is_mate_score(Score score) {
 }
 
 constexpr int plies_to_mate(Score score) {
-    return std::abs(MATE_SCORE - score);
+    return MATE_SCORE - std::abs(score);
 }
 
 constexpr int moves_to_mate(Score score) {
