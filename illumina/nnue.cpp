@@ -50,9 +50,8 @@ void NNUE::clear() {
 }
 
 int NNUE::forward(Color color, size_t piece_count) const {
-    ILLUMINA_ASSERT(bucket < OUTPUT_BUCKETS);
-
     size_t bucket = output_bucket(piece_count);
+    ILLUMINA_ASSERT(bucket < OUTPUT_BUCKETS);
 
     SimdVecI32 sum = SimdVecI32::zero();
     const SimdVecI16 zero = SimdVecI16::zero();

@@ -2,7 +2,14 @@
 #define ILLUMINA_SIMD_H
 
 #include <cstddef>
+
+#ifdef NEON
+#include <sse2neon/sse2neon.h>
+#define HAS_SSE2
+#else
 #include <immintrin.h>
+#endif
+
 #include <cstdint>
 
 #include "types.h"
@@ -481,5 +488,10 @@ inline i32 SimdVecI32::hadd() const {
 #endif
 
 } // illumina
+
+
+#ifdef NEON
+#undef HAS_SSE2
+#endif
 
 #endif // ILLUMINA_SIMD_H
