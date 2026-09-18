@@ -168,9 +168,11 @@ void CLIApplication::set_error_handler(const ErrorHandler& error_handler) {
 }
 
 void CLIApplication::listen(std::istream& in, std::ostream& out) {
-    while (!m_should_stop_serving || in.eof()) {
+    while (!m_should_stop_serving) {
         std::string line;
-        std::getline(in, line);
+        if (!std::getline(in, line)) {
+            break;
+        }
         handle(line);
     }
 }
