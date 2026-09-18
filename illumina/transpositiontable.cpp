@@ -127,6 +127,7 @@ void TranspositionTable::resize(size_t new_size) {
         size_t new_n_entries = new_size / sizeof(TranspositionTableEntry);
         auto new_buf         = std::make_unique<TranspositionTableEntry[]>(new_n_entries);
         m_buf                = std::move(new_buf);
+        m_size_in_bytes      = new_size;
         m_max_entry_count    = new_n_entries;
     }
     catch (const std::bad_alloc& bad_alloc) {
