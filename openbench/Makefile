@@ -12,23 +12,23 @@ BASE_CMAKE_OPTIONS = -DCMAKE_BUILD_TYPE=Release -DDEVELOPMENT=ON -DTUNING=ON -DI
 CMAKE_OPTIONS = $(BASE_CMAKE_OPTIONS) $(CMAKE_ARGS)
 
 # Set default target; can be overridden.
-TARGET ?= illumina_cli_base
-BINARY ?= illumina_base
+TARGET ?= illumina_cli_x64
+BINARY ?= illumina_x64
 
 # Detect CPU capabilities and set the best target and binary name
 # AVX-512 inference requires both the foundation and byte/word instruction sets.
 ifeq ($(shell grep -m1 -o avx512bw /proc/cpuinfo 2>/dev/null),avx512bw)
-	TARGET := illumina_cli_avx512
-	BINARY := illumina_avx512
+	TARGET := illumina_cli_x64_avx512
+	BINARY := illumina_x64_avx512
 else ifeq ($(shell grep -m1 -o bmi2 /proc/cpuinfo 2>/dev/null),bmi2)
-	TARGET := illumina_cli_bmi2
-	BINARY := illumina_bmi2
+	TARGET := illumina_cli_x64_bmi2
+	BINARY := illumina_x64_bmi2
 else ifeq ($(shell grep -m1 -o avx2 /proc/cpuinfo 2>/dev/null),avx2)
-	TARGET := illumina_cli_avx2
-	BINARY := illumina_avx2
+	TARGET := illumina_cli_x64_avx2
+	BINARY := illumina_x64_avx2
 else ifeq ($(shell grep -m1 -o sse2 /proc/cpuinfo 2>/dev/null),sse2)
-	TARGET := illumina_cli_sse2
-	BINARY := illumina_sse2
+	TARGET := illumina_cli_x64_sse2
+	BINARY := illumina_x64_sse2
 endif
 
 # Detect if the environment is Windows and append the .exe extension if so.
@@ -84,4 +84,4 @@ move: build
 # Clean the build directory and binaries.
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f illumina_base illumina_sse2 illumina_bmi2 illumina_avx2 illumina_avx512
+	rm -f illumina_x64 illumina_x64_sse2 illumina_x64_bmi2 illumina_x64_avx2 illumina_x64_avx512
