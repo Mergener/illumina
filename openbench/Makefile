@@ -12,8 +12,8 @@ BASE_CMAKE_OPTIONS = -DCMAKE_BUILD_TYPE=Release -DDEVELOPMENT=ON -DTUNING=ON -DI
 CMAKE_OPTIONS = $(BASE_CMAKE_OPTIONS) $(CMAKE_ARGS)
 
 # Set default target; can be overridden.
-TARGET ?= illumina_cli_x64
-BINARY ?= illumina_x64
+TARGET ?= illumina_cli_x64_base
+BINARY ?= illumina_x64_base
 
 # Detect CPU capabilities and set the best target and binary name
 # AVX-512 inference requires both the foundation and byte/word instruction sets.
@@ -84,4 +84,4 @@ move: build
 # Clean the build directory and binaries.
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f illumina_x64 illumina_x64_sse2 illumina_x64_bmi2 illumina_x64_avx2 illumina_x64_avx512
+	rm -f illumina_x64_base illumina_x64_sse2 illumina_x64_bmi2 illumina_x64_avx2 illumina_x64_avx512

@@ -101,7 +101,7 @@ if (   CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
 endif()
 
 # Define our supported architectures here.
-set(ARCHS x64_avx512 x64_bmi2 x64_avx2 x64_sse2 x64)
+set(ARCHS x64_avx512 x64_bmi2 x64_avx2 x64_sse2 x64_base)
 
 # General setup.
 include_directories(${CMAKE_SOURCE_DIR}/ext/include)
@@ -130,7 +130,7 @@ function(apply_arch_options TARGET ARCH)
             target_compile_options(${TARGET} PRIVATE -msse2)
             target_compile_definitions(${TARGET} PRIVATE HAS_SSE2)
         endif()
-    elseif(${ARCH} STREQUAL x64)
+    elseif(${ARCH} STREQUAL x64_base)
         # Do nothing
     else()
         message("Unsupported architecture ${ARCH}")
