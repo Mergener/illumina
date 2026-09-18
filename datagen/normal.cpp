@@ -22,6 +22,7 @@ namespace {
 struct GamePlyData {
     Score white_pov_score;
     Move  best_move;
+    bool  mate_score;
 };
 
 struct Game {
@@ -256,6 +257,7 @@ Game simulate_game(Searcher& white_searcher,
         ply_data.white_pov_score = board.color_to_move() == CL_WHITE
                                    ? search_results.score
                                    : -search_results.score;
+        ply_data.mate_score = is_mate_score(ply_data.white_pov_score);
         ply_data.white_pov_score = std::clamp(ply_data.white_pov_score, -3000, 3000);
 
         game.ply_data.push_back(ply_data);
@@ -296,7 +298,7 @@ std::vector<DataPoint> select_data_points(const Game& game,
         auto skip =
             (options.exclude_checks && board.in_check())
             || (options.exclude_best_move_captures && ply_data.best_move.is_capture())
-            || (options.exclude_mate_scores && is_mate_score(ply_data.white_pov_score));
+            || (options.exclude_mate_scores && ply_data.mate_score);
 
         if (!skip) {
             extracted_data.push_back({ board.fen(false), ply_data });
