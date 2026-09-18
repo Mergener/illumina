@@ -342,7 +342,17 @@ SearchResults Searcher::search(const Board& board,
                    ? settings.white_time.value_or(UINT64_MAX)
                    : settings.black_time.value_or(UINT64_MAX);
 
-        m_tm.start_tourney_time(our_time, 0, 0, 0);
+        ui64 our_inc = board.color_to_move() == CL_WHITE
+                       ? settings.white_inc.value_or(0)
+                       : settings.black_inc.value_or(0);
+        ui64 their_time = board.color_to_move() == CL_WHITE
+                          ? settings.black_time.value_or(UINT64_MAX)
+                          : settings.white_time.value_or(UINT64_MAX);
+        ui64 their_inc = board.color_to_move() == CL_WHITE
+                         ? settings.black_inc.value_or(0)
+                         : settings.white_inc.value_or(0);
+
+        m_tm.start_tourney_time(our_time, our_inc, their_time, their_inc);
     }
     else {
         // 'infinite'
