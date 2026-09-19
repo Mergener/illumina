@@ -677,7 +677,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Check extensions.
     // Extend positions in check.
-    depth += in_check;
+    depth += in_check && stack_node->skip_move == MOVE_NULL;
 
     // Clamp excessive depths.
     depth = std::min(std::min(MAX_DEPTH, depth), m_root_depth * 2 - ply);
