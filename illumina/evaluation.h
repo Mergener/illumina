@@ -14,6 +14,7 @@ namespace illumina {
 class Evaluation {
 public:
     Score compute(const Board& board);
+    int complexity(const Board& board);
     void on_new_board(const Board& board);
     void on_make_move(const Board& board, Move move);
     void on_undo_move(const Board& board, Move move);

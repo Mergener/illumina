@@ -1,6 +1,7 @@
 #include "evaluation.h"
 
 #include "endgame.h"
+#include "tunablevalues.h"
 
 #include <cmath>
 
@@ -126,6 +127,53 @@ void Evaluation::apply_undo_null_move() {
 Score Evaluation::compute(const Board& board) {
     apply_lazy_updates();
     return std::clamp(m_nnue.forward(m_ctm, popcount(board.occupancy())), -KNOWN_WIN + 1, KNOWN_WIN - 1);
+}
+
+int Evaluation::complexity(const Board& board) {
+    constexpr int WEIGHTS[] = { 1, 3, 3, 5, 9, 0 };
+    constexpr i64 SCALES[]  = { 64, 128, 8, 64 };
+    constexpr i64 Q         = 16384;
+
+    const i64 quadratic[] = {
+        COMPLEXITY_TOTAL_MATERIAL_QUADRATIC,
+        COMPLEXITY_RULE50_QUADRATIC,
+        COMPLEXITY_PIECE_COUNT_IMBALANCE_QUADRATIC,
+        COMPLEXITY_MATERIAL_DIFFERENCE_QUADRATIC,
+    };
+    const i64 linear[] = {
+        COMPLEXITY_TOTAL_MATERIAL_LINEAR,
+        COMPLEXITY_RULE50_LINEAR,
+        COMPLEXITY_PIECE_COUNT_IMBALANCE_LINEAR,
+        COMPLEXITY_MATERIAL_DIFFERENCE_LINEAR,
+    };
+
+    int material = 0;
+    int imbalance = 0;
+    int difference = 0;
+
+    for (size_t i = 0; i < 6; ++i) {
+        PieceType pt = PIECE_TYPES[i];
+
+        int white = int(popcount(board.piece_bb(Piece(CL_WHITE, pt))));
+        int black = int(popcount(board.piece_bb(Piece(CL_BLACK, pt))));
+
+        material   += WEIGHTS[i] * (white + black);
+        imbalance  += std::abs(white - black);
+        difference += WEIGHTS[i] * (white - black);
+    }
+
+    i64 features[] = { material, board.rule50(), imbalance, std::abs(difference) };
+    i64 numerator = 0;
+
+    for (size_t i = 0; i < 4; ++i) {
+        i64 x = features[i];
+        i64 scale = SCALES[i];
+        numerator += quadratic[i] * x * x * (Q / (scale * scale))
+                   + linear[i] * x * (Q / scale);
+    }
+
+    return int((numerator >= 0 ? numerator + Q / 2
+                              : numerator - Q / 2) / Q);
 }
 
 static std::pair<double, double> wdl_params(Score score, const Board& board) {
