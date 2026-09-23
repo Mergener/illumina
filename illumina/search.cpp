@@ -973,6 +973,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
                 // Further reduce cut nodes
                 r += cut_node * LMR_CUT_NODE_FACTOR;
+
+                if (!PV_NODE && complexity < 1536) {
+                    r += 2;
+                }
             }
             else if (move_picker.stage() == MPS_BAD_CAPTURES) {
                 // Further reduce bad captures when we're in a very good position
