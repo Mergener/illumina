@@ -24,7 +24,7 @@ public:
     void apply_lazy_updates();
 
 private:
-    NNUE m_nnue;
+    std::array<NNUE, 2> m_nnues { NNUE(false), NNUE(true) };
     Color m_ctm;
     std::array<Move, MAX_DEPTH> m_lazy_updates;
     size_t m_n_lazy_updates = 0;

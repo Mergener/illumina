@@ -9,6 +9,7 @@ set(lib_src types.h types.h debug.h illumina.h types.cpp illumina.cpp board.cpp 
         simd.h)
 
 set_property(SOURCE nnue.cpp APPEND PROPERTY OBJECT_DEPENDS "${NNUE_PATH}")
+set_property(SOURCE nnue.cpp APPEND PROPERTY OBJECT_DEPENDS "${COMPLEXITY_NNUE_PATH}")
 
 foreach(ARCH ${ARCHS})
     set(TARGET illumina_lib_${ARCH})
@@ -25,4 +26,5 @@ foreach(ARCH ${ARCHS})
     target_include_directories(${TARGET} PUBLIC ${CMAKE_SOURCE_DIR}/ext)
 
     target_compile_definitions(${TARGET} PUBLIC NNUE_PATH=\"${NNUE_PATH}\")
+    target_compile_definitions(${TARGET} PUBLIC COMPLEXITY_NNUE_PATH=\"${COMPLEXITY_NNUE_PATH}\")
 endforeach()

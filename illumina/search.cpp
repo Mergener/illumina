@@ -980,7 +980,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 r -= !stable * (r / 2);
             }
 
-            r += (16384 - m_eval.complexity(m_board)) * 1024 / 4096;
+            r += ((16384 - m_eval.complexity(m_board)) * COMPLEXITY_REDUCTION_FACTOR / 16384) * 1024;
         }
 
         Depth reductions = std::clamp(r / 1024, 0, depth);

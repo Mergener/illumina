@@ -43,10 +43,16 @@ public:
 
     int forward(Color color, size_t piece_count) const;
 
-    NNUE();
+    explicit NNUE(bool complexity = false);
 
 private:
-    const EvalNetwork* m_net;
+    const i16* m_weights;
+    const i16* m_biases;
+    const i16* m_output_weights;
+    const i16* m_output_biases;
+    size_t m_l1_size;
+    size_t m_output_buckets;
+    int m_scale;
     Accumulator m_accum {};
     std::vector<Accumulator> m_accum_stack;
 
@@ -94,14 +100,14 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
     }
 
     auto update = [this](auto& accum, const auto& enabled, const auto& disabled) {
-        for (size_t i = 0; i < L1_SIZE; i += SimdVecI16::STRIDE) {
+        for (size_t i = 0; i < m_l1_size; i += SimdVecI16::STRIDE) {
             SimdVecI16 value = SimdVecI16::load_aligned(&accum[i]);
 
             for (size_t index : enabled) {
-                value += SimdVecI16::load_aligned(&m_net->l1_weights[index * L1_SIZE + i]);
+                value += SimdVecI16::load_aligned(&m_weights[index * m_l1_size + i]);
             }
             for (size_t index : disabled) {
-                value -= SimdVecI16::load_aligned(&m_net->l1_weights[index * L1_SIZE + i]);
+                value -= SimdVecI16::load_aligned(&m_weights[index * m_l1_size + i]);
             }
 
             value.store_aligned(&accum[i]);

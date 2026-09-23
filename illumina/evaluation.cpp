@@ -8,16 +8,18 @@
 namespace illumina {
 
 void Evaluation::on_new_board(const Board& board) {
-    m_nnue.clear();
     m_n_lazy_updates = 0;
     m_ctm = board.color_to_move();
+    for (auto& nnue: m_nnues) {
+        nnue.clear();
 
-    // Activate every feature individually.
-    Bitboard bb = board.occupancy();
-    while (bb) {
-        Square s = lsb(bb);
-        m_nnue.enable_feature(s, board.piece_at(s));
-        bb = unset_lsb(bb);
+        // Activate every feature individually.
+        Bitboard bb = board.occupancy();
+        while (bb) {
+            Square s = lsb(bb);
+            nnue.enable_feature(s, board.piece_at(s));
+            bb = unset_lsb(bb);
+        }
     }
 }
 
@@ -61,59 +63,63 @@ void Evaluation::on_undo_null_move(const Board& board) {
 }
 
 void Evaluation::apply_make_move(Move move) {
-    m_nnue.push_accumulator();
     Color moved_color = m_ctm;
     m_ctm = opposite_color(m_ctm);
+    for (auto& nnue: m_nnues) {
+        nnue.push_accumulator();
 
-    switch (move.type()) {
-        case MT_EN_PASSANT:
-            m_nnue.update_features<1, 2>(
-                    {move.destination()},
-                    {move.source_piece()},
-                    {move.source(), move.destination() - pawn_push_direction(moved_color)},
-                    {move.source_piece(), Piece(m_ctm, PT_PAWN)});
-            break;
-        case MT_CASTLES:
-            m_nnue.update_features<2, 2>(
-                    {castled_rook_square(moved_color, move.castles_side()), move.destination()},
-                    {Piece(moved_color, PT_ROOK), move.source_piece()},
-                    {move.castles_rook_src_square(), move.source()},
-                    {Piece(moved_color, PT_ROOK), move.source_piece()});
-            break;
-        case MT_PROMOTION_CAPTURE:
-            m_nnue.update_features<1, 2>(
-                    {move.destination()},
-                    {Piece(moved_color, move.promotion_piece_type())},
-                    {move.source(), move.destination()},
-                    {move.source_piece(), move.captured_piece()});
-            break;
-        case MT_SIMPLE_CAPTURE:
-            m_nnue.update_features<1, 2>(
-                    {move.destination()},
-                    {move.source_piece()},
-                    {move.source(), move.destination()},
-                    {move.source_piece(), move.captured_piece()});
-            break;
-        case MT_SIMPLE_PROMOTION:
-            m_nnue.update_features<1, 1>(
-                    {move.destination()},
-                    {Piece(moved_color, move.promotion_piece_type())},
-                    {move.source()},
-                    {move.source_piece()});
-            break;
-        default:
-            m_nnue.update_features<1, 1>(
-                    {move.destination()},
-                    {move.source_piece()},
-                    {move.source()},
-                    {move.source_piece()});
-            break;
+        switch (move.type()) {
+            case MT_EN_PASSANT:
+                nnue.update_features<1, 2>(
+                        {move.destination()},
+                        {move.source_piece()},
+                        {move.source(), move.destination() - pawn_push_direction(moved_color)},
+                        {move.source_piece(), Piece(m_ctm, PT_PAWN)});
+                break;
+            case MT_CASTLES:
+                nnue.update_features<2, 2>(
+                        {castled_rook_square(moved_color, move.castles_side()), move.destination()},
+                        {Piece(moved_color, PT_ROOK), move.source_piece()},
+                        {move.castles_rook_src_square(), move.source()},
+                        {Piece(moved_color, PT_ROOK), move.source_piece()});
+                break;
+            case MT_PROMOTION_CAPTURE:
+                nnue.update_features<1, 2>(
+                        {move.destination()},
+                        {Piece(moved_color, move.promotion_piece_type())},
+                        {move.source(), move.destination()},
+                        {move.source_piece(), move.captured_piece()});
+                break;
+            case MT_SIMPLE_CAPTURE:
+                nnue.update_features<1, 2>(
+                        {move.destination()},
+                        {move.source_piece()},
+                        {move.source(), move.destination()},
+                        {move.source_piece(), move.captured_piece()});
+                break;
+            case MT_SIMPLE_PROMOTION:
+                nnue.update_features<1, 1>(
+                        {move.destination()},
+                        {Piece(moved_color, move.promotion_piece_type())},
+                        {move.source()},
+                        {move.source_piece()});
+                break;
+            default:
+                nnue.update_features<1, 1>(
+                        {move.destination()},
+                        {move.source_piece()},
+                        {move.source()},
+                        {move.source_piece()});
+                break;
+        }
     }
 }
 
 void Evaluation::apply_undo_move(Move move) {
     m_ctm = opposite_color(m_ctm);
-    m_nnue.pop_accumulator();
+    for (auto& nnue: m_nnues) {
+        nnue.pop_accumulator();
+    }
 }
 
 void Evaluation::apply_make_null_move() {
@@ -126,55 +132,14 @@ void Evaluation::apply_undo_null_move() {
 
 Score Evaluation::compute(const Board& board) {
     apply_lazy_updates();
-    return std::clamp(m_nnue.forward(m_ctm, popcount(board.occupancy())), -KNOWN_WIN + 1, KNOWN_WIN - 1);
+    return std::clamp(m_nnues[0].forward(m_ctm, popcount(board.occupancy())), -KNOWN_WIN + 1, KNOWN_WIN - 1);
 }
 
 int Evaluation::complexity(const Board& board) {
-    constexpr int WEIGHTS[] = { 1, 3, 3, 5, 9, 0 };
-    constexpr i64 SCALES[]  = { 64, 128, 8, 64 };
-    constexpr i64 Q         = 16384;
-
-    const i64 quadratic[] = {
-        COMPLEXITY_TOTAL_MATERIAL_QUADRATIC,
-        COMPLEXITY_RULE50_QUADRATIC,
-        COMPLEXITY_PIECE_COUNT_IMBALANCE_QUADRATIC,
-        COMPLEXITY_MATERIAL_DIFFERENCE_QUADRATIC,
-    };
-    const i64 linear[] = {
-        COMPLEXITY_TOTAL_MATERIAL_LINEAR,
-        COMPLEXITY_RULE50_LINEAR,
-        COMPLEXITY_PIECE_COUNT_IMBALANCE_LINEAR,
-        COMPLEXITY_MATERIAL_DIFFERENCE_LINEAR,
-    };
-
-    int material = 0;
-    int imbalance = 0;
-    int difference = 0;
-
-    for (size_t i = 0; i < 6; ++i) {
-        PieceType pt = PIECE_TYPES[i];
-
-        int white = int(popcount(board.piece_bb(Piece(CL_WHITE, pt))));
-        int black = int(popcount(board.piece_bb(Piece(CL_BLACK, pt))));
-
-        material   += WEIGHTS[i] * (white + black);
-        imbalance  += std::abs(white - black);
-        difference += WEIGHTS[i] * (white - black);
-    }
-
-    i64 features[] = { material, board.rule50(), imbalance, std::abs(difference) };
-    i64 numerator = 0;
-
-    for (size_t i = 0; i < 4; ++i) {
-        i64 x = features[i];
-        i64 scale = SCALES[i];
-        numerator += quadratic[i] * x * x * (Q / (scale * scale))
-                   + linear[i] * x * (Q / scale);
-    }
-
-    return int((numerator >= 0 ? numerator + Q / 2
-                              : numerator - Q / 2) / Q);
+    apply_lazy_updates();
+    return std::clamp(m_nnues[1].forward(m_ctm, popcount(board.occupancy())), 0, 16384);
 }
+
 
 static std::pair<double, double> wdl_params(Score score, const Board& board) {
     // Stockfish WDL normalization model parameters.

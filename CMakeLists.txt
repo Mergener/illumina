@@ -17,6 +17,10 @@ if(NOT DEFINED NNUE_PATH)
     set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.bin)
 endif()
 message(STATUS "NNUE_PATH is set to: ${NNUE_PATH}")
+if(NOT DEFINED COMPLEXITY_NNUE_PATH)
+    set(COMPLEXITY_NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/compnet.bin)
+endif()
+message(STATUS "COMPLEXITY_NNUE_PATH is set to: ${COMPLEXITY_NNUE_PATH}")
 
 # Add some compilation options.
 option(BUILD_TESTING "Build Illumina's test suite." ON)

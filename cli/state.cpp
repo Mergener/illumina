@@ -223,10 +223,13 @@ void State::evaluate() const {
     }
     std::cout << "\n    -------------------------------------------------";
 
+    int complexity = eval.complexity(m_board);
+
     std::cout << "\n\nFinal evaluation ("
               << (m_board.color_to_move() == CL_WHITE ? "white" : "black") << "'s perspective): "
               << double(score) / 100
-              << " (" << score << " cp)"
+              << " (" << score << " cp)\n"
+              << "Complexity: " << complexity << " (" << int(double(complexity) / 16384.0 * 100.0) << "%)"
               << std::endl;
 }
 
