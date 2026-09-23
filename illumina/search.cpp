@@ -635,6 +635,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     Color us               = m_board.color_to_move();
     Depth ply              = stack_node->ply;
     Score& static_eval     = stack_node->static_eval;
+    int complexity         = m_eval.complexity(m_board);
 
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions)
@@ -979,8 +980,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 bool stable = alpha >= LMR_STABLE_ALPHA_THRESHOLD;
                 r -= !stable * (r / 2);
             }
-
-            r += ((16384 - m_eval.complexity(m_board)) * COMPLEXITY_REDUCTION_FACTOR / 16384) * 1024;
         }
 
         Depth reductions = std::clamp(r / 1024, 0, depth);

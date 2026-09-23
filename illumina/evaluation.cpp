@@ -8,136 +8,133 @@
 namespace illumina {
 
 void Evaluation::on_new_board(const Board& board) {
-    m_n_lazy_updates = 0;
-    m_ctm = board.color_to_move();
-    for (auto& nnue: m_nnues) {
-        nnue.clear();
+    m_n_eval_lazy_updates = 0;
+    m_n_complexity_lazy_updates = 0;
+    m_eval_nnue.clear();
+    m_complexity_nnue.clear();
 
-        // Activate every feature individually.
-        Bitboard bb = board.occupancy();
-        while (bb) {
-            Square s = lsb(bb);
-            nnue.enable_feature(s, board.piece_at(s));
-            bb = unset_lsb(bb);
-        }
+    // Activate every feature individually.
+    Bitboard bb = board.occupancy();
+    while (bb) {
+        Square s = lsb(bb);
+        Piece piece = board.piece_at(s);
+        m_eval_nnue.enable_feature(s, piece);
+        m_complexity_nnue.enable_feature(s, piece);
+        bb = unset_lsb(bb);
     }
-}
-
-void Evaluation::apply_lazy_updates() {
-    for (size_t i = 0; i < m_n_lazy_updates; ++i) {
-        Move move = m_lazy_updates[i];
-        if (move != MOVE_NULL) {
-            apply_make_move(move);
-        }
-        else {
-            apply_make_null_move();
-        }
-    }
-    m_n_lazy_updates = 0;
 }
 
 void Evaluation::on_make_move(const Board& board, Move move) {
-    m_lazy_updates[m_n_lazy_updates++] = move;
+    m_eval_lazy_updates[m_n_eval_lazy_updates++] = move;
+    m_complexity_lazy_updates[m_n_complexity_lazy_updates++] = move;
 }
 
 void Evaluation::on_undo_move(const Board& board, Move move) {
-    if (m_n_lazy_updates == 0) {
-        apply_undo_move(move);
+    if (m_n_eval_lazy_updates != 0) {
+        --m_n_eval_lazy_updates;
+    } else {
+        m_eval_nnue.pop_accumulator();
     }
-    else {
-        m_n_lazy_updates--;
+    if (m_n_complexity_lazy_updates != 0) {
+        --m_n_complexity_lazy_updates;
+    } else {
+        m_complexity_nnue.pop_accumulator();
     }
 }
 
 void Evaluation::on_make_null_move(const Board& board) {
-    m_lazy_updates[m_n_lazy_updates++] = MOVE_NULL;
+    m_eval_lazy_updates[m_n_eval_lazy_updates++] = MOVE_NULL;
+    m_complexity_lazy_updates[m_n_complexity_lazy_updates++] = MOVE_NULL;
 }
 
 void Evaluation::on_undo_null_move(const Board& board) {
-    if (m_n_lazy_updates == 0) {
-        apply_undo_null_move();
+    if (m_n_eval_lazy_updates != 0) {
+        --m_n_eval_lazy_updates;
     }
-    else {
-        m_n_lazy_updates--;
+    if (m_n_complexity_lazy_updates != 0) {
+        --m_n_complexity_lazy_updates;
     }
 }
 
-void Evaluation::apply_make_move(Move move) {
-    Color moved_color = m_ctm;
-    m_ctm = opposite_color(m_ctm);
-    for (auto& nnue: m_nnues) {
-        nnue.push_accumulator();
+template <typename Network>
+static void update_move_features(Network& nnue, Move move) {
+    Color moved_color = move.source_piece().color();
+    switch (move.type()) {
+        case MT_EN_PASSANT:
+            nnue.template update_features<1, 2>(
+                    {move.destination()},
+                    {move.source_piece()},
+                    {move.source(), move.destination() - pawn_push_direction(moved_color)},
+                    {move.source_piece(), Piece(opposite_color(moved_color), PT_PAWN)});
+            break;
+        case MT_CASTLES:
+            nnue.template update_features<2, 2>(
+                    {castled_rook_square(moved_color, move.castles_side()), move.destination()},
+                    {Piece(moved_color, PT_ROOK), move.source_piece()},
+                    {move.castles_rook_src_square(), move.source()},
+                    {Piece(moved_color, PT_ROOK), move.source_piece()});
+            break;
+        case MT_PROMOTION_CAPTURE:
+            nnue.template update_features<1, 2>(
+                    {move.destination()},
+                    {Piece(moved_color, move.promotion_piece_type())},
+                    {move.source(), move.destination()},
+                    {move.source_piece(), move.captured_piece()});
+            break;
+        case MT_SIMPLE_CAPTURE:
+            nnue.template update_features<1, 2>(
+                    {move.destination()},
+                    {move.source_piece()},
+                    {move.source(), move.destination()},
+                    {move.source_piece(), move.captured_piece()});
+            break;
+        case MT_SIMPLE_PROMOTION:
+            nnue.template update_features<1, 1>(
+                    {move.destination()},
+                    {Piece(moved_color, move.promotion_piece_type())},
+                    {move.source()},
+                    {move.source_piece()});
+            break;
+        default:
+            nnue.template update_features<1, 1>(
+                    {move.destination()},
+                    {move.source_piece()},
+                    {move.source()},
+                    {move.source_piece()});
+            break;
+    }
+}
 
-        switch (move.type()) {
-            case MT_EN_PASSANT:
-                nnue.update_features<1, 2>(
-                        {move.destination()},
-                        {move.source_piece()},
-                        {move.source(), move.destination() - pawn_push_direction(moved_color)},
-                        {move.source_piece(), Piece(m_ctm, PT_PAWN)});
-                break;
-            case MT_CASTLES:
-                nnue.update_features<2, 2>(
-                        {castled_rook_square(moved_color, move.castles_side()), move.destination()},
-                        {Piece(moved_color, PT_ROOK), move.source_piece()},
-                        {move.castles_rook_src_square(), move.source()},
-                        {Piece(moved_color, PT_ROOK), move.source_piece()});
-                break;
-            case MT_PROMOTION_CAPTURE:
-                nnue.update_features<1, 2>(
-                        {move.destination()},
-                        {Piece(moved_color, move.promotion_piece_type())},
-                        {move.source(), move.destination()},
-                        {move.source_piece(), move.captured_piece()});
-                break;
-            case MT_SIMPLE_CAPTURE:
-                nnue.update_features<1, 2>(
-                        {move.destination()},
-                        {move.source_piece()},
-                        {move.source(), move.destination()},
-                        {move.source_piece(), move.captured_piece()});
-                break;
-            case MT_SIMPLE_PROMOTION:
-                nnue.update_features<1, 1>(
-                        {move.destination()},
-                        {Piece(moved_color, move.promotion_piece_type())},
-                        {move.source()},
-                        {move.source_piece()});
-                break;
-            default:
-                nnue.update_features<1, 1>(
-                        {move.destination()},
-                        {move.source_piece()},
-                        {move.source()},
-                        {move.source_piece()});
-                break;
+template <typename Network>
+static void apply_pending_updates(Network& nnue, const std::array<Move, MAX_DEPTH>& updates,
+                                  size_t& count) {
+    for (size_t i = 0; i < count; ++i) {
+        Move move = updates[i];
+        if (move != MOVE_NULL) {
+            nnue.push_accumulator();
+            update_move_features(nnue, move);
         }
     }
+    count = 0;
 }
 
-void Evaluation::apply_undo_move(Move move) {
-    m_ctm = opposite_color(m_ctm);
-    for (auto& nnue: m_nnues) {
-        nnue.pop_accumulator();
-    }
+void Evaluation::apply_eval_lazy_updates() {
+    apply_pending_updates(m_eval_nnue, m_eval_lazy_updates, m_n_eval_lazy_updates);
 }
 
-void Evaluation::apply_make_null_move() {
-    m_ctm = opposite_color(m_ctm);
-}
-
-void Evaluation::apply_undo_null_move() {
-    m_ctm = opposite_color(m_ctm);
+void Evaluation::apply_complexity_lazy_updates() {
+    apply_pending_updates(m_complexity_nnue, m_complexity_lazy_updates,
+                          m_n_complexity_lazy_updates);
 }
 
 Score Evaluation::compute(const Board& board) {
-    apply_lazy_updates();
-    return std::clamp(m_nnues[0].forward(m_ctm, popcount(board.occupancy())), -KNOWN_WIN + 1, KNOWN_WIN - 1);
+    apply_eval_lazy_updates();
+    return std::clamp(m_eval_nnue.forward(board.color_to_move(), popcount(board.occupancy())), -KNOWN_WIN + 1, KNOWN_WIN - 1);
 }
 
 int Evaluation::complexity(const Board& board) {
-    apply_lazy_updates();
-    return std::clamp(m_nnues[1].forward(m_ctm, popcount(board.occupancy())), 0, 16384);
+    apply_complexity_lazy_updates();
+    return std::clamp(m_complexity_nnue.forward(board.color_to_move(), popcount(board.occupancy())), 0, 16384);
 }
 
 

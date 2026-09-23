@@ -21,18 +21,16 @@ public:
     void on_make_null_move(const Board& board);
     void on_undo_null_move(const Board& board);
 
-    void apply_lazy_updates();
-
 private:
-    std::array<NNUE, 2> m_nnues { NNUE(false), NNUE(true) };
-    Color m_ctm;
-    std::array<Move, MAX_DEPTH> m_lazy_updates;
-    size_t m_n_lazy_updates = 0;
+    EvaluationNNUE m_eval_nnue { default_eval_network(), 400 };
+    ComplexityNNUE m_complexity_nnue { default_complexity_network(), 16384 };
+    std::array<Move, MAX_DEPTH> m_eval_lazy_updates;
+    std::array<Move, MAX_DEPTH> m_complexity_lazy_updates;
+    size_t m_n_eval_lazy_updates = 0;
+    size_t m_n_complexity_lazy_updates = 0;
 
-    void apply_make_move(Move move);
-    void apply_undo_move(Move move);
-    void apply_make_null_move();
-    void apply_undo_null_move();
+    void apply_eval_lazy_updates();
+    void apply_complexity_lazy_updates();
 };
 
 Score normalize_score(Score score, const Board& board);

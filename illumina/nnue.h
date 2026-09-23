@@ -11,23 +11,31 @@
 namespace illumina {
 
 static constexpr size_t N_INPUTS = 768;
-static constexpr size_t L1_SIZE  = 768;
-static constexpr size_t OUTPUT_BUCKETS = 2;
+static constexpr size_t EVAL_L1_SIZE = 768;
+static constexpr size_t EVAL_BUCKETS = 2;
+static constexpr size_t COMPLEXITY_L1_SIZE = 512;
+static constexpr size_t COMPLEXITY_BUCKETS = 1;
 
+template <size_t L1_SIZE, size_t N_BUCKETS>
 struct EvalNetwork {
     alignas(64) std::array<i16, N_INPUTS * L1_SIZE> l1_weights;
     alignas(64) std::array<i16, L1_SIZE> l1_biases;
-    alignas(64) std::array<i16, OUTPUT_BUCKETS * L1_SIZE * 2> output_weights;
-    std::array<i16, OUTPUT_BUCKETS> output_biases;
+    alignas(64) std::array<i16, N_BUCKETS * L1_SIZE * 2> output_weights;
+    std::array<i16, N_BUCKETS> output_biases;
 };
 
+template <size_t L1_SIZE>
 struct Accumulator {
     alignas(64) std::array<i16, L1_SIZE> white {};
     alignas(64) std::array<i16, L1_SIZE> black {};
 };
 
+template <size_t L1_SIZE, size_t N_BUCKETS>
 class NNUE {
 public:
+    static_assert(L1_SIZE > 0 && L1_SIZE % 32 == 0);
+    static_assert(N_BUCKETS > 0);
+
     void clear();
     void push_accumulator();
     void pop_accumulator();
@@ -43,25 +51,27 @@ public:
 
     int forward(Color color, size_t piece_count) const;
 
-    explicit NNUE(bool complexity = false);
+    NNUE(const EvalNetwork<L1_SIZE, N_BUCKETS>* net, int scale);
 
 private:
-    const i16* m_weights;
-    const i16* m_biases;
-    const i16* m_output_weights;
-    const i16* m_output_biases;
-    size_t m_l1_size;
-    size_t m_output_buckets;
+    const EvalNetwork<L1_SIZE, N_BUCKETS>* m_net;
     int m_scale;
-    Accumulator m_accum {};
-    std::vector<Accumulator> m_accum_stack;
+    Accumulator<L1_SIZE> m_accum {};
+    std::vector<Accumulator<L1_SIZE>> m_accum_stack;
 
     template <Color C>
     static size_t feature_index(Square square, Piece piece);
 };
 
+using EvaluationNNUE = NNUE<EVAL_L1_SIZE, EVAL_BUCKETS>;
+using ComplexityNNUE = NNUE<COMPLEXITY_L1_SIZE, COMPLEXITY_BUCKETS>;
+
+const EvalNetwork<EVAL_L1_SIZE, EVAL_BUCKETS>* default_eval_network();
+const EvalNetwork<COMPLEXITY_L1_SIZE, COMPLEXITY_BUCKETS>* default_complexity_network();
+
+template <size_t L1_SIZE, size_t N_BUCKETS>
 template <Color C>
-size_t NNUE::feature_index(Square square, Piece piece) {
+size_t NNUE<L1_SIZE, N_BUCKETS>::feature_index(Square square, Piece piece) {
     Color color     = piece.color();
     size_t type_idx = piece.type() - 1;
 
@@ -77,8 +87,9 @@ size_t NNUE::feature_index(Square square, Piece piece) {
     return index;
 }
 
+template <size_t L1_SIZE, size_t N_BUCKETS>
 template <int N_ENABLED, int N_DISABLED>
-void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
+void NNUE<L1_SIZE, N_BUCKETS>::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
                            const std::array<Piece, N_ENABLED>& enabled_pieces,
                            const std::array<Square, N_DISABLED>& disabled_squares,
                            const std::array<Piece, N_DISABLED>& disabled_pieces) {
@@ -100,14 +111,14 @@ void NNUE::update_features(const std::array<Square, N_ENABLED>& enabled_squares,
     }
 
     auto update = [this](auto& accum, const auto& enabled, const auto& disabled) {
-        for (size_t i = 0; i < m_l1_size; i += SimdVecI16::STRIDE) {
+        for (size_t i = 0; i < L1_SIZE; i += SimdVecI16::STRIDE) {
             SimdVecI16 value = SimdVecI16::load_aligned(&accum[i]);
 
             for (size_t index : enabled) {
-                value += SimdVecI16::load_aligned(&m_weights[index * m_l1_size + i]);
+                value += SimdVecI16::load_aligned(&m_net->l1_weights[index * L1_SIZE + i]);
             }
             for (size_t index : disabled) {
-                value -= SimdVecI16::load_aligned(&m_weights[index * m_l1_size + i]);
+                value -= SimdVecI16::load_aligned(&m_net->l1_weights[index * L1_SIZE + i]);
             }
 
             value.store_aligned(&accum[i]);
