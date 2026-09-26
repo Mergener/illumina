@@ -316,10 +316,6 @@ std::string Board::pretty() const {
 }
 
 void Board::make_move(Move move) {
-    if (m_listener.on_make_move) {
-        m_listener.on_make_move(*this, move);
-    }
-
     Color moving_color  = color_to_move();
     Color opponent      = opposite_color(color_to_move());
     Square source       = move.source();
@@ -414,9 +410,6 @@ void Board::make_move(Move move) {
 
 void Board::undo_move() {
     Move move = last_move();
-    if (m_listener.on_undo_move) {
-        m_listener.on_undo_move(*this, move);
-    }
 
     set_color_to_move(opposite_color(color_to_move()));
     Color moving_color = color_to_move();
@@ -521,10 +514,6 @@ bool Board::is_attacked_by(Color c, Square s, Bitboard occ) const {
 }
 
 void Board::make_null_move() {
-    if (m_listener.on_make_null_move) {
-        m_listener.on_make_null_move(*this);
-    }
-
     m_prev_states.push_back(m_state);
 
     m_state.last_move = MOVE_NULL;
@@ -536,10 +525,6 @@ void Board::make_null_move() {
 }
 
 void Board::undo_null_move() {
-    if (m_listener.on_undo_null_move) {
-        m_listener.on_undo_null_move(*this);
-    }
-
     set_color_to_move(opposite_color(color_to_move()));
 
     m_state = m_prev_states.back();
@@ -820,10 +805,6 @@ void Board::compute_checkers() {
     m_state.n_checkers = popcount(checkers);
 }
 
-void Board::set_listener(BoardListener listener) {
-    m_listener = std::move(listener);
-}
-
 Board Board::standard_startpos() {
     return Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
@@ -1094,8 +1075,7 @@ Board::Board(const illumina::Board &rhs)
           m_base_ply_count(rhs.m_base_ply_count),
           m_castle_rook_squares(rhs.m_castle_rook_squares),
           m_prev_states(rhs.m_prev_states),
-          m_state(rhs.m_state),
-          m_listener({}) { }
+          m_state(rhs.m_state) { }
 
 Board& Board::operator=(const illumina::Board &rhs) {
     if (this != &rhs) {
@@ -1109,8 +1089,6 @@ Board& Board::operator=(const illumina::Board &rhs) {
         m_castle_rook_squares = rhs.m_castle_rook_squares;
         m_state               = rhs.m_state;
         m_prev_states         = rhs.m_prev_states;
-
-        m_listener = {};
     }
     return *this;
 }
@@ -1125,7 +1103,6 @@ Board::Board(Board&& rhs) noexcept
       m_base_ply_count(rhs.m_base_ply_count),
       m_castle_rook_squares(rhs.m_castle_rook_squares),
       m_prev_states(std::move(rhs.m_prev_states)),
-      m_state(rhs.m_state),
-      m_listener(std::move(rhs.m_listener)) { }
+      m_state(rhs.m_state) { }
 
 } // illumina

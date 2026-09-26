@@ -217,22 +217,16 @@ private:
     Score draw_score() const;
 
     template <bool TRACE>
-    void on_make_move(const Board& board, Move move);
+    void make_move(Move move);
 
     template <bool TRACE>
-    void on_undo_move(const Board& board, Move move);
+    void undo_move();
 
     template <bool TRACE>
-    void on_make_null_move(const Board& board);
+    void make_null_move();
 
     template <bool TRACE>
-    void on_undo_null_move(const Board& board);
-
-    template <bool TRACE>
-    void on_piece_added(const Board& board, Piece p, Square s);
-
-    template <bool TRACE>
-    void on_piece_removed(const Board& board, Piece p, Square s);
+    void undo_null_move();
 
     void check_limits();
     bool tracing() const;
@@ -745,10 +739,10 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         && stack_node->skip_move == MOVE_NULL) {
         Depth reduction = depth / 3 + 4;
 
-        m_board.make_null_move();
+        make_null_move<TRACE_MODE>();
         Score score = -negamax<TRACE_MODE, ZWS, FLAGS, SKIP_NMP>(depth - reduction, -beta, -beta + 1, stack_node + 1, false);
         TRACE_SET(Traceable::SCORE, -score);
-        m_board.undo_null_move();
+        undo_null_move<TRACE_MODE>();
 
         if (score >= beta) {
             tt.try_store(board_key, ply, MOVE_NULL, score, depth, static_eval, BT_LOWERBOUND, ttpv);
@@ -783,14 +777,14 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 continue;
             }
 
-            m_board.make_move(move);
+            make_move<TRACE_MODE>(move);
             Score pc_score = -quiescence_search<TRACE_MODE, ZWS>(ply + 1, -pc_beta, -pc_beta + 1);
             if (pc_score >= pc_beta) {
                 TRACE_PUSH_SIBLING();
                 pc_score = -negamax<TRACE_MODE, ZWS, FLAGS>(pc_depth, -pc_beta, -pc_beta + 1, stack_node + 1, !cut_node);
                 TRACE_POP();
             }
-            m_board.undo_move();
+            undo_move<TRACE_MODE>();
             if (pc_score >= pc_beta) {
                 tt.try_store(m_board.hash_key(), ply, move, pc_score, pc_depth, static_eval, BT_LOWERBOUND, ttpv);
                 return pc_score;
@@ -950,7 +944,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 bit_is_set(threats, move.destination()));
         }
 
-        m_board.make_move(move);
+        make_move<TRACE_MODE>(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
 
         // Late move reductions.
@@ -1011,7 +1005,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
         }
 
-        m_board.undo_move();
+        undo_move<TRACE_MODE>();
 
         if (move.is_quiet()) {
             played_quiets.push_back(move);
@@ -1232,11 +1226,11 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             continue;
         }
 
-        m_board.make_move(move);
+        make_move<TRACE_MODE>(move);
         TRACE_SET(Traceable::LAST_MOVE_SCORE, move.value());
         Score score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -beta, -alpha);
         TRACE_SET(Traceable::SCORE, -score);
-        m_board.undo_move();
+        undo_move<TRACE_MODE>();
 
         if (score > best_score) {
             best_score = score;
@@ -1395,34 +1389,38 @@ Score SearchWorker::draw_score() const {
 }
 
 template <bool TRACING>
-void SearchWorker::on_make_move(const illumina::Board& board, illumina::Move move) {
+void SearchWorker::make_move(illumina::Move move) {
     TRACE_PUSH();
     m_nodes++;
-    m_context->tt().prefetch(board.estimate_hash_key_after(move));
-    m_eval.on_make_move(board, move);
+    m_context->tt().prefetch(m_board.estimate_hash_key_after(move));
+    m_eval.on_make_move(m_board, move);
+    m_board.make_move(move);
 }
 
 template <bool TRACING>
-void SearchWorker::on_undo_move(const illumina::Board& board, illumina::Move move) {
+void SearchWorker::undo_move() {
     TRACE_POP();
-    m_eval.on_undo_move(board, move);
+    m_eval.on_undo_move(m_board, m_board.last_move());
+    m_board.undo_move();
 }
 
 template <bool TRACING>
-void SearchWorker::on_make_null_move(const illumina::Board& board) {
+void SearchWorker::make_null_move() {
     TRACE_PUSH();
     m_nodes++;
-    m_context->tt().prefetch(board.estimate_hash_key_after_null_move());
-    m_eval.on_make_null_move(board);
+    m_context->tt().prefetch(m_board.estimate_hash_key_after_null_move());
+    m_eval.on_make_null_move(m_board);
 
     TRACE_SET(Traceable::LAST_MOVE, MOVE_NULL);
     TRACE_SET(Traceable::LAST_MOVE_RAW, MOVE_NULL.raw());
+    m_board.make_null_move();
 }
 
 template <bool TRACING>
-void SearchWorker::on_undo_null_move(const illumina::Board& board) {
+void SearchWorker::undo_null_move() {
     TRACE_POP();
-    m_eval.on_undo_null_move(board);
+    m_eval.on_undo_null_move(m_board);
+    m_board.undo_null_move();
 }
 
 bool SearchWorker::should_stop() const {
@@ -1458,22 +1456,6 @@ SearchWorker::SearchWorker(bool main,
           m_eval_random_seed(settings->eval_rand_seed),
           m_board(board) {
     m_eval.on_new_board(m_board);
-
-    // Dispatch board callbacks to Worker's methods.
-    BoardListener board_listener {};
-    if (!main || settings->tracer == nullptr) {
-        board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move<false>(b); };
-        board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move<false>(b); };
-        board_listener.on_make_move = [this](const Board& b, Move m) { on_make_move<false>(b, m); };
-        board_listener.on_undo_move = [this](const Board& b, Move m) { on_undo_move<false>(b, m); };
-    }
-    else {
-        board_listener.on_make_null_move = [this](const Board& b) { on_make_null_move<true>(b); };
-        board_listener.on_undo_null_move = [this](const Board& b) { on_undo_null_move<true>(b); };
-        board_listener.on_make_move = [this](const Board& b, Move m) { on_make_move<true>(b, m); };
-        board_listener.on_undo_move = [this](const Board& b, Move m) { on_undo_move<true>(b, m); };
-    }
-    m_board.set_listener(board_listener);
 }
 
 bool SearchWorker::tracing() const {
