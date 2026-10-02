@@ -865,6 +865,17 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 }
             }
 
+            // Capture pruning
+            if (!PV_NODE
+                && !in_check
+                && depth <= 2
+                && found_in_tt
+                && tt_entry.depth() <= 0
+                && tt_entry.bound_type() != BT_UPPERBOUND
+                && tt_entry.move() == MOVE_NULL) {
+                continue;
+            }
+
             Color them = opposite_color(m_board.color_to_move());
 
             const auto no_discovered_attacks = [&]() {
