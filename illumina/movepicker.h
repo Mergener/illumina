@@ -454,6 +454,7 @@ void MovePicker<QUIESCE>::score_move(SearchMove& move) {
         // Adjust score based on move history.
         move.add_value(
             m_mv_hist->quiet_history(
+                *m_board,
                 move,
                 m_board->last_move(),
                 bit_is_set(m_threats, move.source()),
