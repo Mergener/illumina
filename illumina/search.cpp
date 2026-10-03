@@ -617,7 +617,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             || (m_board.rule50() >= 100)
             || m_board.is_insufficient_material_draw())) {
         return draw_score();
-            }
+    }
 
     // Dive into the quiescence search when depth becomes zero.
     if (depth <= 0) {
