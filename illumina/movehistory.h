@@ -16,7 +16,7 @@ static constexpr size_t CORRHIST_ENTRIES = 16384;
 static constexpr int CORRHIST_GRAIN = 256;
 static constexpr int CORRHIST_BASE_WEIGHT = 1024;
 static constexpr int MAX_CORRHIST = 16384;
-static constexpr int PAWN_HIST_SIZE = 16384;
+static constexpr int PAWN_HIST_SIZE = 8192;
 
 template <typename T>
 struct ButterflyArray : std::array<std::array<T, SQ_COUNT>, SQ_COUNT> {
@@ -77,7 +77,7 @@ private:
     std::array<std::array<PieceToArray<i16>, 2>, 2> m_threat_history {};
     PieceToArray<PieceToArray<i16>> m_counter_move_history {};
     PieceToArray<std::array<i16, PT_COUNT - 2>> m_capt_hist {};
-    std::array<PieceToArray<i16>, PAWN_HIST_SIZE> m_pawn_hist {};
+    std::array<ButterflyArray<i16>, PAWN_HIST_SIZE> m_pawn_hist {};
 
     void update_corrhist_entry(CorrhistTable& table,
                                ui64 key,
