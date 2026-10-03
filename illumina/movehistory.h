@@ -16,6 +16,7 @@ static constexpr size_t CORRHIST_ENTRIES = 16384;
 static constexpr int CORRHIST_GRAIN = 256;
 static constexpr int CORRHIST_BASE_WEIGHT = 1024;
 static constexpr int MAX_CORRHIST = 16384;
+static constexpr int PAWN_HIST_SIZE = 16384;
 
 template <typename T>
 struct ButterflyArray : std::array<std::array<T, SQ_COUNT>, SQ_COUNT> {
@@ -54,8 +55,9 @@ public:
     int correct_eval_with_corrhist(const Board& board,
                                    int static_eval) const;
 
-    int quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const;
-    void update_quiet_history(Move move,
+    int quiet_history(const Board& board, Move move, Move last_move, bool threatened_from, bool threatened_to) const;
+    void update_quiet_history(const Board& board,
+                              Move move,
                               Move last_move,
                               Depth depth,
                               bool good, bool threatened_from, bool threatened_to);
@@ -75,6 +77,7 @@ private:
     std::array<std::array<PieceToArray<i16>, 2>, 2> m_threat_history {};
     PieceToArray<PieceToArray<i16>> m_counter_move_history {};
     PieceToArray<std::array<i16, PT_COUNT - 2>> m_capt_hist {};
+    std::array<PieceToArray<i16>, PAWN_HIST_SIZE> m_pawn_hist {};
 
     void update_corrhist_entry(CorrhistTable& table,
                                ui64 key,
@@ -140,14 +143,15 @@ inline void MoveHistory::age() {
     }
 }
 
-inline int MoveHistory::quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const {
-    return int(
-               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_butterfly.get(move) / 1024)
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_counter_move_history.get(last_move).get(move) / 1024)
-             + i64(MV_HIST_THREAT_QHIST_WEIGHT) * m_threat_history[threatened_from][threatened_to].get(move) / 1024);
+inline int MoveHistory::quiet_history(const Board& board, Move move, Move last_move, bool threatened_from, bool threatened_to) const {
+    return MV_HIST_REGULAR_QHIST_WEIGHT * m_butterfly.get(move) / 1024
+           + MV_HIST_COUNTER_MOVE_WEIGHT  * m_counter_move_history.get(last_move).get(move) / 1024
+           + MV_HIST_THREAT_QHIST_WEIGHT * m_threat_history[threatened_from][threatened_to].get(move) / 1024
+           + MV_HIST_PAWN_QHIST_WEIGHT * m_pawn_hist[board.pawn_key() & (PAWN_HIST_SIZE - 1)].get(move) / 1024;
 }
 
-inline void MoveHistory::update_quiet_history(Move move,
+inline void MoveHistory::update_quiet_history(const Board& board,
+                                              Move move,
                                               Move last_move,
                                               Depth depth,
                                               bool good,
@@ -155,6 +159,7 @@ inline void MoveHistory::update_quiet_history(Move move,
                                               bool threatened_to) {
     update_history_by_depth(m_butterfly.get(move), depth, good);
     update_history_by_depth(m_threat_history[threatened_from][threatened_to].get(move), depth, good);
+    update_history_by_depth(m_pawn_hist[board.pawn_key() & (PAWN_HIST_SIZE - 1)].get(move), depth, good);
     if (last_move != MOVE_NULL) {
         update_history_by_depth(m_counter_move_history.get(last_move).get(move), depth, good);
     }

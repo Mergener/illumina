@@ -938,6 +938,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         int move_history = 0;
         if (move.is_quiet()) {
             move_history = m_hist->quiet_history(
+                m_board,
                 move,
                 m_board.last_move(),
                 bit_is_set(threats, move.source()),
@@ -1035,7 +1036,8 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 m_hist->set_killer(ply, move);
 
                 for (Move quiet: played_quiets) {
-                    m_hist->update_quiet_history(quiet,
+                    m_hist->update_quiet_history(m_board,
+                                                quiet,
                                                 m_board.last_move(),
                                                 depth,
                                                 quiet == best_move,
