@@ -728,6 +728,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         }
     }
 
+    // Dive into the quiescence search when depth becomes zero.
+    if (depth <= 0) {
+        Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
+        TRACE_SET(Traceable::SCORE, score);
+        return score;
+    }
+
     // Null move pruning.
     if (   !PV_NODE
         && !SKIPPING_NMP
@@ -791,13 +798,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             }
             pc_searched_moves++;
         }
-    }
-
-    // Dive into the quiescence search when depth becomes zero.
-    if (depth <= 0) {
-        Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
-        TRACE_SET(Traceable::SCORE, score);
-        return score;
     }
 
     // Kickstart our curr move counter for later reporting.
