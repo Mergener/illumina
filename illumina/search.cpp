@@ -619,14 +619,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         return draw_score();
     }
 
-    // Dive into the quiescence search when depth becomes zero.
-    Depth ply = stack_node->ply;
-    if (depth <= 0) {
-        Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
-        TRACE_SET(Traceable::SCORE, score);
-        return score;
-    }
-
     // Setup some important values.
     TranspositionTable& tt = m_context->tt();
     ui64 board_key         = m_board.hash_key();
@@ -635,6 +627,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     Move hash_move         = MOVE_NULL;
     bool in_check          = m_board.in_check();
     Color us               = m_board.color_to_move();
+    Depth ply              = stack_node->ply;
     Score& static_eval     = stack_node->static_eval;
 
     // Probe from transposition table. This will allow us
@@ -733,6 +726,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         if (alpha >= beta) {
             return beta;
         }
+    }
+
+    // Dive into the quiescence search when depth becomes zero.
+    if (depth <= 0) {
+        Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
+        TRACE_SET(Traceable::SCORE, score);
+        return score;
     }
 
     // Null move pruning.
