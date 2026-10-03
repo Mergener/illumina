@@ -617,6 +617,13 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             || (m_board.rule50() >= 100)
             || m_board.is_insufficient_material_draw())) {
         return draw_score();
+            }
+
+    // Dive into the quiescence search when depth becomes zero.
+    if (depth <= 0) {
+        Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
+        TRACE_SET(Traceable::SCORE, score);
+        return score;
     }
 
     // Setup some important values.
@@ -726,13 +733,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         if (alpha >= beta) {
             return beta;
         }
-    }
-
-    // Dive into the quiescence search when depth becomes zero.
-    if (depth <= 0) {
-        Score score = quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply, alpha, beta);
-        TRACE_SET(Traceable::SCORE, score);
-        return score;
     }
 
     // Null move pruning.
