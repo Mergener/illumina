@@ -737,7 +737,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         && static_eval >= beta
         && depth >= NMP_MIN_DEPTH
         && stack_node->skip_move == MOVE_NULL) {
-        Depth reduction = depth / 3 + 4;
+        Depth reduction = depth / 3 + 4 + improving;
 
         make_null_move<TRACE_MODE>();
         Score score = -negamax<TRACE_MODE, ZWS, FLAGS, SKIP_NMP>(depth - reduction, -beta, -beta + 1, stack_node + 1, false);
