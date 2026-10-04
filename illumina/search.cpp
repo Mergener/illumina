@@ -1032,7 +1032,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
                 m_hist->update_capture_history(capt, depth, capt == best_move);
             }
             if (move.is_quiet()) {
-                m_hist->set_killer(ply, move);
+                if (score >= beta + KILLER_MOVE_MARGIN) {
+                    m_hist->set_killer(ply, move);
+                }
 
                 for (Move quiet: played_quiets) {
                     m_hist->update_quiet_history(quiet,
