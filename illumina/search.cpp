@@ -1176,10 +1176,6 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     bool found_in_tt = tt.probe(m_board.hash_key(), tt_entry);
     if (found_in_tt
         && tt_entry.move() != MOVE_NULL) {
-        // On multithreaded searches, race conditions might make it so
-        // that the TT move is invalid. The following check loses elo
-        // on single threaded searches (~-2), so we only do it if we're
-        // running SMP.
         if ((!m_board.is_move_pseudo_legal(tt_entry.move())
              || !m_board.is_move_legal(tt_entry.move()))) {
             found_in_tt = false;
