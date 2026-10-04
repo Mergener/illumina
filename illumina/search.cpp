@@ -1215,7 +1215,13 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     SearchMove move;
     SearchMove best_move;
     Score best_score = stand_pat;
+    int moves_searched = 0;
     while ((move = move_picker.next()) != MOVE_NULL) {
+        if (found_in_tt
+            && moves_searched > 2) {
+            break;
+        }
+
         // SEE pruning.
         if (   move_picker.stage() >= MPS_BAD_CAPTURES
             && !has_good_see(m_board, move.source(), move.destination(), QSEE_PRUNING_THRESHOLD)) {
@@ -1227,6 +1233,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
         Score score = -quiescence_search<TRACE_MODE, SEARCH_TYPE>(ply + 1, -beta, -alpha);
         TRACE_SET(Traceable::SCORE, -score);
         undo_move<TRACE_MODE>();
+        moves_searched++;
 
         if (score > best_score) {
             best_score = score;
