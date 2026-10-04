@@ -729,7 +729,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     }
 
     // Null move pruning.
-    if (   !PV_NODE
+    if (   cut_node
         && !SKIPPING_NMP
         && !in_check
         && non_pawn_bb(m_board) != 0
