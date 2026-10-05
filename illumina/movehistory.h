@@ -142,9 +142,9 @@ inline void MoveHistory::age() {
 
 inline int MoveHistory::quiet_history(Move move, Move last_move, bool threatened_from, bool threatened_to) const {
     return int(
-               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_butterfly.get(move))
-             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_counter_move_history.get(last_move).get(move))
-             + i64(MV_HIST_THREAT_QHIST_WEIGHT) * m_threat_history[threatened_from][threatened_to].get(move));
+               i64(MV_HIST_REGULAR_QHIST_WEIGHT * m_butterfly.get(move) / 1024)
+             + i64(MV_HIST_COUNTER_MOVE_WEIGHT  * m_counter_move_history.get(last_move).get(move) / 1024)
+             + i64(MV_HIST_THREAT_QHIST_WEIGHT) * m_threat_history[threatened_from][threatened_to].get(move) / 1024);
 }
 
 inline void MoveHistory::update_quiet_history(Move move,
