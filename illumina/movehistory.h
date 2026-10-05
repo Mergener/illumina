@@ -234,9 +234,7 @@ inline int MoveHistory::correct_eval_with_corrhist(const Board& board,
 inline void MoveHistory::update_history_by_depth(i16& history,
                                                  Depth depth,
                                                  bool good) {
-    int delta = (depth < MV_HIST_QUIET_HIGH_DEPTH_THRESHOLD)
-              ? (depth * depth)
-              : (MV_HIST_QUIET_HIGH_DEPTH_FACTOR * depth * depth);
+    int delta = depth * depth;
     int sign  = good ? 1 : -1;
     update_history(history, sign * delta);
 }
