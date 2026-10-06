@@ -13,16 +13,6 @@
 
 namespace illumina {
 
-/**
- * Listens to changes made to a board object.
- */
-struct BoardListener {
-    std::function<void(const Board& board, Move move)> on_make_move = nullptr;
-    std::function<void(const Board& board, Move move)> on_undo_move = nullptr;
-    std::function<void(const Board& board)> on_make_null_move = nullptr;
-    std::function<void(const Board& board)> on_undo_null_move = nullptr;
-};
-
 constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
 
 enum class BoardOutcome {
@@ -106,8 +96,6 @@ public:
     bool is_move_pseudo_legal(Move move) const;
     bool is_move_legal(Move move) const;
 
-    void set_listener(BoardListener listener);
-
     template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
     Square first_attacker_of(Color c, Square s) const;
 
@@ -167,7 +155,6 @@ private:
     };
 
     std::vector<State> m_prev_states;
-    BoardListener m_listener {};
 
     int m_base_ply_count = 0; // Gets added by m_prev_states.size()
 
