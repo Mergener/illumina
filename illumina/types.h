@@ -9,12 +9,9 @@
 #include "debug.h"
 
 //
-// The following headers contain required intrinsics to manipulate bits on a bitboard.
-// We conditionally include them based on the compiler we're using.
+// MSVC requires this header for bitboard intrinsics; GCC and Clang use builtins.
 //
-#ifdef __GNUC__
-#include <cpuid.h>
-#elif defined(_MSC_VER)
+#ifdef _MSC_VER
 #include <intrin.h>
 #pragma intrinsic(_BitScanForward64)
 #pragma intrinsic(_BitScanReverse64)
