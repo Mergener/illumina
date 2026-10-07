@@ -101,7 +101,15 @@ if (   CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
 endif()
 
 # Define our supported architectures here.
-set(ARCHS x64_avx512 x64_bmi2 x64_avx2 x64_sse2 x64_base)
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" TARGET_PROCESSOR)
+if(TARGET_PROCESSOR MATCHES "^(x86_64|amd64|x64)$")
+    set(ARCHS x64_avx512 x64_bmi2 x64_avx2 x64_sse2 x64_base)
+elseif(TARGET_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(ARCHS arm64_neon)
+else()
+    message(FATAL_ERROR
+            "Unsupported target architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 
 # General setup.
 include_directories(${CMAKE_SOURCE_DIR}/ext/include)
@@ -132,6 +140,8 @@ function(apply_arch_options TARGET ARCH)
         endif()
     elseif(${ARCH} STREQUAL x64_base)
         # Do nothing
+    elseif(${ARCH} STREQUAL arm64_neon)
+        target_compile_definitions(${TARGET} PRIVATE NEON)
     else()
         message("Unsupported architecture ${ARCH}")
     endif()
