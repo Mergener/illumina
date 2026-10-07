@@ -13,14 +13,12 @@ namespace illumina {
 
 class Evaluation {
 public:
-    Score compute();
+    Score compute(const Board& board);
     void on_new_board(const Board& board);
     void on_make_move(const Board& board, Move move);
     void on_undo_move(const Board& board, Move move);
     void on_make_null_move(const Board& board);
     void on_undo_null_move(const Board& board);
-    void on_piece_added(const Board& board, Piece , Square s);
-    void on_piece_removed(const Board& board, Piece p, Square s);
 
     void apply_lazy_updates();
 

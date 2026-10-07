@@ -1,48 +1,47 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
 #include "staticlist.h"
 
-using namespace litetest;
 using namespace illumina;
 
-TEST_SUITE(StaticList);
+TEST_SUITE_BEGIN("StaticList");
 
-TEST_CASE(StaticListConstructor) {
+TEST_CASE("StaticListConstructor") {
     StaticList<int, 5> int_list;
 
-    EXPECT(int_list.empty()).to_be(true);
-    EXPECT(int_list.full()).to_be(false);
-    EXPECT(int_list.size()).to_be(0);
-    EXPECT(int_list.capacity()).to_be(5);
+    REQUIRE_EQ(int_list.empty(), true);
+    REQUIRE_EQ(int_list.full(), false);
+    REQUIRE_EQ(int_list.size(), 0);
+    REQUIRE_EQ(int_list.capacity(), 5);
 }
 
-TEST_CASE(StaticListPushBackAndSize) {
-    StaticList<int, 5> int_list;
-
-    int_list.push_back(1);
-    int_list.push_back(2);
-    int_list.push_back(3);
-
-    EXPECT(int_list.empty()).to_be(false);
-    EXPECT(int_list.full()).to_be(false);
-    EXPECT(int_list.size()).to_be(3);
-    EXPECT(int_list.capacity()).to_be(5);
-}
-
-TEST_CASE(StaticListAccessors) {
+TEST_CASE("StaticListPushBackAndSize") {
     StaticList<int, 5> int_list;
 
     int_list.push_back(1);
     int_list.push_back(2);
     int_list.push_back(3);
 
-
-    EXPECT(int_list[0]).to_be(1);
-    EXPECT(int_list.at(1)).to_be(2);
-    EXPECT(int_list[2]).to_be(3);
+    REQUIRE_EQ(int_list.empty(), false);
+    REQUIRE_EQ(int_list.full(), false);
+    REQUIRE_EQ(int_list.size(), 3);
+    REQUIRE_EQ(int_list.capacity(), 5);
 }
 
-TEST_CASE(StaticListPopBack) {
+TEST_CASE("StaticListAccessors") {
+    StaticList<int, 5> int_list;
+
+    int_list.push_back(1);
+    int_list.push_back(2);
+    int_list.push_back(3);
+
+
+    REQUIRE_EQ(int_list[0], 1);
+    REQUIRE_EQ(int_list.at(1), 2);
+    REQUIRE_EQ(int_list[2], 3);
+}
+
+TEST_CASE("StaticListPopBack") {
     StaticList<int, 5> int_list;
 
     int_list.push_back(1);
@@ -51,12 +50,12 @@ TEST_CASE(StaticListPopBack) {
 
     int_list.pop_back();
 
-    EXPECT(int_list.size()).to_be(2);
-    EXPECT(int_list[0]).to_be(1);
-    EXPECT(int_list[1]).to_be(2);
+    REQUIRE_EQ(int_list.size(), 2);
+    REQUIRE_EQ(int_list[0], 1);
+    REQUIRE_EQ(int_list[1], 2);
 }
 
-TEST_CASE(StaticListIterators) {
+TEST_CASE("StaticListIterators") {
     StaticList<int, 5> int_list;
 
     int_list.push_back(1);
@@ -68,25 +67,27 @@ TEST_CASE(StaticListIterators) {
         sum += i;
     }
 
-    EXPECT(sum).to_be(6);
+    REQUIRE_EQ(sum, 6);
 }
 
-TEST_CASE(StaticListCopyAndAssignment) {
+TEST_CASE("StaticListCopyAndAssignment") {
     StaticList<int, 5> int_list;
     int_list.push_back(1);
     int_list.push_back(2);
     int_list.push_back(3);
 
     StaticList<int, 5> int_list_copy(int_list);
-    EXPECT(int_list_copy.size()).to_be(3);
-    EXPECT(int_list_copy[0]).to_be(1);
-    EXPECT(int_list_copy[1]).to_be(2);
-    EXPECT(int_list_copy[2]).to_be(3);
+    REQUIRE_EQ(int_list_copy.size(), 3);
+    REQUIRE_EQ(int_list_copy[0], 1);
+    REQUIRE_EQ(int_list_copy[1], 2);
+    REQUIRE_EQ(int_list_copy[2], 3);
 
     StaticList<int, 5> int_list_assigned {};
     int_list_assigned = int_list;
-    EXPECT(int_list_assigned.size()).to_be(3);
-    EXPECT(int_list_assigned[0]).to_be(1);
-    EXPECT(int_list_assigned[1]).to_be(2);
-    EXPECT(int_list_assigned[2]).to_be(3);
+    REQUIRE_EQ(int_list_assigned.size(), 3);
+    REQUIRE_EQ(int_list_assigned[0], 1);
+    REQUIRE_EQ(int_list_assigned[1], 2);
+    REQUIRE_EQ(int_list_assigned[2], 3);
 }
+
+TEST_SUITE_END;

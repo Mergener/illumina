@@ -1,15 +1,14 @@
-#include "../litetest/litetest.h"
+#include <doctest/doctest.h>
 
 #include <iostream>
 
 #include "board.h"
 
-using namespace litetest;
 using namespace illumina;
 
-TEST_SUITE(Board);
+TEST_SUITE_BEGIN("Board");
 
-TEST_CASE(SetPieceAt) {
+TEST_CASE("SetPieceAt") {
     struct {
         Piece p;
         Square s;
@@ -32,28 +31,28 @@ TEST_CASE(SetPieceAt) {
             Bitboard occ  = b.occupancy();
             ui64 key      = b.hash_key();
 
-            EXPECT(b.piece_at(s)).to_be(p);
+            REQUIRE_EQ(b.piece_at(s), p);
 
             if (p != prev_piece) {
-                EXPECT(key).to_not_be(prev_key);
-                EXPECT(p_bb).to_be(set_bit(prev_p_bb, s));
+                REQUIRE_NE(key, prev_key);
+                REQUIRE_EQ(p_bb, set_bit(prev_p_bb, s));
 
                 if (p == PIECE_NULL) {
-                    EXPECT(occ).to_be(unset_bit(prev_occ, s));
+                    REQUIRE_EQ(occ, unset_bit(prev_occ, s));
                 }
                 else if (prev_piece == PIECE_NULL) {
-                    EXPECT(occ).to_be(set_bit(prev_occ, s));
+                    REQUIRE_EQ(occ, set_bit(prev_occ, s));
                 }
                 else {
-                    EXPECT(occ).to_be(prev_occ);
+                    REQUIRE_EQ(occ, prev_occ);
                 }
             }
             else {
                 // Expect no changes.
-                EXPECT(occ).to_be(prev_occ);
-                EXPECT(p_bb).to_be(prev_p_bb);
-                EXPECT(prev_piece_bb).to_be(prev_prev_piece_bb);
-                EXPECT(key).to_be(prev_key);
+                REQUIRE_EQ(occ, prev_occ);
+                REQUIRE_EQ(p_bb, prev_p_bb);
+                REQUIRE_EQ(prev_piece_bb, prev_prev_piece_bb);
+                REQUIRE_EQ(key, prev_key);
             }
         }
     } s_cases[] = {
@@ -61,125 +60,127 @@ TEST_CASE(SetPieceAt) {
     };
 
     for (auto& test_case: s_cases) {
+        CAPTURE(test_case.p);
+        CAPTURE(test_case.s);
         test_case.test();
     }
 }
 
-TEST_CASE(BoardFENConstructor) {
+TEST_CASE("BoardFENConstructor") {
     // Test default constructor
     Board board_default("");
-    EXPECT(board_default.color_to_move()).to_be(CL_WHITE);
-    EXPECT(board_default.occupancy()).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_WHITE, PT_PAWN))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_WHITE, PT_KNIGHT))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_WHITE, PT_BISHOP))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_WHITE, PT_ROOK))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_WHITE, PT_QUEEN))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_WHITE, PT_KING))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_BLACK, PT_PAWN))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_BLACK, PT_KNIGHT))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_BLACK, PT_BISHOP))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_BLACK, PT_ROOK))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_BLACK, PT_QUEEN))).to_be(0ULL);
-    EXPECT(board_default.piece_bb(Piece(CL_BLACK, PT_KING))).to_be(0ULL);
-    EXPECT(board_default.ep_square()).to_be(SQ_NULL);
-    EXPECT(board_default.rule50()).to_be(0);
-    EXPECT(board_default.in_check()).to_be(false);
-    EXPECT(board_default.in_double_check()).to_be(false);
-    EXPECT(board_default.hash_key()).to_be(EMPTY_BOARD_HASH_KEY);
-    EXPECT(board_default.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_H1);
-    EXPECT(board_default.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_A1);
-    EXPECT(board_default.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_H8);
-    EXPECT(board_default.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_A8);
-    EXPECT(board_default.legal()).to_be(false);
+    REQUIRE_EQ(board_default.color_to_move(), CL_WHITE);
+    REQUIRE_EQ(board_default.occupancy(), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_WHITE, PT_PAWN)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_WHITE, PT_KNIGHT)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_WHITE, PT_BISHOP)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_WHITE, PT_ROOK)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_WHITE, PT_QUEEN)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_WHITE, PT_KING)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_BLACK, PT_PAWN)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_BLACK, PT_KNIGHT)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_BLACK, PT_BISHOP)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_BLACK, PT_ROOK)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_BLACK, PT_QUEEN)), 0ULL);
+    REQUIRE_EQ(board_default.piece_bb(Piece(CL_BLACK, PT_KING)), 0ULL);
+    REQUIRE_EQ(board_default.ep_square(), SQ_NULL);
+    REQUIRE_EQ(board_default.rule50(), 0);
+    REQUIRE_EQ(board_default.in_check(), false);
+    REQUIRE_EQ(board_default.in_double_check(), false);
+    REQUIRE_EQ(board_default.hash_key(), EMPTY_BOARD_HASH_KEY);
+    REQUIRE_EQ(board_default.castle_rook_square(CL_WHITE, SIDE_KING), SQ_H1);
+    REQUIRE_EQ(board_default.castle_rook_square(CL_WHITE, SIDE_QUEEN), SQ_A1);
+    REQUIRE_EQ(board_default.castle_rook_square(CL_BLACK, SIDE_KING), SQ_H8);
+    REQUIRE_EQ(board_default.castle_rook_square(CL_BLACK, SIDE_QUEEN), SQ_A8);
+    REQUIRE_EQ(board_default.legal(), false);
 
     // Test constructor with FEN string representing the starting position
     Board board_startpos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    EXPECT(board_startpos.color_to_move()).to_be(CL_WHITE);
-    EXPECT(board_startpos.occupancy()).to_be(0xffff00000000ffffULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_WHITE, PT_PAWN))).to_be(0xff00ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_WHITE, PT_KNIGHT))).to_be(0x42ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_WHITE, PT_BISHOP))).to_be(0x24ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_WHITE, PT_ROOK))).to_be(0x81ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_WHITE, PT_QUEEN))).to_be(0x8ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_WHITE, PT_KING))).to_be(0x10ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_BLACK, PT_PAWN))).to_be(0xff000000000000ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_BLACK, PT_KNIGHT))).to_be(0x4200000000000000ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_BLACK, PT_BISHOP))).to_be(0x2400000000000000ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_BLACK, PT_ROOK))).to_be(0x8100000000000000ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_BLACK, PT_QUEEN))).to_be(0x800000000000000ULL);
-    EXPECT(board_startpos.piece_bb(Piece(CL_BLACK, PT_KING))).to_be(0x1000000000000000ULL);
-    EXPECT(board_startpos.ep_square()).to_be(SQ_NULL);
-    EXPECT(board_startpos.in_check()).to_be(false);
-    EXPECT(board_startpos.in_double_check()).to_be(false);
-    EXPECT(board_startpos.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_H1);
-    EXPECT(board_startpos.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_A1);
-    EXPECT(board_startpos.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_H8);
-    EXPECT(board_startpos.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_A8);
-    EXPECT(board_startpos.legal()).to_be(true);
+    REQUIRE_EQ(board_startpos.color_to_move(), CL_WHITE);
+    REQUIRE_EQ(board_startpos.occupancy(), 0xffff00000000ffffULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_WHITE, PT_PAWN)), 0xff00ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_WHITE, PT_KNIGHT)), 0x42ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_WHITE, PT_BISHOP)), 0x24ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_WHITE, PT_ROOK)), 0x81ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_WHITE, PT_QUEEN)), 0x8ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_WHITE, PT_KING)), 0x10ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_BLACK, PT_PAWN)), 0xff000000000000ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_BLACK, PT_KNIGHT)), 0x4200000000000000ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_BLACK, PT_BISHOP)), 0x2400000000000000ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_BLACK, PT_ROOK)), 0x8100000000000000ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_BLACK, PT_QUEEN)), 0x800000000000000ULL);
+    REQUIRE_EQ(board_startpos.piece_bb(Piece(CL_BLACK, PT_KING)), 0x1000000000000000ULL);
+    REQUIRE_EQ(board_startpos.ep_square(), SQ_NULL);
+    REQUIRE_EQ(board_startpos.in_check(), false);
+    REQUIRE_EQ(board_startpos.in_double_check(), false);
+    REQUIRE_EQ(board_startpos.castle_rook_square(CL_WHITE, SIDE_KING), SQ_H1);
+    REQUIRE_EQ(board_startpos.castle_rook_square(CL_WHITE, SIDE_QUEEN), SQ_A1);
+    REQUIRE_EQ(board_startpos.castle_rook_square(CL_BLACK, SIDE_KING), SQ_H8);
+    REQUIRE_EQ(board_startpos.castle_rook_square(CL_BLACK, SIDE_QUEEN), SQ_A8);
+    REQUIRE_EQ(board_startpos.legal(), true);
 
     // Test constructor with FEN string representing custom positions.
     Board board_custompos_1("7k/8/8/3K4/8/8/P7/8 b - - 32 1");
-    EXPECT(board_custompos_1.color_to_move()).to_be(CL_BLACK);
-    EXPECT(board_custompos_1.occupancy()).to_be(0x8000000800000100ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_PAWN))).to_be(0x100ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_KNIGHT))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_BISHOP))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_ROOK))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_QUEEN))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_KING))).to_be(0x800000000ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_PAWN))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_KNIGHT))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_BISHOP))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_ROOK))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_QUEEN))).to_be(0x0ULL);
-    EXPECT(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_KING))).to_be(0x8000000000000000ULL);
-    EXPECT(board_custompos_1.ep_square()).to_be(SQ_NULL);
-    EXPECT(board_custompos_1.rule50()).to_be(32);
-    EXPECT(board_custompos_1.in_check()).to_be(false);
-    EXPECT(board_custompos_1.in_double_check()).to_be(false);
-    EXPECT(board_custompos_1.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_H1);
-    EXPECT(board_custompos_1.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_A1);
-    EXPECT(board_custompos_1.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_H8);
-    EXPECT(board_custompos_1.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_A8);
-    EXPECT(board_custompos_1.legal()).to_be(true);
+    REQUIRE_EQ(board_custompos_1.color_to_move(), CL_BLACK);
+    REQUIRE_EQ(board_custompos_1.occupancy(), 0x8000000800000100ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_PAWN)), 0x100ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_KNIGHT)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_BISHOP)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_ROOK)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_QUEEN)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_WHITE, PT_KING)), 0x800000000ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_PAWN)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_KNIGHT)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_BISHOP)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_ROOK)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_QUEEN)), 0x0ULL);
+    REQUIRE_EQ(board_custompos_1.piece_bb(Piece(CL_BLACK, PT_KING)), 0x8000000000000000ULL);
+    REQUIRE_EQ(board_custompos_1.ep_square(), SQ_NULL);
+    REQUIRE_EQ(board_custompos_1.rule50(), 32);
+    REQUIRE_EQ(board_custompos_1.in_check(), false);
+    REQUIRE_EQ(board_custompos_1.in_double_check(), false);
+    REQUIRE_EQ(board_custompos_1.castle_rook_square(CL_WHITE, SIDE_KING), SQ_H1);
+    REQUIRE_EQ(board_custompos_1.castle_rook_square(CL_WHITE, SIDE_QUEEN), SQ_A1);
+    REQUIRE_EQ(board_custompos_1.castle_rook_square(CL_BLACK, SIDE_KING), SQ_H8);
+    REQUIRE_EQ(board_custompos_1.castle_rook_square(CL_BLACK, SIDE_QUEEN), SQ_A8);
+    REQUIRE_EQ(board_custompos_1.legal(), true);
 
     // Test FRC construction with FEN.
     Board frc_board_1("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w KQkq - 0 1");
-    EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
-    EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_D1);
-    EXPECT(frc_board_1.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
-    EXPECT(frc_board_1.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_D8);
-    EXPECT(frc_board_1.castling_rights()).to_be(CR_ALL);
-    EXPECT(frc_board_1.has_castling_rights(CL_WHITE, SIDE_KING)).to_be(true);
-    EXPECT(frc_board_1.has_castling_rights(CL_WHITE, SIDE_QUEEN)).to_be(true);
-    EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_KING)).to_be(true);
-    EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_QUEEN)).to_be(true);
+    REQUIRE_EQ(frc_board_1.castle_rook_square(CL_WHITE, SIDE_KING), SQ_F1);
+    REQUIRE_EQ(frc_board_1.castle_rook_square(CL_WHITE, SIDE_QUEEN), SQ_D1);
+    REQUIRE_EQ(frc_board_1.castle_rook_square(CL_BLACK, SIDE_KING), SQ_F8);
+    REQUIRE_EQ(frc_board_1.castle_rook_square(CL_BLACK, SIDE_QUEEN), SQ_D8);
+    REQUIRE_EQ(frc_board_1.castling_rights(), CR_ALL);
+    REQUIRE_EQ(frc_board_1.has_castling_rights(CL_WHITE, SIDE_KING), true);
+    REQUIRE_EQ(frc_board_1.has_castling_rights(CL_WHITE, SIDE_QUEEN), true);
+    REQUIRE_EQ(frc_board_1.has_castling_rights(CL_BLACK, SIDE_KING), true);
+    REQUIRE_EQ(frc_board_1.has_castling_rights(CL_BLACK, SIDE_QUEEN), true);
 
     Board frc_board_2("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w FDfd - 0 1");
-    EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
-    EXPECT(frc_board_1.castle_rook_square(CL_WHITE, SIDE_QUEEN)).to_be(SQ_D1);
-    EXPECT(frc_board_1.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
-    EXPECT(frc_board_1.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_D8);
-    EXPECT(frc_board_1.castling_rights()).to_be(CR_ALL);
-    EXPECT(frc_board_1.has_castling_rights(CL_WHITE, SIDE_KING)).to_be(true);
-    EXPECT(frc_board_1.has_castling_rights(CL_WHITE, SIDE_QUEEN)).to_be(true);
-    EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_KING)).to_be(true);
-    EXPECT(frc_board_1.has_castling_rights(CL_BLACK, SIDE_QUEEN)).to_be(true);
+    REQUIRE_EQ(frc_board_1.castle_rook_square(CL_WHITE, SIDE_KING), SQ_F1);
+    REQUIRE_EQ(frc_board_1.castle_rook_square(CL_WHITE, SIDE_QUEEN), SQ_D1);
+    REQUIRE_EQ(frc_board_1.castle_rook_square(CL_BLACK, SIDE_KING), SQ_F8);
+    REQUIRE_EQ(frc_board_1.castle_rook_square(CL_BLACK, SIDE_QUEEN), SQ_D8);
+    REQUIRE_EQ(frc_board_1.castling_rights(), CR_ALL);
+    REQUIRE_EQ(frc_board_1.has_castling_rights(CL_WHITE, SIDE_KING), true);
+    REQUIRE_EQ(frc_board_1.has_castling_rights(CL_WHITE, SIDE_QUEEN), true);
+    REQUIRE_EQ(frc_board_1.has_castling_rights(CL_BLACK, SIDE_KING), true);
+    REQUIRE_EQ(frc_board_1.has_castling_rights(CL_BLACK, SIDE_QUEEN), true);
 
     Board frc_board_3("bnnrkrqb/pppppppp/8/8/8/8/PPPPPPPP/BNNRKRQB w Kkq - 0 1");
-    EXPECT(frc_board_3.castle_rook_square(CL_WHITE, SIDE_KING)).to_be(SQ_F1);
-    EXPECT(frc_board_3.castle_rook_square(CL_BLACK, SIDE_KING)).to_be(SQ_F8);
-    EXPECT(frc_board_3.castle_rook_square(CL_BLACK, SIDE_QUEEN)).to_be(SQ_D8);
-    EXPECT(frc_board_3.castling_rights()).to_be(CR_WHITE_OO | CR_BLACK_OO | CR_BLACK_OOO);
-    EXPECT(frc_board_3.has_castling_rights(CL_WHITE, SIDE_KING)).to_be(true);
-    EXPECT(frc_board_3.has_castling_rights(CL_WHITE, SIDE_QUEEN)).to_be(false);
-    EXPECT(frc_board_3.has_castling_rights(CL_BLACK, SIDE_KING)).to_be(true);
-    EXPECT(frc_board_3.has_castling_rights(CL_BLACK, SIDE_QUEEN)).to_be(true);
+    REQUIRE_EQ(frc_board_3.castle_rook_square(CL_WHITE, SIDE_KING), SQ_F1);
+    REQUIRE_EQ(frc_board_3.castle_rook_square(CL_BLACK, SIDE_KING), SQ_F8);
+    REQUIRE_EQ(frc_board_3.castle_rook_square(CL_BLACK, SIDE_QUEEN), SQ_D8);
+    REQUIRE_EQ(frc_board_3.castling_rights(), CR_WHITE_OO | CR_BLACK_OO | CR_BLACK_OOO);
+    REQUIRE_EQ(frc_board_3.has_castling_rights(CL_WHITE, SIDE_KING), true);
+    REQUIRE_EQ(frc_board_3.has_castling_rights(CL_WHITE, SIDE_QUEEN), false);
+    REQUIRE_EQ(frc_board_3.has_castling_rights(CL_BLACK, SIDE_KING), true);
+    REQUIRE_EQ(frc_board_3.has_castling_rights(CL_BLACK, SIDE_QUEEN), true);
 
 }
 
-TEST_CASE(MakeUndoNullMove) {
+TEST_CASE("MakeUndoNullMove") {
     struct {
         const char* fen;
 
@@ -196,27 +197,27 @@ TEST_CASE(MakeUndoNullMove) {
 
             board.make_null_move();
 
-            EXPECT(board.legal()).to_be(true);
+            REQUIRE_EQ(board.legal(), true);
             std::string null_fen = board.fen();
             ui64 null_key        = board.hash_key();
             Color null_color     = board.color_to_move();
 
             board.undo_null_move();
 
-            EXPECT(board.legal()).to_be(true);
+            REQUIRE_EQ(board.legal(), true);
             std::string curr_fen = board.fen();
             ui64 curr_key        = board.hash_key();
             Color curr_color     = board.color_to_move();
 
             // Test against current values.
-            EXPECT(curr_fen).to_be(start_fen);
-            EXPECT(curr_color).to_be(start_color);
-            EXPECT(curr_key).to_be(start_key);
+            REQUIRE_EQ(curr_fen, start_fen);
+            REQUIRE_EQ(curr_color, start_color);
+            REQUIRE_EQ(curr_key, start_key);
 
             // Test against values during the null move.
-            EXPECT(null_fen).to_not_be(start_fen);
-            EXPECT(null_color).to_be(opposite_color(start_color));
-            EXPECT(null_key).to_not_be(start_key);
+            REQUIRE_NE(null_fen, start_fen);
+            REQUIRE_EQ(null_color, opposite_color(start_color));
+            REQUIRE_NE(null_key, start_key);
         }
 
     } tests[] = {
@@ -349,26 +350,27 @@ TEST_CASE(MakeUndoNullMove) {
     };
 
     for (auto& t: tests) {
+        CAPTURE(t.fen);
         t.run();
     }
 }
 
-TEST_CASE(IsMovePseudoLegal) {
+TEST_CASE("IsMovePseudoLegal") {
     {
         Board b("r3k2r/8/8/8/8/8/8/2R1K2R b Kkq - 0 1");
-        EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e8g8"))).to_be(true);
+        REQUIRE_EQ(b.is_move_pseudo_legal(Move::parse_uci(b, "e8g8")), true);
     }
     {
-        Board b("fen rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq d3 0 7");
-        EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e4d3"))).to_be(true);
+        Board b("rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq d3 0 7");
+        REQUIRE_EQ(b.is_move_pseudo_legal(Move::parse_uci(b, "e4d3")), true);
     }
     {
-        Board b("fen rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq - 0 7");
-        EXPECT(b.is_move_pseudo_legal(Move::parse_uci(b, "e4d3"))).to_be(false);
+        Board b("rnbqk2r/ppp1bppp/5n2/4N3/3Pp3/2P5/PP2BPPP/RNBQK2R b KQkq - 0 7");
+        REQUIRE_EQ(b.is_move_pseudo_legal(Move::parse_uci(b, "e4d3")), false);
     }
 }
 
-TEST_CASE(MoveGivesCheck) {
+TEST_CASE("MoveGivesCheck") {
     struct {
         std::string fen;
         std::string move_str;
@@ -378,7 +380,7 @@ TEST_CASE(MoveGivesCheck) {
             Board board(fen);
             Move move = Move::parse_uci(board, move_str);
 
-            EXPECT(board.gives_check(move)).to_be(gives_check);
+            REQUIRE_EQ(board.gives_check(move), gives_check);
         }
     } tests[] = {
         { "rnbqkbnr/ppp2ppp/4p3/3p4/2PP4/5N2/PP2PPPP/RNBQKB1R b KQkq - 1 3", "f8b4", true },
@@ -395,22 +397,27 @@ TEST_CASE(MoveGivesCheck) {
     };
 
     for (auto& test: tests) {
+        CAPTURE(test.fen);
+        CAPTURE(test.move_str);
+        CAPTURE(test.gives_check);
         test.run();
     }
 }
 
-TEST_CASE(PawnKeys) {
+TEST_CASE("PawnKeys") {
     {
         // Test for startpos.
         Board startpos = Board::standard_startpos();
         Board board = startpos;
         board.make_move(Move::parse_uci(board, "g1f3"));
         board.make_move(Move::parse_uci(board, "g8f6"));
-        EXPECT(board.pawn_key()).to_be(startpos.pawn_key());
+        REQUIRE_EQ(board.pawn_key(), startpos.pawn_key());
     }
     {
         // Other tests.
-        EXPECT(Board("rnbqkbnr/5p1p/1p1pp3/6p1/1PpPP3/6P1/P1P5/RNBQKBNR w KQkq - 0 1").pawn_key())
-            .to_be(Board("4k3/2b2p1p/1p1ppn2/r5pb/1PpPP2r/2n2qP1/PKP5/RNBQ1BNR w - - 0 1").pawn_key());
+        REQUIRE_EQ(Board("rnbqkbnr/5p1p/1p1pp3/6p1/1PpPP3/6P1/P1P5/RNBQKBNR w KQkq - 0 1").pawn_key(),
+                   Board("4k3/2b2p1p/1p1ppn2/r5pb/1PpPP2r/2n2qP1/PKP5/RNBQ1BNR w - - 0 1").pawn_key());
     }
 }
+
+TEST_SUITE_END;

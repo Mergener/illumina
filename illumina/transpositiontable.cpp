@@ -33,7 +33,6 @@ void TranspositionTableEntry::replace(ui64 key,
                                       BoundType bound_type,
                                       ui8 generation,
                                       bool ttpv) {
-    m_key_low = key & 0xFFFFFFFF;
     m_key_hi  = key >> 32;
     m_move  = move;
     m_score = score;
@@ -52,7 +51,7 @@ void TranspositionTable::new_search() {
 
 bool TranspositionTable::probe(ui64 key, TranspositionTableEntry& entry, Depth ply) {
     entry = entry_ref(key);
-    if (entry.key() != key) {
+    if (entry.key_hi() != (key >> 32)) {
         return false;
     }
     if (!entry.valid()) {
@@ -128,6 +127,7 @@ void TranspositionTable::resize(size_t new_size) {
         size_t new_n_entries = new_size / sizeof(TranspositionTableEntry);
         auto new_buf         = std::make_unique<TranspositionTableEntry[]>(new_n_entries);
         m_buf                = std::move(new_buf);
+        m_size_in_bytes      = new_size;
         m_max_entry_count    = new_n_entries;
     }
     catch (const std::bad_alloc& bad_alloc) {

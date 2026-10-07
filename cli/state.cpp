@@ -173,7 +173,7 @@ void State::evaluate() const {
     Evaluation eval;
     Board repl = m_board;
     eval.on_new_board(repl);
-    Score score = normalize_score_if_desired(eval.compute(), repl);
+    Score score = normalize_score_if_desired(eval.compute(repl), repl);
 
     std::cout << "      ";
 
@@ -197,7 +197,7 @@ void State::evaluate() const {
             else {
                 repl.set_piece_at(s, PIECE_NULL);
                 eval.on_new_board(repl);
-                Score score_without_piece = normalize_score_if_desired(eval.compute(), repl);
+                Score score_without_piece = normalize_score_if_desired(eval.compute(repl), repl);
                 repl.set_piece_at(s, p);
 
                 std::cout << std::setw(6)
@@ -311,8 +311,9 @@ void State::search(SearchSettings settings, bool trace) {
     settings.contempt  = m_options.option<UCIOptionSpin>("Contempt").value();
     settings.n_pvs     = m_options.option<UCIOptionSpin>("MultiPV").value();
     settings.n_threads = m_options.option<UCIOptionSpin>("Threads").value();
-    settings.eval_random_margin = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
-    settings.eval_rand_seed     = m_eval_random_seed;
+    settings.eval_random_margin  = m_options.option<UCIOptionSpin>("EvalRandomMargin").value();
+    settings.eval_rand_seed      = m_eval_random_seed;
+    settings.shallow_search_hint = m_options.option<UCIOptionCheck>("OptimizeForShallowSearches").value();
 
     // User might want to override number of search nodes.
     // This is useful when performing node-odds testing on a GUI that
@@ -324,7 +325,7 @@ void State::search(SearchSettings settings, bool trace) {
     }
 
     // Setup search tracing (if build supports it).
-    std::shared_ptr<ISearchTracer> tracer = nullptr;
+    std::shared_ptr<SearchTracer> tracer = nullptr;
     if (trace) {
 #ifndef TRACING_ENABLED
         std::cout << "info string Tracing is not enabled in this version -- option skipped." << std::endl;
@@ -332,7 +333,7 @@ void State::search(SearchSettings settings, bool trace) {
         try {
             std::string trace_path = m_options.option<UCIOptionString>("TraceFile").value();
             size_t trace_batch_size = m_options.option<UCIOptionSpin>("TraceBatchSize").value();
-            tracer = std::make_shared<SearchTracer>(trace_path, trace_batch_size);
+            tracer = std::make_shared<SqliteSearchTracer>(trace_path, trace_batch_size);
             settings.tracer = tracer.get();
         }
         catch (const std::exception& e) {
@@ -496,6 +497,7 @@ void State::register_options() {
     m_options.register_option<UCIOptionSpin>("OverrideNodesLimit", 0, 0, INT32_MAX);
     m_options.register_option<UCIOptionCheck>("NormalizeScores", true);
     m_options.register_option<UCIOptionCheck>("UCI_ShowWDL", false);
+    m_options.register_option<UCIOptionCheck>("OptimizeForShallowSearches", false);
 
 #ifdef TUNING_BUILD
 #define TUNABLE_VALUE(name, type, ...) add_tuning_option(m_options, \

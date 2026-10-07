@@ -5,8 +5,9 @@ namespace illumina {
 static Square least_valuable_attacker_of(const Board& board,
                                          Color c,
                                          Square s,
-                                         Bitboard occ) {
-    Bitboard their_pawns = board.piece_bb(Piece(c, PT_PAWN)) & occ;
+                                         Bitboard occ,
+                                         Bitboard ignored) {
+    Bitboard their_pawns = board.piece_bb(Piece(c, PT_PAWN)) & occ & ~ignored;
     Bitboard pawn_targets;
     pawn_targets = pawn_attacks(s, opposite_color(c));
     Bitboard pawn_attacker = pawn_targets & their_pawns;
@@ -14,35 +15,35 @@ static Square least_valuable_attacker_of(const Board& board,
         return lsb(pawn_attacker);
     }
 
-    Bitboard their_knights   = board.piece_bb(Piece(c, PT_KNIGHT)) & occ;
+    Bitboard their_knights   = board.piece_bb(Piece(c, PT_KNIGHT)) & occ & ~ignored;
     Bitboard knight_atks     = knight_attacks(s);
     Bitboard knight_attacker = knight_atks & their_knights;
     if (knight_attacker) {
         return lsb(knight_attacker);
     }
 
-    Bitboard their_bishops   = board.piece_bb(Piece(c, PT_BISHOP)) & occ;
+    Bitboard their_bishops   = board.piece_bb(Piece(c, PT_BISHOP)) & occ & ~ignored;
     Bitboard bishop_atks     = bishop_attacks(s, occ);
     Bitboard bishop_attacker = bishop_atks & their_bishops;
     if (bishop_attacker) {
         return lsb(bishop_attacker);
     }
 
-    Bitboard their_rooks   = board.piece_bb(Piece(c, PT_ROOK)) & occ;
+    Bitboard their_rooks   = board.piece_bb(Piece(c, PT_ROOK)) & occ & ~ignored;
     Bitboard rook_atks     = rook_attacks(s, occ);
     Bitboard rook_attacker = rook_atks & their_rooks;
     if (rook_attacker) {
         return lsb(rook_attacker);
     }
 
-    Bitboard their_queens   = board.piece_bb(Piece(c, PT_QUEEN)) & occ;
+    Bitboard their_queens   = board.piece_bb(Piece(c, PT_QUEEN)) & occ & ~ignored;
     Bitboard queen_atks     = rook_atks | bishop_atks;
     Bitboard queen_attacker = queen_atks & their_queens;
     if (queen_attacker) {
         return lsb(queen_attacker);
     }
 
-    Bitboard their_king_bb  = board.piece_bb(Piece(c, PT_KING)) & occ;
+    Bitboard their_king_bb  = board.piece_bb(Piece(c, PT_KING)) & occ & ~ignored;
     Bitboard king_atks      = king_attacks(s);
     Bitboard king_attacker  = king_atks & their_king_bb;
     if (king_attacker) {
@@ -66,6 +67,18 @@ bool has_good_see(const Board& board,
     Piece dst_piece = board.piece_at(dest);
     Color color  = src_piece.color();
     Bitboard occ = board.occupancy();
+    Bitboard ignored = 0;
+
+    if (src_piece.type() == PT_PAWN) {
+        if (square_rank(dest) == promotion_rank(color)) {
+            gain += PIECE_VALUES[PT_QUEEN] - PIECE_VALUES[PT_PAWN];
+        }
+        else if (dst_piece == PIECE_NULL && square_file(dest) != square_file(source)) {
+            // We assume this must be an en passant capture, since the pawn
+            // moved to a different file and there is no piece there.
+            dst_piece = Piece(opposite_color(color), PT_PAWN);
+        }
+    }
 
     // Simulate our first capture.
     gain += PIECE_VALUES[dst_piece.type()];
@@ -74,8 +87,12 @@ bool has_good_see(const Board& board,
     color = opposite_color(color);
     sign  = -1;
 
+    if (gain < threshold) {
+        return false;
+    }
+
     while (true) {
-        Square attacker_sq = least_valuable_attacker_of(board, color, dest, occ);
+        Square attacker_sq = least_valuable_attacker_of(board, color, dest, occ, ignored);
         if (attacker_sq == SQ_NULL) {
             break;
         }
@@ -83,9 +100,13 @@ bool has_good_see(const Board& board,
         // Prevent pinned attackers from trying to capture, unless 'dest' is between
         // them and their pinner.
         if (   board.is_pinned(attacker_sq)
-            && !bit_is_set(between_bb_inclusive(attacker_sq, board.pinner_square(attacker_sq)), dest)) {
-            occ = unset_bit(occ, attacker_sq);
+            && !bit_is_set(between_bb_inclusive(board.king_square(color), board.pinner_square(attacker_sq)), dest)) {
+            ignored = set_bit(ignored, attacker_sq);
             continue;
+        }
+
+        if (dst_piece.type() == PT_PAWN && promotion_rank(dst_piece.color()) == square_rank(dest)) {
+            dst_piece = Piece(dst_piece.color(), PT_QUEEN);
         }
 
         gain += sign * PIECE_VALUES[dst_piece.type()];
@@ -95,6 +116,9 @@ bool has_good_see(const Board& board,
         sign  = -sign;
 
         if (sign == 1 && gain >= threshold) {
+            break;
+        }
+        if (sign == -1 && gain < threshold) {
             break;
         }
     }
@@ -252,6 +276,40 @@ Bitboard non_pawn_bb(const Board& board) {
     Bitboard kings     = board.piece_type_bb(PT_KING);
     Bitboard pawns     = board.piece_type_bb(PT_PAWN);
     return occupancy & (~kings) & (~pawns);
+}
+
+Bitboard all_attacked_squares(const Board& board, Color c) {
+    auto pawns = board.piece_bb(Piece(c, PT_PAWN));
+    auto knights = board.piece_bb(Piece(c, PT_KNIGHT));
+    auto bishops = board.piece_bb(Piece(c, PT_BISHOP));
+    auto rooks = board.piece_bb(Piece(c, PT_ROOK));
+    auto queens = board.piece_bb(Piece(c, PT_QUEEN));
+    const auto occ = board.occupancy();
+
+    Bitboard bb {};
+    while (pawns != 0) {
+        bb |= pawn_attacks(lsb(pawns), c);
+        pawns = unset_lsb(pawns);
+    }
+    while (knights != 0) {
+        bb |= knight_attacks(lsb(knights));
+        knights = unset_lsb(knights);
+    }
+    while (bishops != 0) {
+        bb |= bishop_attacks(lsb(bishops), occ);
+        bishops = unset_lsb(bishops);
+    }
+    while (rooks != 0) {
+        bb |= rook_attacks(lsb(rooks), occ);
+        rooks = unset_lsb(rooks);
+    }
+    while (queens != 0) {
+        bb |= queen_attacks(lsb(queens), occ);
+        queens = unset_lsb(queens);
+    }
+    bb |= king_attacks(board.king_square(c));
+
+    return bb;
 }
 
 } // illumina

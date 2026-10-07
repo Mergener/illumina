@@ -13,18 +13,6 @@
 
 namespace illumina {
 
-/**
- * Listens to changes made to a board object.
- */
-struct BoardListener {
-    std::function<void(const Board& board, Piece p, Square s)> on_add_piece = nullptr;
-    std::function<void(const Board& board, Piece p, Square s)> on_remove_piece = nullptr;
-    std::function<void(const Board& board, Move move)> on_make_move = nullptr;
-    std::function<void(const Board& board, Move move)> on_undo_move = nullptr;
-    std::function<void(const Board& board)> on_make_null_move = nullptr;
-    std::function<void(const Board& board)> on_undo_null_move = nullptr;
-};
-
 constexpr ui64 EMPTY_BOARD_HASH_KEY = 1;
 
 enum class BoardOutcome {
@@ -90,6 +78,11 @@ public:
      */
     ui64 estimate_hash_key_after(Move move) const;
 
+    /**
+     * Same as estimate_hash_key_after but for null moves.
+     */
+    ui64 estimate_hash_key_after_null_move() const;
+
     void set_piece_at(Square s, Piece p);
     void set_color_to_move(Color c);
     void set_ep_square(Square s);
@@ -102,8 +95,6 @@ public:
     void undo_null_move();
     bool is_move_pseudo_legal(Move move) const;
     bool is_move_legal(Move move) const;
-
-    void set_listener(BoardListener listener);
 
     template <bool QUIET_PAWN_MOVES = false, bool EXCLUDE_KING_ATKS = false>
     Square first_attacker_of(Color c, Square s) const;
@@ -132,15 +123,25 @@ private:
     // the copy, assignment and move constructors -- these were manually written
     // to prevent copying m_listeners to board copies.
 
-    std::array<Piece, SQ_COUNT> m_pieces {};
     std::array<std::array<Bitboard, PT_COUNT>, CL_COUNT> m_bbs {};
+    std::array<Piece, SQ_COUNT> m_pieces {};
     Color m_ctm = CL_WHITE;
     Bitboard m_occ = 0;
 
-    std::array<Square, SQ_COUNT> m_pinners;
+    std::array<ui8, SQ_COUNT> m_pinners;
     Bitboard m_pinned_bb = 0;
 
-    int m_base_ply_count = 0; // Gets added by m_prev_states.size()
+    struct State {
+        ui64 hash_key    = EMPTY_BOARD_HASH_KEY;
+        ui64 pawn_key    = EMPTY_BOARD_HASH_KEY;
+        ui64 non_pawn_key = EMPTY_BOARD_HASH_KEY;
+        Move last_move   = MOVE_NULL;
+        ui16 rule50      = 0;
+        ui8 n_checkers   = 0;
+        Square ep_square = SQ_NULL;
+        CastlingRights castle_rights = CR_NONE;
+    };
+    State m_state {};
 
     std::array<std::array<Square, SIDE_COUNT>, CL_COUNT> m_castle_rook_squares = {
         std::array<Square, SIDE_COUNT> {
@@ -153,21 +154,9 @@ private:
         },
     };
 
-    struct State {
-        Move last_move   = MOVE_NULL;
-        Square ep_square = SQ_NULL;
-        ui64 hash_key    = EMPTY_BOARD_HASH_KEY;
-        ui64 pawn_key    = EMPTY_BOARD_HASH_KEY;
-        ui64 non_pawn_key = EMPTY_BOARD_HASH_KEY;
-        ui16 rule50      = 0;
-        ui8 n_checkers   = 0;
-        CastlingRights castle_rights = CR_NONE;
-    };
-
     std::vector<State> m_prev_states;
-    State m_state {};
 
-    BoardListener m_listener {};
+    int m_base_ply_count = 0; // Gets added by m_prev_states.size()
 
     Bitboard& piece_bb_ref(Piece piece);
     Bitboard& color_bb_ref(Color color);
@@ -366,10 +355,6 @@ inline void Board::set_piece_at_internal(Square s, Piece p) {
 
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_added(Square s, Piece p) {
-    if (m_listener.on_add_piece) {
-        m_listener.on_add_piece(*this, p, s);
-    }
-
     Color piece_color = p.color();
 
     Bitboard& new_color_bb  = color_bb_ref(piece_color);
@@ -395,9 +380,6 @@ inline void Board::piece_added(Square s, Piece p) {
 template <bool DO_ZOB, bool DO_PINS_AND_CHECKS>
 inline void Board::piece_removed(Square s) {
     Piece prev_piece = piece_at(s);
-    if (m_listener.on_remove_piece) {
-        m_listener.on_remove_piece(*this, prev_piece, s);
-    }
 
     Bitboard& prev_piece_bb = piece_bb_ref(prev_piece);
     Bitboard& prev_color_bb = color_bb_ref(prev_piece.color());

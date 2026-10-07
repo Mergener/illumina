@@ -17,7 +17,9 @@ CMakeSettings.json
 data/*
 out/*
 temp/*
+tmp/*
 builds/*
 build/*
 openbench/build/*
 cmake-build-*
+tmp/*

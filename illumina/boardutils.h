@@ -27,10 +27,15 @@ Bitboard discovered_attacks(const Board& board,
                             Square source,
                             Square dest);
 
-/*
+/**
  * Returns the bitboard of non-pawn pieces, excluding kings as well.
  */
 Bitboard non_pawn_bb(const Board& board);
+
+/**
+ * Returns all squares attacked by pieces of color c in a given board.
+ */
+Bitboard all_attacked_squares(const Board& board, Color c);
 
 } // illumina
 

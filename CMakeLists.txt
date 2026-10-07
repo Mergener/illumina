@@ -3,7 +3,7 @@ project(illumina)
 set(CMAKE_CXX_STANDARD 17)
 
 # Set illumina version.
-set(ILLUMINA_VERSION_MAJOR 3)
+set(ILLUMINA_VERSION_MAJOR 4)
 set(ILLUMINA_VERSION_MINOR 0)
 
 # Setup important paths.
@@ -14,11 +14,13 @@ set(ILLUMINA_EXT_DIR ${CMAKE_SOURCE_DIR}/ext)
 
 # We might want to use a custom net.
 if(NOT DEFINED NNUE_PATH)
-    set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.json)
+    set(NNUE_PATH ${CMAKE_SOURCE_DIR}/illumina/net/net.bin)
 endif()
 message(STATUS "NNUE_PATH is set to: ${NNUE_PATH}")
 
 # Add some compilation options.
+option(BUILD_TESTING "Build Illumina's test suite." ON)
+
 option(TUNING "Tunable values become runtime variables that can be changed via UCI options." OFF)
 if (TUNING)
     add_definitions(-DTUNING_BUILD)
@@ -99,27 +101,47 @@ if (   CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
 endif()
 
 # Define our supported architectures here.
-set(ARCHS bmi2 avx2 base)
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" TARGET_PROCESSOR)
+if(TARGET_PROCESSOR MATCHES "^(x86_64|amd64|x64)$")
+    set(ARCHS x64_avx512 x64_bmi2 x64_avx2 x64_sse2 x64_base)
+elseif(TARGET_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(ARCHS arm64_neon)
+else()
+    message(FATAL_ERROR
+            "Unsupported target architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 
 # General setup.
-enable_testing()
 include_directories(${CMAKE_SOURCE_DIR}/ext/include)
 
 # Define architecture specific options here.
 function(apply_arch_options TARGET ARCH)
-    if (${ARCH} STREQUAL bmi2)
+    if (${ARCH} STREQUAL x64_avx512)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            target_compile_options(${TARGET} PRIVATE -mavx512f -mavx512bw)
+            target_compile_definitions(${TARGET} PRIVATE HAS_AVX512)
+        endif()
+        apply_arch_options(${TARGET} x64_bmi2)
+    elseif(${ARCH} STREQUAL x64_bmi2)
         if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             target_compile_options(${TARGET} PRIVATE -mbmi2)
             target_compile_definitions(${TARGET} PRIVATE HAS_PEXT)
         endif()
-        apply_arch_options(${TARGET} avx2)
-    elseif(${ARCH} STREQUAL avx2)
+        apply_arch_options(${TARGET} x64_avx2)
+    elseif(${ARCH} STREQUAL x64_avx2)
         if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             target_compile_options(${TARGET} PRIVATE -mavx2)
             target_compile_definitions(${TARGET} PRIVATE HAS_AVX2)
         endif()
-    elseif(${ARCH} STREQUAL base)
+    elseif(${ARCH} STREQUAL x64_sse2)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            target_compile_options(${TARGET} PRIVATE -msse2)
+            target_compile_definitions(${TARGET} PRIVATE HAS_SSE2)
+        endif()
+    elseif(${ARCH} STREQUAL x64_base)
         # Do nothing
+    elseif(${ARCH} STREQUAL arm64_neon)
+        target_compile_definitions(${TARGET} PRIVATE NEON)
     else()
         message("Unsupported architecture ${ARCH}")
     endif()
@@ -144,7 +166,6 @@ add_definitions(-DILLUMINA_VERSION_MINOR=${ILLUMINA_VERSION_MINOR})
 add_definitions(-DILLUMINA_VERSION_NAME=\"${ILLUMINA_VERSION_NAME}\")
 
 # Check for available modules
-set(HAS_LITETEST false)
 set(HAS_SQLITE   false)
 
 # Add external dependencies.
@@ -155,10 +176,19 @@ add_subdirectory(illumina)
 add_subdirectory(cli)
 add_subdirectory(datagen)
 
-if (HAS_LITETEST)
+if (BUILD_TESTING)
+    enable_testing()
+
+    include(FetchContent)
+    FetchContent_Declare(
+        doctest
+        GIT_REPOSITORY https://github.com/doctest/doctest.git
+        GIT_TAG v2.5.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(doctest)
+
     add_subdirectory(tests)
-else()
-    message("Litetest submodule not found; tests won't be compiled")
 endif()
 
 if (INCLUDE_TRACING_MODULE AND NOT HAS_SQLITE)

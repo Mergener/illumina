@@ -41,7 +41,8 @@ struct SearchSettings {
     std::optional<i64>   black_inc;
     std::optional<i64>   move_time;
     std::optional<std::vector<Move>> search_moves;
-    ISearchTracer* tracer = nullptr;
+    SearchTracer* tracer = nullptr;
+    bool shallow_search_hint = false;
 };
 
 struct SearchResults {
@@ -81,6 +82,8 @@ private:
     std::unique_ptr<CorrectionHistory> m_corr_hist = std::make_unique<CorrectionHistory>();
 
     TimeManager m_tm;
+
+    std::unique_ptr<MoveHistory> m_main_worker_history = std::make_unique<MoveHistory>();
 
     struct Listeners {
         PVFinishListener    pv_finish = [](PVResults&) {};
