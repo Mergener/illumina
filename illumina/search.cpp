@@ -703,7 +703,6 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
         static_eval = corrhist.correct_eval(m_board, raw_eval);
         stack_node->has_static_eval = true;
         TRACE_SET(Traceable::PAWN_CORRHIST, corrhist.pawn.get(m_board.hash_key(), m_board.color_to_move()) / CORRHIST_GRAIN);
-        TRACE_SET(Traceable::NON_PAWN_CORRHIST, corrhist.non_pawn.get(m_board.hash_key(), m_board.color_to_move()) / CORRHIST_GRAIN);
     }
     else {
         raw_eval    = 0;

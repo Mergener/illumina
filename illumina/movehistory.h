@@ -86,7 +86,6 @@ struct CorrectionHistoryTable {
 
 struct CorrectionHistory {
     CorrectionHistoryTable pawn;
-    CorrectionHistoryTable non_pawn;
 
     CorrectionHistory();
 
@@ -200,7 +199,6 @@ inline void CorrectionHistory::update_all(const Board& board, Depth depth, int d
     int depth_score = std::min(depth * depth + 2 * depth + 1, 128);
 
     pawn.update(board.pawn_key(), color, depth_score, diff);
-    non_pawn.update(board.non_pawn_key(), color, depth_score, diff);
 }
 
 inline int CorrectionHistoryTable::get(ui64 key, Color color) const {
@@ -225,8 +223,7 @@ inline int CorrectionHistory::correct_eval(const Board& board, int static_eval) 
     }
 
     Color color = board.color_to_move();
-    int unscaled_correction = pawn.get(board.pawn_key(), color)
-                            + non_pawn.get(board.non_pawn_key(), color);
+    int unscaled_correction = pawn.get(board.pawn_key(), color);
 
     return std::clamp(static_eval + unscaled_correction / CORRHIST_GRAIN,
                       -KNOWN_WIN, KNOWN_WIN);
@@ -238,7 +235,6 @@ inline void CorrectionHistoryTable::reset() {
 
 inline void CorrectionHistory::reset() {
     pawn.reset();
-    non_pawn.reset();
 }
 
 inline CorrectionHistory::CorrectionHistory() {
