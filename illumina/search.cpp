@@ -50,6 +50,7 @@ public:
     const Searcher::Listeners& listeners() const;
     const RootInfo&            root_info() const;
     const std::vector<std::unique_ptr<SearchWorker>>& helper_workers() const;
+    CorrectionHistory&         corr_hist() const;
 
     /**
      * Time, in milliseconds, since this worker started searching.
@@ -65,7 +66,8 @@ public:
                   const Searcher::Listeners* listeners,
                   const RootInfo* root_info,
                   const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
-                  TimeManager* time_manager);
+                  TimeManager* time_manager,
+                  CorrectionHistory* corr_hist);
 
 private:
     TranspositionTable*        m_tt;
@@ -75,6 +77,7 @@ private:
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
     const std::vector<std::unique_ptr<SearchWorker>>* m_helper_workers;
+    CorrectionHistory* m_corrhist;
 };
 
 TranspositionTable& SearchContext::tt() const {
@@ -89,6 +92,10 @@ ui64 SearchContext::elapsed() const {
     return delta_ms(now(), m_search_start);
 }
 
+CorrectionHistory& SearchContext::corr_hist() const {
+    return *m_corrhist;
+}
+
 const Searcher::Listeners& SearchContext::listeners() const {
     return *m_listeners;
 }
@@ -98,14 +105,16 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              const Searcher::Listeners* listeners,
                              const RootInfo* root_info,
                              const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
-                             TimeManager* time_manager)
+                             TimeManager* time_manager,
+                             CorrectionHistory* corr_hist)
         : m_tt(tt),
           m_listeners(listeners),
           m_root_info(root_info),
           m_stop(should_stop),
           m_time_manager(time_manager),
           m_search_start(now()),
-          m_helper_workers(helper_workers)
+          m_helper_workers(helper_workers),
+          m_corrhist(corr_hist)
 { }
 
 void SearchContext::stop_search() const {
@@ -318,7 +327,7 @@ SearchResults Searcher::search(const Board& board,
     std::vector<std::unique_ptr<MoveHistory>> secondary_histories;
     m_stop.store(false, std::memory_order::memory_order_seq_cst);
     m_tt.new_search();
-    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
+    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm, m_corr_hist.get());
 
     // Create main worker.
     SearchWorker main_worker(true, m_main_worker_history.get(), board, &context, &settings);
@@ -639,6 +648,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     Color us               = m_board.color_to_move();
     Depth ply              = stack_node->ply;
     Score& static_eval     = stack_node->static_eval;
+    CorrectionHistory& corrhist = m_context->corr_hist();
 
     // Probe from transposition table. This will allow us
     // to use information gathered in other searches (or transpositions)
@@ -690,10 +700,9 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
     Score raw_eval;
     if (!in_check) {
         raw_eval    = !found_in_tt ? evaluate() : tt_entry.static_eval();
-        static_eval = m_hist->correct_eval_with_corrhist(m_board, raw_eval);
+        static_eval = corrhist.correct_eval(m_board, raw_eval);
         stack_node->has_static_eval = true;
-        TRACE_SET(Traceable::PAWN_CORRHIST, m_hist->pawn_corrhist(m_board) / CORRHIST_GRAIN);
-        TRACE_SET(Traceable::NON_PAWN_CORRHIST, m_hist->non_pawn_corrhist(m_board) / CORRHIST_GRAIN);
+        TRACE_SET(Traceable::PAWN_CORRHIST, corrhist.pawn.get(m_board.hash_key(), m_board.color_to_move()) / CORRHIST_GRAIN);
     }
     else {
         raw_eval    = 0;
@@ -1125,7 +1134,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha >= static_eval) {
-                m_hist->update_corrhist(m_board, depth, alpha - static_eval);
+                corrhist.update_all(m_board, depth, alpha - static_eval);
             }
         } else if (alpha <= original_alpha) {
             // Couldn't raise alpha, score is an upperbound.
@@ -1140,7 +1149,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha <= static_eval) {
-                m_hist->update_corrhist(m_board, depth, alpha - static_eval);
+                corrhist.update_all(m_board, depth, alpha - static_eval);
             }
         } else {
             // We have an exact score.
@@ -1155,7 +1164,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
             if (   !in_check
                 && (best_move == MOVE_NULL || best_move.is_quiet())
                 && alpha >= static_eval) {
-                m_hist->update_corrhist(m_board, depth, alpha - static_eval);
+                corrhist.update_all(m_board, depth, alpha - static_eval);
             }
         }
     }
@@ -1203,7 +1212,7 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
     Score raw_eval = found_in_tt ? tt_entry.static_eval() : evaluate();
     Score stand_pat = raw_eval;
     if (!m_board.in_check()) {
-        stand_pat = m_hist->correct_eval_with_corrhist(m_board, stand_pat);
+        stand_pat = m_context->corr_hist().correct_eval(m_board, stand_pat);
     }
     TRACE_SET(Traceable::STATIC_EVAL, stand_pat);
 
