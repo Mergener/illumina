@@ -1191,6 +1191,17 @@ Score SearchWorker::quiescence_search(Depth ply, Score alpha, Score beta) {
             found_in_tt = false;
         }
         else {
+            if constexpr (PV_NODE) {
+                auto bt = tt_entry.bound_type();
+                auto score = tt_entry.score();
+                if (bt == BT_EXACT
+                    || (bt == BT_UPPERBOUND && score <= alpha)
+                    || (bt == BT_LOWERBOUND && score >= beta)) {
+                    TRACE_SET(Traceable::TT_CUTOFF, true);
+                    return score;
+                }
+            }
+
             // We're in qsearch, never search non capture moves.
             tt_move = tt_entry.move().is_capture()
                       ? tt_entry.move()
