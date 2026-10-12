@@ -79,6 +79,7 @@ private:
 
     std::atomic_bool m_stop = false;
     TranspositionTable m_tt;
+    std::unique_ptr<CorrectionHistory> m_corr_hist = std::make_unique<CorrectionHistory>();
 
     TimeManager m_tm;
 
