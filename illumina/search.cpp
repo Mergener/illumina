@@ -49,7 +49,7 @@ public:
     TranspositionTable&        tt() const;
     const Searcher::Listeners& listeners() const;
     const RootInfo&            root_info() const;
-    const std::vector<std::unique_ptr<SearchWorker>>& helper_workers() const;
+    const std::vector<std::atomic<SearchWorker*>>& helper_workers() const;
 
     /**
      * Time, in milliseconds, since this worker started searching.
@@ -64,7 +64,7 @@ public:
                   std::atomic<bool>* should_stop,
                   const Searcher::Listeners* listeners,
                   const RootInfo* root_info,
-                  const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
+                  const std::vector<std::atomic<SearchWorker*>>* helper_workers,
                   TimeManager* time_manager);
 
 private:
@@ -74,7 +74,7 @@ private:
     std::atomic<bool>*         m_stop;
     TimeManager*               m_time_manager;
     TimePoint                  m_search_start;
-    const std::vector<std::unique_ptr<SearchWorker>>* m_helper_workers;
+    const std::vector<std::atomic<SearchWorker*>>* m_helper_workers;
 };
 
 TranspositionTable& SearchContext::tt() const {
@@ -97,7 +97,7 @@ SearchContext::SearchContext(TranspositionTable* tt,
                              std::atomic<bool>* should_stop,
                              const Searcher::Listeners* listeners,
                              const RootInfo* root_info,
-                             const std::vector<std::unique_ptr<SearchWorker>>* helper_workers,
+                             const std::vector<std::atomic<SearchWorker*>>* helper_workers,
                              TimeManager* time_manager)
         : m_tt(tt),
           m_listeners(listeners),
@@ -120,7 +120,7 @@ const RootInfo& SearchContext::root_info() const {
     return *m_root_info;
 }
 
-const std::vector<std::unique_ptr<SearchWorker>>& SearchContext::helper_workers() const {
+const std::vector<std::atomic<SearchWorker*>>& SearchContext::helper_workers() const {
     return *m_helper_workers;
 }
 
@@ -187,7 +187,7 @@ private:
     Depth       m_sel_depth = 0;
 
     Score m_score = 0;
-    ui64  m_nodes = 0;
+    std::atomic<ui64> m_nodes = 0;
     Move  m_best_move = MOVE_NULL;
     Move  m_ponder_move = MOVE_NULL;
 
@@ -314,11 +314,16 @@ SearchResults Searcher::search(const Board& board,
     results.best_move = root_info.moves[0];
 
     // Create search context.
+    int n_helper_threads = std::max(1, settings.n_threads) - 1;
+    std::vector<std::atomic<SearchWorker*>> ready_workers(n_helper_threads);
+    for (auto& worker : ready_workers) {
+        worker.store(nullptr, std::memory_order_relaxed);
+    }
     std::vector<std::unique_ptr<SearchWorker>> secondary_workers;
     std::vector<std::unique_ptr<MoveHistory>> secondary_histories;
     m_stop.store(false, std::memory_order::memory_order_seq_cst);
     m_tt.new_search();
-    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &secondary_workers, &m_tm);
+    SearchContext context(&m_tt, &m_stop, &m_listeners, &root_info, &ready_workers, &m_tm);
 
     // Create main worker.
     SearchWorker main_worker(true, m_main_worker_history.get(), board, &context, &settings);
@@ -353,21 +358,19 @@ SearchResults Searcher::search(const Board& board,
         m_tm.stop();
     }
 
-    // Determine the number of helper threads to be used.
-    int n_helper_threads = std::max(1, settings.n_threads) - 1;
-
     // Fire secondary threads.
-    secondary_workers.clear();
     std::vector<std::thread> helper_threads;
     secondary_workers.resize(n_helper_threads);
     secondary_histories.resize(n_helper_threads);
     for (int i = 0; i < n_helper_threads; ++i) {
-        helper_threads.emplace_back([&secondary_workers, &secondary_histories, &board, &context, &settings, i]() {
-            auto history = std::make_unique<MoveHistory>();
-            auto worker = std::make_unique<SearchWorker>(false, history.get(), board, &context, &settings);
+        helper_threads.emplace_back([&secondary_workers, &secondary_histories, &ready_workers,
+                                     &board, &context, &settings, i]() {
+            secondary_histories[i] = std::make_unique<MoveHistory>();
+            secondary_workers[i] = std::make_unique<SearchWorker>(false, secondary_histories[i].get(),
+                                                                board, &context, &settings);
+            SearchWorker* worker = secondary_workers[i].get();
+            ready_workers[i].store(worker, std::memory_order_release);
             worker->iterative_deepening();
-            secondary_workers[i]   = std::move(worker);
-            secondary_histories[i] = std::move(history);
         });
     }
 
@@ -611,7 +614,7 @@ Score SearchWorker::negamax(Depth depth, Score alpha, Score beta, SearchNode* st
 
     // Make sure we count the root node.
     if constexpr (ROOT_NODE) {
-        m_nodes++;
+        m_nodes.fetch_add(1, std::memory_order_relaxed);
     }
 
     // Check if we must stop our search.
@@ -1343,7 +1346,8 @@ void SearchWorker::update_pv_results(const SearchNode* search_stack,
     pv_results.bound_type = bt;
 
     ui64 total_nodes = nodes();
-    for (const std::unique_ptr<SearchWorker>& worker: m_context->helper_workers()) {
+    for (const auto& w: m_context->helper_workers()) {
+        SearchWorker* worker = w.load(std::memory_order_acquire);
         if (worker == nullptr) {
             continue;
         }
@@ -1408,7 +1412,7 @@ Score SearchWorker::draw_score() const {
 template <bool TRACING>
 void SearchWorker::make_move(illumina::Move move) {
     TRACE_PUSH();
-    m_nodes++;
+    m_nodes.fetch_add(1, std::memory_order_relaxed);
     m_context->tt().prefetch(m_board.estimate_hash_key_after(move));
     m_eval.on_make_move(m_board, move);
     m_board.make_move(move);
@@ -1424,7 +1428,7 @@ void SearchWorker::undo_move() {
 template <bool TRACING>
 void SearchWorker::make_null_move() {
     TRACE_PUSH();
-    m_nodes++;
+    m_nodes.fetch_add(1, std::memory_order_relaxed);
     m_context->tt().prefetch(m_board.estimate_hash_key_after_null_move());
     m_eval.on_make_null_move(m_board);
 
@@ -1449,7 +1453,7 @@ Score SearchWorker::score() const {
 }
 
 ui64 SearchWorker::nodes() const {
-    return m_nodes;
+    return m_nodes.load(std::memory_order_relaxed);
 }
 
 Move SearchWorker::best_move() const {
